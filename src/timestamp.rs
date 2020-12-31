@@ -103,43 +103,43 @@ impl<T> DerefMut for Timestamped<T> {
     }
 }
 
-pub struct EarliestFirst<T>(Timestamped<T>);
+pub struct EarliestPrioritized<T>(Timestamped<T>);
 
-impl<T> From<Timestamped<T>> for EarliestFirst<T> {
+impl<T> From<Timestamped<T>> for EarliestPrioritized<T> {
     fn from(timestamp: Timestamped<T>) -> Self {
         Self(timestamp)
     }
 }
 
-impl<T> Deref for EarliestFirst<T> {
+impl<T> Deref for EarliestPrioritized<T> {
     type Target = Timestamped<T>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<T> DerefMut for EarliestFirst<T> {
+impl<T> DerefMut for EarliestPrioritized<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T> Ord for EarliestFirst<T> {
+impl<T> Ord for EarliestPrioritized<T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.timestamp().cmp(&other.timestamp())
+        self.timestamp().cmp(&other.timestamp()).reverse()
     }
 }
 
-impl<T> PartialOrd for EarliestFirst<T> {
+impl<T> PartialOrd for EarliestPrioritized<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T> PartialEq for EarliestFirst<T> {
+impl<T> PartialEq for EarliestPrioritized<T> {
     fn eq(&self, other: &Self) -> bool {
         self.timestamp() == other.timestamp()
     }
 }
 
-impl<T> Eq for EarliestFirst<T> {}
+impl<T> Eq for EarliestPrioritized<T> {}

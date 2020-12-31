@@ -4,7 +4,7 @@ use crate::{
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
     old_new::OldNew,
-    timestamp::{EarliestFirst, Timestamp, Timestamped},
+    timestamp::{EarliestPrioritized, Timestamp, Timestamped},
     world::{State, World},
     Config,
 };
@@ -253,7 +253,7 @@ pub struct ActiveClient<WorldType: World> {
 
     /// Buffers user commands from all players that are needed to be replayed after receiving the
     /// server's snapshot, since the server snapshot is behind the actual timestamp.
-    command_buffer: BinaryHeap<EarliestFirst<WorldType::CommandType>>,
+    command_buffer: BinaryHeap<EarliestPrioritized<WorldType::CommandType>>,
 
     config: Config,
 }

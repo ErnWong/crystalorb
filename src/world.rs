@@ -1,6 +1,6 @@
 use crate::{
     command::Command,
-    timestamp::{EarliestFirst, Timestamp, Timestamped},
+    timestamp::{EarliestPrioritized, Timestamp, Timestamped},
 };
 use std::{collections::BinaryHeap, fmt::Debug};
 use turbulence::message_channels::ChannelMessage;
@@ -23,7 +23,7 @@ pub trait World: Default + Send + Sync + 'static {
 impl<WorldType: World> Timestamped<WorldType> {
     pub fn apply_stale_commands(
         &mut self,
-        command_buffer: &mut BinaryHeap<EarliestFirst<WorldType::CommandType>>,
+        command_buffer: &mut BinaryHeap<EarliestPrioritized<WorldType::CommandType>>,
     ) {
         while let Some(command) = command_buffer.peek() {
             if command.timestamp() > self.timestamp() {
@@ -37,7 +37,7 @@ impl<WorldType: World> Timestamped<WorldType> {
     pub fn fast_forward_to_timestamp(
         &mut self,
         timestamp: &Timestamp,
-        command_buffer: &mut BinaryHeap<EarliestFirst<WorldType::CommandType>>,
+        command_buffer: &mut BinaryHeap<EarliestPrioritized<WorldType::CommandType>>,
     ) {
         while self.timestamp() < *timestamp {
             self.apply_stale_commands(command_buffer);

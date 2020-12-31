@@ -3,7 +3,7 @@ use crate::{
     events::ClientConnectionEvent,
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
-    timestamp::{EarliestFirst, Timestamp, Timestamped},
+    timestamp::{EarliestPrioritized, Timestamp, Timestamped},
     world::World,
     Config,
 };
@@ -15,7 +15,7 @@ use std::{collections::BinaryHeap, convert::TryInto, marker::PhantomData, net::S
 
 pub struct Server<WorldType: World> {
     world: Timestamped<WorldType>,
-    commands: BinaryHeap<EarliestFirst<WorldType::CommandType>>,
+    commands: BinaryHeap<EarliestPrioritized<WorldType::CommandType>>,
     timestep_overshoot_seconds: f32,
     seconds_since_last_snapshot: f32,
     config: Config,
@@ -131,8 +131,10 @@ pub fn server_system<WorldType: World>(
         }
     }
 
-    let mut new_commands: BinaryHeap<(EarliestFirst<WorldType::CommandType>, ConnectionHandle)> =
-        Default::default();
+    let mut new_commands: BinaryHeap<(
+        EarliestPrioritized<WorldType::CommandType>,
+        ConnectionHandle,
+    )> = Default::default();
     for (handle, connection) in net.connections.iter_mut() {
         let channels = connection.channels().unwrap();
         while let Some(command) = channels.recv::<Timestamped<WorldType::CommandType>>() {
