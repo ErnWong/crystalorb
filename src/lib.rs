@@ -3,6 +3,7 @@
 pub mod channels;
 pub mod client;
 pub mod command;
+pub mod events;
 pub mod fixed_timestepper;
 pub mod old_new;
 pub mod server;

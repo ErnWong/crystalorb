@@ -1,5 +1,6 @@
 use crate::{
     channels::{network_setup, ClockSyncMessage},
+    events::ClientConnectionEvent,
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
     timestamp::{EarliestFirst, Timestamp, Timestamped},
@@ -7,8 +8,10 @@ use crate::{
     Config,
 };
 use bevy::prelude::*;
-use bevy_networking_turbulence::{ConnectionHandle, NetworkResource, NetworkingPlugin};
-use std::{collections::BinaryHeap, marker::PhantomData, net::SocketAddr};
+use bevy_networking_turbulence::{
+    ConnectionHandle, NetworkEvent, NetworkResource, NetworkingPlugin,
+};
+use std::{collections::BinaryHeap, convert::TryInto, marker::PhantomData, net::SocketAddr};
 
 pub struct Server<WorldType: World> {
     world: Timestamped<WorldType>,
@@ -93,11 +96,25 @@ impl<WorldType: World> FixedTimestepper for Server<WorldType> {
     }
 }
 
+#[derive(Default)]
+pub struct ServerSystemState {
+    network_event_reader: EventReader<NetworkEvent>,
+}
+
 pub fn server_system<WorldType: World>(
+    mut state: Local<ServerSystemState>,
     mut server: ResMut<Server<WorldType>>,
     time: Res<Time>,
     mut net: ResMut<NetworkResource>,
+    network_events: Res<Events<NetworkEvent>>,
+    mut client_connection_events: ResMut<Events<ClientConnectionEvent>>,
 ) {
+    for network_event in state.network_event_reader.iter(&network_events) {
+        if let Ok(client_connection_event) = network_event.try_into() {
+            client_connection_events.send(client_connection_event);
+        }
+    }
+
     let mut new_commands: BinaryHeap<(EarliestFirst<WorldType::CommandType>, ConnectionHandle)> =
         Default::default();
     for (handle, connection) in net.connections.iter_mut() {
@@ -152,6 +169,7 @@ impl<WorldType: World> NetworkedPhysicsServerPlugin<WorldType> {
 impl<WorldType: World> Plugin for NetworkedPhysicsServerPlugin<WorldType> {
     fn build(&self, app: &mut AppBuilder) {
         app.add_plugin(NetworkingPlugin)
+            .add_event::<ClientConnectionEvent>()
             .add_resource(Server::<WorldType>::new(self.config.clone()))
             .add_startup_system(network_setup::<WorldType>.system())
             .add_startup_system(server_setup::<WorldType>.system())
