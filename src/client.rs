@@ -158,6 +158,10 @@ impl<WorldType: World> ReadyClient<WorldType> {
         net.broadcast_message(command);
     }
 
+    pub fn world_state(&self) -> &WorldType::StateType {
+        &self.client.display_state
+    }
+
     fn update(&mut self, time: &Time, net: &mut NetworkResource) -> bool {
         self.client.update(time, net);
         false
