@@ -43,6 +43,32 @@ impl<WorldType: World> Server<WorldType> {
             .set_timestamp(timestamp - self.config.lag_compensation_frame_count());
     }
 
+    fn apply_validated_command(
+        &mut self,
+        command: Timestamped<WorldType::CommandType>,
+        command_source: Option<ConnectionHandle>,
+        net: &mut NetworkResource,
+    ) {
+        // Apply this command to our world later on.
+        self.commands.push(command.clone().into());
+
+        // Relay command to every other client.
+        for (handle, connection) in net.connections.iter_mut() {
+            // Don't send it back to the same client if there is one.
+            if let Some(source_handle) = command_source {
+                if *handle == source_handle {
+                    continue;
+                }
+            }
+            let channels = connection.channels().unwrap();
+            let result = channels.send(command.clone());
+            channels.flush::<Timestamped<WorldType::CommandType>>();
+            if let Some(message) = result {
+                error!("Failed to relay command to [{}]: {:?}", handle, message);
+            }
+        }
+    }
+
     fn receive_command(
         &mut self,
         command: Timestamped<WorldType::CommandType>,
@@ -53,22 +79,12 @@ impl<WorldType: World> Server<WorldType> {
             && command.timestamp() >= self.world.timestamp()
             && command.timestamp() <= self.timestamp()
         {
-            // Apply this command to our world later on.
-            self.commands.push(command.clone().into());
-
-            // Relay command to every other client.
-            for (handle, connection) in net.connections.iter_mut() {
-                // Don't send it back to the same client.
-                if *handle != command_source {
-                    let channels = connection.channels().unwrap();
-                    let result = channels.send(command.clone());
-                    channels.flush::<Timestamped<WorldType::CommandType>>();
-                    if let Some(message) = result {
-                        error!("Failed to relay command to [{}]: {:?}", handle, message);
-                    }
-                }
-            }
+            self.apply_validated_command(command, Some(command_source), net);
         }
+    }
+
+    pub fn issue_command(&mut self, command: WorldType::CommandType, net: &mut NetworkResource) {
+        self.apply_validated_command(Timestamped::new(command, self.timestamp()), None, net);
     }
 
     fn send_snapshot(&mut self, time: &Time, net: &mut NetworkResource) {
