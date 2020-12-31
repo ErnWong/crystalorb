@@ -145,19 +145,28 @@ pub fn server_system<WorldType: World>(
         EarliestPrioritized<WorldType::CommandType>,
         ConnectionHandle,
     )> = Default::default();
+    let mut clock_syncs = Vec::new();
     for (handle, connection) in net.connections.iter_mut() {
         let channels = connection.channels().unwrap();
         while let Some(command) = channels.recv::<Timestamped<WorldType::CommandType>>() {
+            info!(
+                "Received command from client_id: {} - {:?}",
+                *handle, command
+            );
             new_commands.push((command.into(), *handle));
         }
         while let Some(mut clock_sync_message) = channels.recv::<ClockSyncMessage>() {
+            info!("Replying to clock sync message. client_id: {}", handle);
             clock_sync_message.server_seconds_since_startup = time.seconds_since_startup();
             clock_sync_message.client_id = *handle as usize;
-            channels.send(clock_sync_message);
+            clock_syncs.push((*handle, clock_sync_message));
         }
     }
     while let Some((command, handle)) = new_commands.pop() {
         server.receive_command(command.clone(), handle, &mut *net);
+    }
+    for (handle, clock_sync_message) in clock_syncs {
+        net.send_message(handle, clock_sync_message).unwrap();
     }
     server.advance(time.delta_seconds());
 
