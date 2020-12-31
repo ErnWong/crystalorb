@@ -15,8 +15,8 @@ pub trait World: Default + Send + Sync + 'static {
 
     fn apply_command(&mut self, command: &Self::CommandType);
     fn step(&mut self);
-    fn set_state(&mut self, target_state: &Self::StateType);
-    fn state(&self) -> &Self::StateType;
+    fn set_state(&mut self, target_state: Self::StateType);
+    fn state(&self) -> Self::StateType;
 }
 
 impl<WorldType: World> Timestamped<WorldType> {
@@ -46,6 +46,6 @@ impl<WorldType: World> Timestamped<WorldType> {
 
     pub fn set_state(&mut self, snapshot: Timestamped<WorldType::StateType>) {
         self.set_timestamp(snapshot.timestamp());
-        self.inner_mut().set_state(snapshot.inner());
+        self.inner_mut().set_state(snapshot.inner().clone());
     }
 }

@@ -290,8 +290,8 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
         self.states.swap();
         self.states
             .set_new(WorldType::StateType::from_interpolation(
-                old_world.state(),
-                new_world.state(),
+                &old_world.state(),
+                &new_world.state(),
                 self.old_new_interpolation_t,
             ));
 
