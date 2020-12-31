@@ -49,4 +49,8 @@ impl<WorldType: World> Timestamped<WorldType> {
         self.set_timestamp(snapshot.timestamp());
         self.inner_mut().set_state(snapshot.inner().clone());
     }
+
+    pub fn state(&self) -> Timestamped<WorldType::StateType> {
+        Timestamped::new(self.inner().state(), self.timestamp())
+    }
 }
