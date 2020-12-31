@@ -1,5 +1,5 @@
 use crate::{
-    channels::ClockSyncMessage,
+    channels::{network_setup, ClockSyncMessage},
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
     old_new::OldNew,
@@ -346,6 +346,7 @@ impl<WorldType: World> Plugin for NetworkedPhysicsClientPlugin<WorldType> {
     fn build(&self, app: &mut AppBuilder) {
         app.add_plugin(NetworkingPlugin)
             .add_resource(Client::<WorldType>::new(self.config.clone()))
+            .add_startup_system(network_setup::<WorldType>.system())
             .add_startup_system(client_setup::<WorldType>.system())
             .add_system(client_system::<WorldType>.system());
     }
