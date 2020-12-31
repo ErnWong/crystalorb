@@ -13,7 +13,7 @@ pub trait World: Default + Send + Sync + 'static {
     type CommandType: Command;
     type StateType: State;
 
-    fn apply_command(&mut self, command: &Timestamped<Self::CommandType>);
+    fn apply_command(&mut self, command: &Self::CommandType);
     fn step(&mut self);
     fn set_state(&mut self, target_state: &Self::StateType);
     fn state(&self) -> &Self::StateType;
@@ -28,7 +28,7 @@ impl<WorldType: World> Timestamped<WorldType> {
             if command.timestamp() > self.timestamp() {
                 break;
             }
-            self.apply_command(&command);
+            self.apply_command(command.inner());
             command_buffer.pop();
         }
     }

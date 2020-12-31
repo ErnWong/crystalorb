@@ -248,8 +248,8 @@ impl<WorldType: World> ActiveClient<WorldType> {
 
     fn receive_command(&mut self, command: Timestamped<WorldType::CommandType>) {
         let (old_world, new_world) = self.worlds.get_mut();
-        old_world.apply_command(&command);
-        new_world.apply_command(&command);
+        old_world.apply_command(command.inner());
+        new_world.apply_command(command.inner());
         self.command_buffer.push(command.into());
     }
 
