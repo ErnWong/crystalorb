@@ -46,7 +46,9 @@ impl<WorldType: World> Server<WorldType> {
         command_source: ConnectionHandle,
         net: &mut NetworkResource,
     ) {
-        if command.timestamp() >= self.world.timestamp() && command.timestamp() <= self.timestamp()
+        if WorldType::command_is_valid(command.inner(), command_source as usize)
+            && command.timestamp() >= self.world.timestamp()
+            && command.timestamp() <= self.timestamp()
         {
             // Apply this command to our world later on.
             self.commands.push(command.clone().into());

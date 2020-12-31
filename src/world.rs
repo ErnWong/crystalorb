@@ -13,6 +13,7 @@ pub trait World: Default + Send + Sync + 'static {
     type CommandType: Command;
     type StateType: State;
 
+    fn command_is_valid(command: &Self::CommandType, client_id: usize) -> bool;
     fn apply_command(&mut self, command: &Self::CommandType);
     fn step(&mut self);
     fn set_state(&mut self, target_state: Self::StateType);
