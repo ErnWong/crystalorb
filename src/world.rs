@@ -1,5 +1,6 @@
 use crate::{
     command::Command,
+    fixed_timestepper::Stepper,
     timestamp::{EarliestPrioritized, Timestamp, Timestamped},
 };
 use std::{collections::BinaryHeap, fmt::Debug};
@@ -9,13 +10,12 @@ pub trait State: Default + ChannelMessage + Debug + Clone {
     fn from_interpolation(state1: &Self, state2: &Self, t: f32) -> Self;
 }
 
-pub trait World: Default + Send + Sync + 'static {
+pub trait World: Stepper + Default + Send + Sync + 'static {
     type CommandType: Command;
     type StateType: State;
 
     fn command_is_valid(command: &Self::CommandType, client_id: usize) -> bool;
     fn apply_command(&mut self, command: &Self::CommandType);
-    fn step(&mut self);
     fn set_state(&mut self, target_state: Self::StateType);
     fn state(&self) -> Self::StateType;
 }
