@@ -1,3 +1,5 @@
+#![feature(const_fn_floating_point_arithmetic)]
+
 pub mod channels;
 pub mod client;
 pub mod command;
@@ -38,6 +40,16 @@ pub struct Config {
 }
 
 impl Config {
+    pub const fn new() -> Self {
+        Self {
+            lag_compensation_latency: 0.2,
+            interpolation_latency: 0.1,
+            timestep_seconds: 1.0 / 60.0,
+            timestamp_sync_needed_sample_count: 20,
+            initial_clock_sync_period: 0.2,
+            snapshot_send_period: 0.2,
+        }
+    }
     pub fn lag_compensation_frame_count(&self) -> i16 {
         return (self.lag_compensation_latency / self.timestep_seconds).round() as i16;
     }
@@ -49,14 +61,7 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self {
-            lag_compensation_latency: 0.2,
-            interpolation_latency: 0.1,
-            timestep_seconds: 1.0 / 60.0,
-            timestamp_sync_needed_sample_count: 20,
-            initial_clock_sync_period: 0.2,
-            snapshot_send_period: 0.2,
-        }
+        Self::new()
     }
 }
 
