@@ -38,9 +38,14 @@ impl<WorldType: World> Server<WorldType> {
 
     fn update_timestamp(&mut self, time: &Time) {
         let timestamp =
-            Timestamp::from_seconds(time.seconds_since_startup(), self.config.timestep_seconds);
-        self.world
-            .set_timestamp(timestamp - self.config.lag_compensation_frame_count());
+            Timestamp::from_seconds(time.seconds_since_startup(), self.config.timestep_seconds)
+                - self.config.lag_compensation_frame_count();
+        info!(
+            "Updating server world timestamp to {:?} (note: lag compensation frame count = {})",
+            timestamp,
+            self.config.lag_compensation_frame_count()
+        );
+        self.world.set_timestamp(timestamp);
     }
 
     fn apply_validated_command(
@@ -90,6 +95,10 @@ impl<WorldType: World> Server<WorldType> {
     fn send_snapshot(&mut self, time: &Time, net: &mut NetworkResource) {
         self.seconds_since_last_snapshot += time.delta_seconds();
         if self.seconds_since_last_snapshot > self.config.snapshot_send_period {
+            info!(
+                "Broadcasting snapshot at timestamp: {:?}",
+                self.world.timestamp()
+            );
             self.seconds_since_last_snapshot = 0.0;
             net.broadcast_message(self.world.state());
         }
@@ -127,6 +136,7 @@ pub fn server_system<WorldType: World>(
 ) {
     for network_event in state.network_event_reader.iter(&network_events) {
         if let Ok(client_connection_event) = network_event.try_into() {
+            info!("Connection event: {:?}", client_connection_event);
             client_connection_events.send(client_connection_event);
         }
     }

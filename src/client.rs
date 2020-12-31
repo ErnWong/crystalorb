@@ -77,6 +77,7 @@ pub struct SyncingInitialTimestampClient<WorldType: World> {
 
 impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
     fn new(config: Config) -> Self {
+        info!("Syncing timestamp");
         SyncingInitialTimestampClient {
             config,
             server_seconds_offset_sum: 0.0,
@@ -94,6 +95,10 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
                 let corresponding_client_time =
                     (sync.client_send_seconds_since_startup + received_time) / 2.0;
                 let offset = sync.server_seconds_since_startup - corresponding_client_time;
+                info!(
+                    "Received clock sync message. ClientId: {}. Estimated clock offset: {}",
+                    sync.client_id, offset,
+                );
                 self.server_seconds_offset_sum += offset;
                 self.sample_count += 1;
                 self.client_id = sync.client_id;
@@ -103,6 +108,7 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
         self.seconds_since_last_send += time.delta_seconds();
         if self.seconds_since_last_send > self.config.initial_clock_sync_period {
             self.seconds_since_last_send = 0.0;
+            info!("Sending clock sync message");
             net.broadcast_message(ClockSyncMessage {
                 client_send_seconds_since_startup: time.seconds_since_startup(),
                 server_seconds_since_startup: 0.0,
@@ -124,9 +130,7 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
             let initial_timestamp =
                 Timestamp::from_seconds(server_time, self.config.timestep_seconds);
             Some(ClientState::SyncingInitialState(
-                SyncingInitialStateClient {
-                    client: ActiveClient::new(self.config, initial_timestamp, self.client_id),
-                },
+                SyncingInitialStateClient::new(self.config, initial_timestamp, self.client_id),
             ))
         } else {
             None
@@ -139,6 +143,16 @@ pub struct SyncingInitialStateClient<WorldType: World> {
 }
 
 impl<WorldType: World> SyncingInitialStateClient<WorldType> {
+    fn new(config: Config, initial_timestamp: Timestamp, client_id: usize) -> Self {
+        info!(
+            "Initial timestamp: {:?}, client_id: {}",
+            initial_timestamp, client_id
+        );
+        info!("Syncing initial state");
+        Self {
+            client: ActiveClient::new(config, initial_timestamp, client_id),
+        }
+    }
     fn update(&mut self, time: &Time, net: &mut NetworkResource) -> bool {
         self.client.update(time, net);
         self.should_transition()
@@ -154,9 +168,7 @@ impl<WorldType: World> SyncingInitialStateClient<WorldType> {
     ) -> Option<ClientState<WorldType>> {
         if self.should_transition() {
             client_connection_events.send(ClientConnectionEvent::Connected(self.client.client_id));
-            Some(ClientState::Ready(ReadyClient {
-                client: self.client,
-            }))
+            Some(ClientState::Ready(ReadyClient::new(self.client)))
         } else {
             None
         }
@@ -185,6 +197,11 @@ impl<WorldType: World> ReadyClient<WorldType> {
 
     pub fn world_state(&self) -> &WorldType::StateType {
         &self.client.display_state
+    }
+
+    fn new(client: ActiveClient<WorldType>) -> Self {
+        info!("Client ready");
+        Self { client }
     }
 
     fn update(&mut self, time: &Time, net: &mut NetworkResource) -> bool {
@@ -296,6 +313,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
     }
 
     fn receive_command(&mut self, command: Timestamped<WorldType::CommandType>) {
+        info!("Received command");
         let (old_world, new_world) = self.worlds.get_mut();
         old_world.apply_command(command.inner());
         new_world.apply_command(command.inner());
@@ -303,6 +321,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
     }
 
     fn receive_snapshot(&mut self, snapshot: Timestamped<WorldType::StateType>) {
+        info!("Received snapshot");
         match &self.last_queued_snapshot_timestamp {
             None => self.queued_snapshot = Some(snapshot),
             Some(last_timestamp) => {
@@ -319,23 +338,33 @@ impl<WorldType: World> ActiveClient<WorldType> {
 
 impl<WorldType: World> Stepper for ActiveClient<WorldType> {
     fn step(&mut self) -> f32 {
+        info!("Step...");
+
         if self.old_new_interpolation_t < 1.0 {
             self.old_new_interpolation_t += self.config.interpolation_progress_per_frame();
             self.old_new_interpolation_t = self.old_new_interpolation_t.clamp(0.0, 1.0);
         } else if let Some(snapshot) = self.queued_snapshot.take() {
+            info!("Applying new snapshot from server");
             self.worlds.swap();
             let (old_world, new_world) = self.worlds.get_mut();
             new_world.set_state(snapshot);
+            info!(
+                "Fastforwarding old snapshot from timestamp {:?} to current timestamp {:?}",
+                new_world.timestamp(),
+                old_world.timestamp()
+            );
             new_world.fast_forward_to_timestamp(&old_world.timestamp(), &mut self.command_buffer);
             self.old_new_interpolation_t = 0.0;
         }
 
+        info!("Stepping each world by one step");
         let (old_world, new_world) = self.worlds.get_mut();
         old_world.step();
         new_world.step();
 
         // TODO: Optimizable - the states only need to be updated at the last step of the
         // current advance.
+        info!("Blending the old and new world states");
         self.states.swap();
         self.states
             .set_new(WorldType::StateType::from_interpolation(
@@ -350,16 +379,20 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
 
 impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
     fn advance(&mut self, delta_seconds: f32) {
+        info!("Advancing by {} seconds", delta_seconds);
         self.timestep_overshoot_seconds =
             fixed_timestepper::advance(self, delta_seconds, self.timestep_overshoot_seconds);
 
         // We display an interpolation between the undershot and overshot states.
+        info!("Interpolating undershot/overshot states");
         let (undershot_state, overshot_state) = self.states.get();
         self.display_state = WorldType::StateType::from_interpolation(
             undershot_state,
             overshot_state,
             1.0 - self.timestep_overshoot_seconds / self.config.timestep_seconds,
         );
+
+        info!("Done advancing");
     }
 }
 

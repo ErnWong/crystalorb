@@ -1,6 +1,7 @@
 use bevy_networking_turbulence::NetworkEvent;
 use std::convert::TryFrom;
 
+#[derive(Debug)]
 pub enum ClientConnectionEvent {
     Connected(usize),
     Disconnected(usize),
