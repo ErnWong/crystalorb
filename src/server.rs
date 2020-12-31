@@ -105,6 +105,7 @@ pub fn server_system<WorldType: World>(
         }
         while let Some(mut clock_sync_message) = channels.recv::<ClockSyncMessage>() {
             clock_sync_message.server_seconds_since_startup = time.seconds_since_startup();
+            clock_sync_message.client_id = *handle as usize;
             channels.send(clock_sync_message);
         }
     }

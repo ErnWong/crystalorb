@@ -11,6 +11,7 @@ use std::time::Duration;
 pub struct ClockSyncMessage {
     pub client_send_seconds_since_startup: f64,
     pub server_seconds_since_startup: f64,
+    pub client_id: usize,
 }
 
 pub fn network_setup<WorldType: World>(mut net: ResMut<NetworkResource>) {

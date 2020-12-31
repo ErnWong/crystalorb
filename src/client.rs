@@ -24,6 +24,7 @@ impl<WorldType: World> Client<WorldType> {
                     server_seconds_offset_sum: 0.0,
                     sample_count: 0,
                     seconds_since_last_send: 0.0,
+                    client_id: 0,
                     _world_type: PhantomData,
                 },
             )),
@@ -67,6 +68,7 @@ pub struct SyncingInitialTimestampClient<WorldType: World> {
     server_seconds_offset_sum: f64,
     sample_count: usize,
     seconds_since_last_send: f32,
+    client_id: usize,
     _world_type: PhantomData<WorldType>,
 }
 
@@ -81,6 +83,7 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
                 let offset = sync.server_seconds_since_startup - corresponding_client_time;
                 self.server_seconds_offset_sum += offset;
                 self.sample_count += 1;
+                self.client_id = sync.client_id;
             }
         }
 
@@ -90,6 +93,7 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
             net.broadcast_message(ClockSyncMessage {
                 client_send_seconds_since_startup: time.seconds_since_startup(),
                 server_seconds_since_startup: 0.0,
+                client_id: 0,
             });
         }
 
@@ -108,7 +112,7 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
                 Timestamp::from_seconds(server_time, self.config.timestep_seconds);
             Some(ClientState::SyncingInitialState(
                 SyncingInitialStateClient {
-                    client: ActiveClient::new(self.config, initial_timestamp),
+                    client: ActiveClient::new(self.config, initial_timestamp, self.client_id),
                 },
             ))
         } else {
@@ -151,6 +155,10 @@ impl<WorldType: World> ReadyClient<WorldType> {
         self.client.timestamp()
     }
 
+    pub fn client_id(&self) -> usize {
+        self.client.client_id
+    }
+
     /// Issue a command from this client's player to the world.
     pub fn issue_command(&mut self, command: WorldType::CommandType, net: &mut NetworkResource) {
         let command = Timestamped::new(command, self.timestamp());
@@ -169,6 +177,8 @@ impl<WorldType: World> ReadyClient<WorldType> {
 }
 
 pub struct ActiveClient<WorldType: World> {
+    client_id: usize,
+
     /// The next server snapshot that needs applying after the current latest snapshot has been
     /// fully interpolated into.
     queued_snapshot: Option<Timestamped<WorldType::StateType>>,
@@ -211,8 +221,9 @@ pub struct ActiveClient<WorldType: World> {
 }
 
 impl<WorldType: World> ActiveClient<WorldType> {
-    fn new(config: Config, initial_timestamp: Timestamp) -> Self {
+    fn new(config: Config, initial_timestamp: Timestamp, client_id: usize) -> Self {
         let mut client = Self {
+            client_id,
             queued_snapshot: None,
             last_queued_snapshot_timestamp: None,
             worlds: OldNew::new(),
