@@ -9,6 +9,7 @@ pub mod server;
 pub mod timestamp;
 pub mod world;
 
+pub use bevy_networking_turbulence as net;
 pub use client::NetworkedPhysicsClientPlugin;
 pub use server::NetworkedPhysicsServerPlugin;
 
