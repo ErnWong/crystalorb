@@ -1,9 +1,9 @@
 use crate::{
-    command::Command,
+    command::{Command, CommandBuffer},
     fixed_timestepper::Stepper,
-    timestamp::{EarliestPrioritized, Timestamp, Timestamped},
+    timestamp::{Timestamp, Timestamped},
 };
-use std::{collections::BinaryHeap, fmt::Debug};
+use std::fmt::Debug;
 use turbulence::message_channels::ChannelMessage;
 
 pub trait State: Default + ChannelMessage + Debug + Clone {
@@ -21,26 +21,21 @@ pub trait World: Stepper + Default + Send + Sync + 'static {
 }
 
 impl<WorldType: World> Timestamped<WorldType> {
-    pub fn apply_stale_commands(
-        &mut self,
-        command_buffer: &mut BinaryHeap<EarliestPrioritized<WorldType::CommandType>>,
-    ) {
-        while let Some(command) = command_buffer.peek() {
-            if command.timestamp() > self.timestamp() {
-                break;
+    pub fn apply_commands(&mut self, command_buffer: &CommandBuffer<WorldType::CommandType>) {
+        if let Some(commands) = command_buffer.commands_at(self.timestamp()) {
+            for command in commands {
+                self.apply_command(command);
             }
-            self.apply_command(command.inner());
-            command_buffer.pop();
         }
     }
 
     pub fn fast_forward_to_timestamp(
         &mut self,
         timestamp: &Timestamp,
-        command_buffer: &mut BinaryHeap<EarliestPrioritized<WorldType::CommandType>>,
+        command_buffer: &CommandBuffer<WorldType::CommandType>,
     ) {
         while self.timestamp() < *timestamp {
-            self.apply_stale_commands(command_buffer);
+            self.apply_commands(command_buffer);
             self.step();
         }
     }

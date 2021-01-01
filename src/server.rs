@@ -1,5 +1,6 @@
 use crate::{
     channels::{network_setup, ClockSyncMessage},
+    command::CommandBuffer,
     events::ClientConnectionEvent,
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
@@ -15,7 +16,7 @@ use std::{collections::BinaryHeap, convert::TryInto, marker::PhantomData, net::S
 
 pub struct Server<WorldType: World> {
     world: Timestamped<WorldType>,
-    commands: BinaryHeap<EarliestPrioritized<WorldType::CommandType>>,
+    command_buffer: CommandBuffer<WorldType::CommandType>,
     timestep_overshoot_seconds: f32,
     seconds_since_last_snapshot: f32,
     config: Config,
@@ -25,7 +26,7 @@ impl<WorldType: World> Server<WorldType> {
     fn new(config: Config) -> Self {
         Self {
             world: Default::default(),
-            commands: Default::default(),
+            command_buffer: CommandBuffer::new(),
             timestep_overshoot_seconds: 0.0,
             seconds_since_last_snapshot: 0.0,
             config,
@@ -55,7 +56,7 @@ impl<WorldType: World> Server<WorldType> {
         net: &mut NetworkResource,
     ) {
         // Apply this command to our world later on.
-        self.commands.push(command.clone().into());
+        self.command_buffer.insert(command.clone());
 
         // Relay command to every other client.
         for (handle, connection) in net.connections.iter_mut() {
@@ -109,7 +110,8 @@ impl<WorldType: World> Server<WorldType> {
 
 impl<WorldType: World> Stepper for Server<WorldType> {
     fn step(&mut self) -> f32 {
-        self.world.apply_stale_commands(&mut self.commands);
+        self.command_buffer.discard_old(self.world.timestamp());
+        self.world.apply_commands(&self.command_buffer);
         self.world.step();
 
         self.config.timestep_seconds

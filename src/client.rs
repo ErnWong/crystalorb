@@ -1,16 +1,17 @@
 use crate::{
     channels::{network_setup, ClockSyncMessage},
+    command::CommandBuffer,
     events::ClientConnectionEvent,
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
     old_new::OldNew,
-    timestamp::{EarliestPrioritized, Timestamp, Timestamped},
+    timestamp::{Timestamp, Timestamped},
     world::{State, World},
     Config,
 };
 use bevy::prelude::*;
 use bevy_networking_turbulence::{NetworkResource, NetworkingPlugin};
-use std::{collections::BinaryHeap, marker::PhantomData, net::SocketAddr};
+use std::{marker::PhantomData, net::SocketAddr};
 
 pub struct Client<WorldType: World> {
     state: Option<ClientState<WorldType>>,
@@ -270,7 +271,7 @@ pub struct ActiveClient<WorldType: World> {
 
     /// Buffers user commands from all players that are needed to be replayed after receiving the
     /// server's snapshot, since the server snapshot is behind the actual timestamp.
-    command_buffer: BinaryHeap<EarliestPrioritized<WorldType::CommandType>>,
+    command_buffer: CommandBuffer<WorldType::CommandType>,
 
     config: Config,
 }
@@ -286,7 +287,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
             states: OldNew::new(),
             display_state: Default::default(),
             timestep_overshoot_seconds: 0.0,
-            command_buffer: Default::default(),
+            command_buffer: CommandBuffer::new(),
             config,
         };
         let (old_world, new_world) = client.worlds.get_mut();
@@ -317,7 +318,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
         let (old_world, new_world) = self.worlds.get_mut();
         old_world.apply_command(command.inner());
         new_world.apply_command(command.inner());
-        self.command_buffer.push(command.into());
+        self.command_buffer.insert(command);
     }
 
     fn receive_snapshot(&mut self, snapshot: Timestamped<WorldType::StateType>) {
@@ -334,8 +335,9 @@ impl<WorldType: World> ActiveClient<WorldType> {
                 }
             }
         }
-        self.last_queued_snapshot_timestamp =
-            Some(self.queued_snapshot.as_ref().unwrap().timestamp());
+        if let Some(queued_snapshot) = &self.queued_snapshot {
+            self.last_queued_snapshot_timestamp = Some(queued_snapshot.timestamp());
+        }
     }
 }
 
@@ -356,7 +358,12 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
                 new_world.timestamp(),
                 old_world.timestamp()
             );
-            new_world.fast_forward_to_timestamp(&old_world.timestamp(), &mut self.command_buffer);
+
+            // We can now safely discard commands from the buffer that are older than
+            // this server snapshot.
+            self.command_buffer.discard_old(new_world.timestamp());
+
+            new_world.fast_forward_to_timestamp(&old_world.timestamp(), &self.command_buffer);
             self.old_new_interpolation_t = 0.0;
         }
 
