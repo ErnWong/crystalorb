@@ -13,7 +13,7 @@ pub struct Timestamp(Wrapping<i16>);
 impl Timestamp {
     pub fn from_seconds(seconds: f64, timestep_seconds: f32) -> Self {
         let frames_f64 = seconds / timestep_seconds as f64;
-        let frames_wrapped = (frames_f64 % 2.0f64.powi(16)) - 2.0f64.powi(8);
+        let frames_wrapped = (frames_f64 % 2.0f64.powi(16)) - 2.0f64.powi(15);
         Self(Wrapping(frames_wrapped as i16))
     }
 
