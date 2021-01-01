@@ -93,6 +93,10 @@ impl<WorldType: World> Server<WorldType> {
         self.apply_validated_command(Timestamped::new(command, self.timestamp()), None, net);
     }
 
+    pub fn world_state(&self) -> WorldType::StateType {
+        self.world.inner().state()
+    }
+
     fn send_snapshot(&mut self, time: &Time, net: &mut NetworkResource) {
         self.seconds_since_last_snapshot += time.delta_seconds();
         if self.seconds_since_last_snapshot > self.config.snapshot_send_period {
