@@ -36,6 +36,13 @@ impl Sub<i16> for Timestamp {
     }
 }
 
+impl Sub<Timestamp> for Timestamp {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
 impl Ord for Timestamp {
     fn cmp(&self, other: &Self) -> Ordering {
         let difference: Wrapping<i16> = self.0 - other.0;

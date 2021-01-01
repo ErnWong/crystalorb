@@ -96,8 +96,10 @@ impl<WorldType: World> Server<WorldType> {
         self.seconds_since_last_snapshot += time.delta_seconds();
         if self.seconds_since_last_snapshot > self.config.snapshot_send_period {
             info!(
-                "Broadcasting snapshot at timestamp: {:?}",
-                self.world.timestamp()
+                "Broadcasting snapshot at timestamp: {:?} (note: drift error: {:?})",
+                self.world.timestamp(),
+                Timestamp::from_seconds(time.seconds_since_startup(), self.config.timestep_seconds)
+                    - self.world.timestamp(),
             );
             self.seconds_since_last_snapshot = 0.0;
             net.broadcast_message(self.world.state());

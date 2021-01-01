@@ -321,7 +321,10 @@ impl<WorldType: World> ActiveClient<WorldType> {
     }
 
     fn receive_snapshot(&mut self, snapshot: Timestamped<WorldType::StateType>) {
-        info!("Received snapshot");
+        info!(
+            "Received snapshot: {:?} frames behind",
+            self.timestamp() - snapshot.timestamp()
+        );
         match &self.last_queued_snapshot_timestamp {
             None => self.queued_snapshot = Some(snapshot),
             Some(last_timestamp) => {
