@@ -131,7 +131,12 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
             let initial_timestamp =
                 Timestamp::from_seconds(server_time, self.config.timestep_seconds);
             Some(ClientState::SyncingInitialState(
-                SyncingInitialStateClient::new(self.config, initial_timestamp, self.client_id),
+                SyncingInitialStateClient::new(
+                    self.config,
+                    initial_timestamp,
+                    seconds_offset,
+                    self.client_id,
+                ),
             ))
         } else {
             None
@@ -144,14 +149,19 @@ pub struct SyncingInitialStateClient<WorldType: World> {
 }
 
 impl<WorldType: World> SyncingInitialStateClient<WorldType> {
-    fn new(config: Config, initial_timestamp: Timestamp, client_id: usize) -> Self {
+    fn new(
+        config: Config,
+        initial_timestamp: Timestamp,
+        server_seconds_offset: f64,
+        client_id: usize,
+    ) -> Self {
         info!(
             "Initial timestamp: {:?}, client_id: {}",
             initial_timestamp, client_id
         );
         info!("Syncing initial state");
         Self {
-            client: ActiveClient::new(config, initial_timestamp, client_id),
+            client: ActiveClient::new(config, initial_timestamp, server_seconds_offset, client_id),
         }
     }
     fn update(&mut self, time: &Time, net: &mut NetworkResource) -> bool {
@@ -235,6 +245,8 @@ impl<WorldType: World> ReadyClient<WorldType> {
 pub struct ActiveClient<WorldType: World> {
     client_id: usize,
 
+    server_seconds_offset: f64,
+
     /// The next server snapshot that needs applying after the current latest snapshot has been
     /// fully interpolated into.
     queued_snapshot: Option<Timestamped<WorldType::StateType>>,
@@ -277,9 +289,15 @@ pub struct ActiveClient<WorldType: World> {
 }
 
 impl<WorldType: World> ActiveClient<WorldType> {
-    fn new(config: Config, initial_timestamp: Timestamp, client_id: usize) -> Self {
+    fn new(
+        config: Config,
+        initial_timestamp: Timestamp,
+        server_seconds_offset: f64,
+        client_id: usize,
+    ) -> Self {
         let mut client = Self {
             client_id,
+            server_seconds_offset,
             queued_snapshot: None,
             last_queued_snapshot_timestamp: None,
             worlds: OldNew::new(),
@@ -300,6 +318,14 @@ impl<WorldType: World> ActiveClient<WorldType> {
         self.worlds.get().0.timestamp()
     }
 
+    /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
+    /// negative refers that our world needs to catchup in the next frame.
+    fn timestamp_drift_seconds(&self, time: &Time) -> f32 {
+        let server_time = time.seconds_since_startup() + self.server_seconds_offset;
+        (self.timestamp() - Timestamp::from_seconds(server_time, self.config.timestep_seconds))
+            .as_seconds(self.config.timestep_seconds)
+    }
+
     fn update(&mut self, time: &Time, net: &mut NetworkResource) {
         for (_, connection) in net.connections.iter_mut() {
             let channels = connection.channels().unwrap();
@@ -310,7 +336,11 @@ impl<WorldType: World> ActiveClient<WorldType> {
                 self.receive_snapshot(snapshot);
             }
         }
-        self.advance(time.delta_seconds());
+
+        // Note: Compensate for any drift.
+        let next_delta_seconds =
+            (time.delta_seconds() - self.timestamp_drift_seconds(time)).max(0.0);
+        self.advance(next_delta_seconds);
     }
 
     fn receive_command(&mut self, command: Timestamped<WorldType::CommandType>) {

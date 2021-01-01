@@ -37,6 +37,14 @@ impl<WorldType: World> Server<WorldType> {
         self.world.timestamp() + self.config.lag_compensation_frame_count()
     }
 
+    /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
+    /// negative refers that our world needs to catchup in the next frame.
+    fn timestamp_drift_seconds(&self, time: &Time) -> f32 {
+        (self.timestamp()
+            - Timestamp::from_seconds(time.seconds_since_startup(), self.config.timestep_seconds))
+        .as_seconds(self.config.timestep_seconds)
+    }
+
     fn update_timestamp(&mut self, time: &Time) {
         let timestamp =
             Timestamp::from_seconds(time.seconds_since_startup(), self.config.timestep_seconds)
@@ -101,10 +109,9 @@ impl<WorldType: World> Server<WorldType> {
         self.seconds_since_last_snapshot += time.delta_seconds();
         if self.seconds_since_last_snapshot > self.config.snapshot_send_period {
             info!(
-                "Broadcasting snapshot at timestamp: {:?} (note: drift error: {:?})",
+                "Broadcasting snapshot at timestamp: {:?} (note: drift error: {})",
                 self.world.timestamp(),
-                Timestamp::from_seconds(time.seconds_since_startup(), self.config.timestep_seconds)
-                    - self.world.timestamp(),
+                self.timestamp_drift_seconds(time),
             );
             self.seconds_since_last_snapshot = 0.0;
             net.broadcast_message(self.world.state());
@@ -176,7 +183,11 @@ pub fn server_system<WorldType: World>(
     for (handle, clock_sync_message) in clock_syncs {
         net.send_message(handle, clock_sync_message).unwrap();
     }
-    server.advance(time.delta_seconds());
+
+    // Note: Compensate for any drift.
+    let next_delta_seconds =
+        (time.delta_seconds() - server.timestamp_drift_seconds(&time)).max(0.0);
+    server.advance(next_delta_seconds);
 
     server.send_snapshot(&*time, &mut *net);
 }
