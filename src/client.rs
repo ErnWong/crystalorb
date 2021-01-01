@@ -341,7 +341,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
 
 impl<WorldType: World> Stepper for ActiveClient<WorldType> {
     fn step(&mut self) -> f32 {
-        info!("Step...");
+        trace!("Step...");
 
         if self.old_new_interpolation_t < 1.0 {
             self.old_new_interpolation_t += self.config.interpolation_progress_per_frame();
@@ -360,14 +360,14 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
             self.old_new_interpolation_t = 0.0;
         }
 
-        info!("Stepping each world by one step");
+        trace!("Stepping each world by one step");
         let (old_world, new_world) = self.worlds.get_mut();
         old_world.step();
         new_world.step();
 
         // TODO: Optimizable - the states only need to be updated at the last step of the
         // current advance.
-        info!("Blending the old and new world states");
+        trace!("Blending the old and new world states");
         self.states.swap();
         self.states
             .set_new(WorldType::StateType::from_interpolation(
@@ -382,12 +382,12 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
 
 impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
     fn advance(&mut self, delta_seconds: f32) {
-        info!("Advancing by {} seconds", delta_seconds);
+        trace!("Advancing by {} seconds", delta_seconds);
         self.timestep_overshoot_seconds =
             fixed_timestepper::advance(self, delta_seconds, self.timestep_overshoot_seconds);
 
         // We display an interpolation between the undershot and overshot states.
-        info!("Interpolating undershot/overshot states");
+        trace!("Interpolating undershot/overshot states");
         let (undershot_state, overshot_state) = self.states.get();
         self.display_state = WorldType::StateType::from_interpolation(
             undershot_state,
@@ -395,7 +395,7 @@ impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
             1.0 - self.timestep_overshoot_seconds / self.config.timestep_seconds,
         );
 
-        info!("Done advancing");
+        trace!("Done advancing");
     }
 }
 
