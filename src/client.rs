@@ -393,6 +393,9 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
             // this server snapshot.
             self.command_buffer.discard_old(new_world.timestamp());
 
+            if new_world.timestamp() > old_world.timestamp() {
+                warn!("Server's snapshot is newer than client!");
+            }
             new_world.fast_forward_to_timestamp(&old_world.timestamp(), &self.command_buffer);
             self.old_new_interpolation_t = 0.0;
         }
