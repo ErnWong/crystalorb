@@ -63,7 +63,7 @@ impl<WorldType: World> Server<WorldType> {
         command_source: Option<ConnectionHandle>,
         net: &mut NetworkResource,
     ) {
-        info!("Received command {:?}", command);
+        info!("Received command from {:?} - {:?}", command_source, command);
 
         // Apply this command to our world later on.
         self.command_buffer.insert(command.clone());
@@ -166,10 +166,6 @@ pub fn server_system<WorldType: World>(
     for (handle, connection) in net.connections.iter_mut() {
         let channels = connection.channels().unwrap();
         while let Some(command) = channels.recv::<Timestamped<WorldType::CommandType>>() {
-            info!(
-                "Received command from client_id: {} - {:?}",
-                *handle, command
-            );
             new_commands.push((command.into(), *handle));
         }
         while let Some(mut clock_sync_message) = channels.recv::<ClockSyncMessage>() {
