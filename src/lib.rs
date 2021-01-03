@@ -6,12 +6,16 @@ pub mod command;
 pub mod events;
 pub mod fixed_timestepper;
 pub mod old_new;
-pub mod server;
 pub mod timestamp;
 pub mod world;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod server;
+
 pub use bevy_networking_turbulence as net;
 pub use client::NetworkedPhysicsClientPlugin;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub use server::NetworkedPhysicsServerPlugin;
 
 #[derive(Clone)]

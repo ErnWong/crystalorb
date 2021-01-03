@@ -63,6 +63,8 @@ impl<WorldType: World> Server<WorldType> {
         command_source: Option<ConnectionHandle>,
         net: &mut NetworkResource,
     ) {
+        info!("Received command {:?}", command);
+
         // Apply this command to our world later on.
         self.command_buffer.insert(command.clone());
 
@@ -199,11 +201,9 @@ pub fn server_setup<WorldType: World>(
 ) {
     server.update_timestamp(&*time);
 
-    let ip_address =
-        bevy_networking_turbulence::find_my_ip_address().expect("Cannot find IP address");
     // TODO: Configurable port number and IP address.
-    let socket_address = SocketAddr::new(ip_address, 14192);
-    info!("Starting server");
+    let socket_address = SocketAddr::new("127.0.0.1".parse().unwrap(), 9001);
+    info!("Starting server - listening at {}", socket_address);
     net.listen(socket_address);
 }
 

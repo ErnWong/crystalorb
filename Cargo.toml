@@ -4,8 +4,19 @@ version = "0.1.0"
 authors = ["Ernest Wong <sudo@ernestwong.nz>"]
 edition = "2018"
 
+[features]
+default = [
+    "use-udp",
+]
+use-udp = [
+    "bevy_networking_turbulence/use-udp",
+]
+use-webrtc = [
+    "bevy_networking_turbulence/use-webrtc",
+]
+
 [dependencies]
 bevy = {version = "0.4", default-features = false}
-bevy_networking_turbulence = {git = "https://github.com/smokku/bevy_networking_turbulence", rev = "1bfe6f44397e510009a8a80abad1e105d875bf94"}
+bevy_networking_turbulence = {git = "https://github.com/smokku/bevy_networking_turbulence", rev = "1bfe6f44397e510009a8a80abad1e105d875bf94", default-features = false}
 turbulence = "0.3.0"
 serde="1.0.118"

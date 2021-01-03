@@ -449,11 +449,9 @@ pub fn client_system<WorldType: World>(
 }
 
 pub fn client_setup<WorldType: World>(mut net: ResMut<NetworkResource>) {
-    let ip_address =
-        bevy_networking_turbulence::find_my_ip_address().expect("Cannot find IP address");
     // TODO: Configurable port number and IP address.
-    let socket_address = SocketAddr::new(ip_address, 14192);
-    info!("Starting client");
+    let socket_address = SocketAddr::new("127.0.0.1".parse().unwrap(), 9001);
+    info!("Starting client - connecting to {}", socket_address);
     net.connect(socket_address);
 }
 
