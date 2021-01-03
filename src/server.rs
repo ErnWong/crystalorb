@@ -110,7 +110,7 @@ impl<WorldType: World> Server<WorldType> {
     fn send_snapshot(&mut self, time: &Time, net: &mut NetworkResource) {
         self.seconds_since_last_snapshot += time.delta_seconds();
         if self.seconds_since_last_snapshot > self.config.snapshot_send_period {
-            info!(
+            trace!(
                 "Broadcasting snapshot at timestamp: {:?} (note: drift error: {})",
                 self.world.timestamp(),
                 self.timestamp_drift_seconds(time),
@@ -173,7 +173,7 @@ pub fn server_system<WorldType: World>(
             new_commands.push((command.into(), *handle));
         }
         while let Some(mut clock_sync_message) = channels.recv::<ClockSyncMessage>() {
-            info!("Replying to clock sync message. client_id: {}", handle);
+            trace!("Replying to clock sync message. client_id: {}", handle);
             clock_sync_message.server_seconds_since_startup = time.seconds_since_startup();
             clock_sync_message.client_id = *handle as usize;
             clock_syncs.push((*handle, clock_sync_message));

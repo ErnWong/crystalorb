@@ -96,9 +96,10 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
                 let corresponding_client_time =
                     (sync.client_send_seconds_since_startup + received_time) / 2.0;
                 let offset = sync.server_seconds_since_startup - corresponding_client_time;
-                info!(
+                trace!(
                     "Received clock sync message. ClientId: {}. Estimated clock offset: {}",
-                    sync.client_id, offset,
+                    sync.client_id,
+                    offset,
                 );
                 self.server_seconds_offset_sum += offset;
                 self.sample_count += 1;
@@ -109,7 +110,7 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
         self.seconds_since_last_send += time.delta_seconds();
         if self.seconds_since_last_send > self.config.initial_clock_sync_period {
             self.seconds_since_last_send = 0.0;
-            info!("Sending clock sync message");
+            trace!("Sending clock sync message");
             net.broadcast_message(ClockSyncMessage {
                 client_send_seconds_since_startup: time.seconds_since_startup(),
                 server_seconds_since_startup: 0.0,
@@ -344,7 +345,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
     }
 
     fn receive_command(&mut self, command: Timestamped<WorldType::CommandType>) {
-        info!("Received command");
+        info!("Received command {:?}", command);
         let (old_world, new_world) = self.worlds.get_mut();
         old_world.apply_command(command.inner());
         new_world.apply_command(command.inner());
@@ -352,7 +353,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
     }
 
     fn receive_snapshot(&mut self, snapshot: Timestamped<WorldType::StateType>) {
-        info!(
+        trace!(
             "Received snapshot: {:?} frames behind",
             self.timestamp() - snapshot.timestamp()
         );
@@ -379,11 +380,11 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
             self.old_new_interpolation_t += self.config.interpolation_progress_per_frame();
             self.old_new_interpolation_t = self.old_new_interpolation_t.clamp(0.0, 1.0);
         } else if let Some(snapshot) = self.queued_snapshot.take() {
-            info!("Applying new snapshot from server");
+            trace!("Applying new snapshot from server");
             self.worlds.swap();
             let (old_world, new_world) = self.worlds.get_mut();
             new_world.set_state(snapshot);
-            info!(
+            trace!(
                 "Fastforwarding old snapshot from timestamp {:?} to current timestamp {:?}",
                 new_world.timestamp(),
                 old_world.timestamp()
