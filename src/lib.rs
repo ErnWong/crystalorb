@@ -48,8 +48,8 @@ pub struct Config {
 impl Config {
     pub const fn new() -> Self {
         Self {
-            lag_compensation_latency: 0.2,
-            interpolation_latency: 0.1,
+            lag_compensation_latency: 0.4,
+            interpolation_latency: 0.4,
             timestep_seconds: 1.0 / 60.0,
             timestamp_sync_needed_sample_count: 4,
             initial_clock_sync_period: 0.2,
