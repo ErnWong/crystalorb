@@ -33,8 +33,12 @@ impl<WorldType: World> Timestamped<WorldType> {
         &mut self,
         timestamp: &Timestamp,
         command_buffer: &CommandBuffer<WorldType::CommandType>,
+        max_steps: usize,
     ) {
-        while self.timestamp() < *timestamp {
+        for _ in 0..max_steps {
+            if self.timestamp() >= *timestamp {
+                break;
+            }
             self.apply_commands(command_buffer);
             self.step();
         }

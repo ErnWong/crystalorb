@@ -43,6 +43,12 @@ pub struct Config {
     pub initial_clock_sync_period: f32,
 
     pub snapshot_send_period: f32,
+
+    pub update_delta_seconds_max: f32,
+
+    pub timestamp_skip_threshold_seconds: f32,
+
+    pub fastforward_max_per_step: usize,
 }
 
 impl Config {
@@ -54,6 +60,9 @@ impl Config {
             timestamp_sync_needed_sample_count: 4,
             initial_clock_sync_period: 0.2,
             snapshot_send_period: 0.2,
+            update_delta_seconds_max: 0.25,
+            timestamp_skip_threshold_seconds: 1.0,
+            fastforward_max_per_step: 10,
         }
     }
     pub fn lag_compensation_frame_count(&self) -> i16 {

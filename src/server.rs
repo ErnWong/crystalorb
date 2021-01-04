@@ -39,10 +39,16 @@ impl<WorldType: World> Server<WorldType> {
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
+    fn timestamp_drift(&self, time: &Time) -> Timestamp {
+        self.timestamp()
+            - Timestamp::from_seconds(time.seconds_since_startup(), self.config.timestep_seconds)
+    }
+
+    /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
+    /// negative refers that our world needs to catchup in the next frame.
     fn timestamp_drift_seconds(&self, time: &Time) -> f32 {
-        (self.timestamp()
-            - Timestamp::from_seconds(time.seconds_since_startup(), self.config.timestep_seconds))
-        .as_seconds(self.config.timestep_seconds)
+        self.timestamp_drift(time)
+            .as_seconds(self.config.timestep_seconds)
     }
 
     fn update_timestamp(&mut self, time: &Time) {
@@ -182,10 +188,21 @@ pub fn server_system<WorldType: World>(
         net.send_message(handle, clock_sync_message).unwrap();
     }
 
-    // Note: Compensate for any drift.
-    let next_delta_seconds =
-        (time.delta_seconds() - server.timestamp_drift_seconds(&time)).max(0.0);
+    // Compensate for any drift.
+    // TODO: Remove duplicate code between client and server.
+    let next_delta_seconds = (time.delta_seconds() - server.timestamp_drift_seconds(&time))
+        .clamp(0.0, server.config.update_delta_seconds_max);
+
     server.advance(next_delta_seconds);
+
+    // If drift is too large and we still couldn't keep up, do a time skip.
+    if server.timestamp_drift_seconds(&time) > server.config.timestamp_skip_threshold_seconds {
+        // Note: only skip on the old world's timestamp.
+        // If new world couldn't catch up, then it can simply grab the next server snapshot
+        // when it arrives.
+        let corrected_timestamp = server.timestamp() - server.timestamp_drift(&time);
+        server.world.set_timestamp(corrected_timestamp);
+    }
 
     server.send_snapshot(&*time, &mut *net);
 }

@@ -321,9 +321,15 @@ impl<WorldType: World> ActiveClient<WorldType> {
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
-    fn timestamp_drift_seconds(&self, time: &Time) -> f32 {
+    fn timestamp_drift(&self, time: &Time) -> Timestamp {
         let server_time = time.seconds_since_startup() + self.server_seconds_offset;
-        (self.timestamp() - Timestamp::from_seconds(server_time, self.config.timestep_seconds))
+        self.timestamp() - Timestamp::from_seconds(server_time, self.config.timestep_seconds)
+    }
+
+    /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
+    /// negative refers that our world needs to catchup in the next frame.
+    fn timestamp_drift_seconds(&self, time: &Time) -> f32 {
+        self.timestamp_drift(time)
             .as_seconds(self.config.timestep_seconds)
     }
 
@@ -338,10 +344,26 @@ impl<WorldType: World> ActiveClient<WorldType> {
             }
         }
 
-        // Note: Compensate for any drift.
-        let next_delta_seconds =
-            (time.delta_seconds() - self.timestamp_drift_seconds(time)).max(0.0);
+        // Compensate for any drift.
+        // TODO: Remove duplicate code between client and server.
+        let next_delta_seconds = (time.delta_seconds() - self.timestamp_drift_seconds(time))
+            .clamp(0.0, self.config.update_delta_seconds_max);
+
         self.advance(next_delta_seconds);
+
+        // If drift is too large and we still couldn't keep up, do a time skip.
+        if self.timestamp_drift_seconds(time) < -self.config.timestamp_skip_threshold_seconds {
+            // Note: only skip on the old world's timestamp.
+            // If new world couldn't catch up, then it can simply grab the next server snapshot
+            // when it arrives.
+            let corrected_timestamp = self.timestamp() - self.timestamp_drift(time);
+            warn!(
+                "Client is too far behind. Skipping timestamp from {:?} to {:?}",
+                self.timestamp(),
+                corrected_timestamp
+            );
+            self.worlds.get_mut().0.set_timestamp(corrected_timestamp);
+        }
     }
 
     fn receive_command(&mut self, command: Timestamped<WorldType::CommandType>) {
@@ -376,35 +398,63 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
     fn step(&mut self) -> f32 {
         trace!("Step...");
 
-        if self.old_new_interpolation_t < 1.0 {
+        // Figure out what state we are in.
+        // TODO: This logic needs tidying up and untangling.
+        let has_finished_interpolating_to_new_world = self.old_new_interpolation_t >= 1.0;
+        let (is_fastforwarding_and_snapshot_is_newer, is_interpolating) = {
+            let (old_world, new_world) = self.worlds.get();
+            let is_fastforwarding = new_world.timestamp() < old_world.timestamp();
+            let snapshot_is_newer = self.queued_snapshot.as_ref().map_or(false, |snapshot| {
+                snapshot.timestamp() > new_world.timestamp()
+            });
+            let is_interpolating = new_world.timestamp() == old_world.timestamp();
+            (is_fastforwarding && snapshot_is_newer, is_interpolating)
+        };
+
+        // Note: Don't progress with interpolation if new world is still fast forwarding or is
+        // ahead of old world.
+        if is_interpolating && !has_finished_interpolating_to_new_world {
             self.old_new_interpolation_t += self.config.interpolation_progress_per_frame();
             self.old_new_interpolation_t = self.old_new_interpolation_t.clamp(0.0, 1.0);
-        } else if let Some(snapshot) = self.queued_snapshot.take() {
-            trace!("Applying new snapshot from server");
-            self.worlds.swap();
-            let (old_world, new_world) = self.worlds.get_mut();
-            new_world.set_state(snapshot);
-            trace!(
-                "Fastforwarding old snapshot from timestamp {:?} to current timestamp {:?}",
-                new_world.timestamp(),
-                old_world.timestamp()
-            );
+        } else if is_fastforwarding_and_snapshot_is_newer || has_finished_interpolating_to_new_world
+        {
+            if let Some(snapshot) = self.queued_snapshot.take() {
+                trace!("Applying new snapshot from server");
 
-            // We can now safely discard commands from the buffer that are older than
-            // this server snapshot.
-            self.command_buffer.discard_old(new_world.timestamp());
+                if has_finished_interpolating_to_new_world {
+                    self.worlds.swap();
+                } else {
+                    warn!("Abandoning previous snapshot for newer shapshot! Couldn't fastforward the previous snapshot in time,");
+                }
 
-            if new_world.timestamp() > old_world.timestamp() {
-                warn!("Server's snapshot is newer than client!");
+                let (old_world, new_world) = self.worlds.get_mut();
+                new_world.set_state(snapshot);
+
+                // We can now safely discard commands from the buffer that are older than
+                // this server snapshot.
+                self.command_buffer.discard_old(new_world.timestamp());
+
+                if new_world.timestamp() > old_world.timestamp() {
+                    warn!("Server's snapshot is newer than client!");
+                }
+                self.old_new_interpolation_t = 0.0;
             }
-            new_world.fast_forward_to_timestamp(&old_world.timestamp(), &self.command_buffer);
-            self.old_new_interpolation_t = 0.0;
         }
 
-        trace!("Stepping each world by one step");
+        trace!("Stepping old world by one frame");
         let (old_world, new_world) = self.worlds.get_mut();
         old_world.step();
-        new_world.step();
+
+        trace!(
+            "Fastforwarding new world from timestamp {:?} to current timestamp {:?}",
+            new_world.timestamp(),
+            old_world.timestamp()
+        );
+        new_world.fast_forward_to_timestamp(
+            &old_world.timestamp(),
+            &self.command_buffer,
+            self.config.fastforward_max_per_step,
+        );
 
         // TODO: Optimizable - the states only need to be updated at the last step of the
         // current advance.
