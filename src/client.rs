@@ -6,7 +6,7 @@ use crate::{
     fixed_timestepper::{FixedTimestepper, Stepper},
     old_new::OldNew,
     timestamp::{Timestamp, Timestamped},
-    world::{State, World},
+    world::{DisplayState, World},
     Config,
 };
 use bevy::prelude::*;
@@ -207,7 +207,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
         net.broadcast_message(command);
     }
 
-    pub fn world_state(&self) -> &WorldType::StateType {
+    pub fn display_state(&self) -> &WorldType::DisplayStateType {
         &self.client.display_state
     }
 
@@ -250,7 +250,7 @@ pub struct ActiveClient<WorldType: World> {
 
     /// The next server snapshot that needs applying after the current latest snapshot has been
     /// fully interpolated into.
-    queued_snapshot: Option<Timestamped<WorldType::StateType>>,
+    queued_snapshot: Option<Timestamped<WorldType::SnapshotType>>,
 
     /// The timestamp of the last queued snapshot from the server, so we can discard stale
     /// snapshots from the server when the arrive out of order. This persists even after the queued
@@ -273,14 +273,14 @@ pub struct ActiveClient<WorldType: World> {
     /// `states.get_old()` is the state just before the requested timestamp.
     /// `states.get_new()` is the state just after the requested timestamp.
     /// Old and new gets swapped every step.
-    states: OldNew<WorldType::StateType>,
+    states: OldNew<WorldType::DisplayStateType>,
 
     /// The number of seconds that `current_state` has overshooted the requested render timestamp.
     timestep_overshoot_seconds: f32,
 
     /// The interpolation between `previous_state` and `current_state` for the requested render
     /// timestamp.
-    display_state: WorldType::StateType,
+    display_state: WorldType::DisplayStateType,
 
     /// Buffers user commands from all players that are needed to be replayed after receiving the
     /// server's snapshot, since the server snapshot is behind the actual timestamp.
@@ -339,7 +339,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
             while let Some(command) = channels.recv::<Timestamped<WorldType::CommandType>>() {
                 self.receive_command(command);
             }
-            while let Some(snapshot) = channels.recv::<Timestamped<WorldType::StateType>>() {
+            while let Some(snapshot) = channels.recv::<Timestamped<WorldType::SnapshotType>>() {
                 self.receive_snapshot(snapshot);
             }
         }
@@ -374,7 +374,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
         self.command_buffer.insert(command);
     }
 
-    fn receive_snapshot(&mut self, snapshot: Timestamped<WorldType::StateType>) {
+    fn receive_snapshot(&mut self, snapshot: Timestamped<WorldType::SnapshotType>) {
         trace!(
             "Received snapshot: {:?} frames behind",
             self.timestamp() - snapshot.timestamp()
@@ -428,7 +428,7 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
                 }
 
                 let (old_world, new_world) = self.worlds.get_mut();
-                new_world.set_state(snapshot);
+                new_world.apply_snapshot(snapshot);
 
                 // We can now safely discard commands from the buffer that are older than
                 // this server snapshot.
@@ -461,9 +461,9 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
         trace!("Blending the old and new world states");
         self.states.swap();
         self.states
-            .set_new(WorldType::StateType::from_interpolation(
-                &old_world.state(),
-                &new_world.state(),
+            .set_new(WorldType::DisplayStateType::from_interpolation(
+                &old_world.display_state(),
+                &new_world.display_state(),
                 self.old_new_interpolation_t,
             ));
 
@@ -480,7 +480,7 @@ impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
         // We display an interpolation between the undershot and overshot states.
         trace!("Interpolating undershot/overshot states");
         let (undershot_state, overshot_state) = self.states.get();
-        self.display_state = WorldType::StateType::from_interpolation(
+        self.display_state = WorldType::DisplayStateType::from_interpolation(
             undershot_state,
             overshot_state,
             1.0 - self.timestep_overshoot_seconds / self.config.timestep_seconds,

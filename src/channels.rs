@@ -40,7 +40,7 @@ pub fn network_setup<WorldType: World>(mut net: ResMut<NetworkResource>) {
             .unwrap();
 
         builder
-            .register::<Timestamped<WorldType::StateType>>(MessageChannelSettings {
+            .register::<Timestamped<WorldType::SnapshotType>>(MessageChannelSettings {
                 channel: 1,
                 channel_mode: MessageChannelMode::Unreliable,
                 message_buffer_size: 8,

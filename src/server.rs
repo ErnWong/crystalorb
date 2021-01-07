@@ -109,8 +109,8 @@ impl<WorldType: World> Server<WorldType> {
         self.apply_validated_command(Timestamped::new(command, self.timestamp()), None, net);
     }
 
-    pub fn world_state(&self) -> WorldType::StateType {
-        self.world.inner().state()
+    pub fn display_state(&self) -> WorldType::DisplayStateType {
+        self.world.inner().display_state()
     }
 
     fn send_snapshot(&mut self, time: &Time, net: &mut NetworkResource) {
@@ -122,7 +122,7 @@ impl<WorldType: World> Server<WorldType> {
                 self.timestamp_drift_seconds(time),
             );
             self.seconds_since_last_snapshot = 0.0;
-            net.broadcast_message(self.world.state());
+            net.broadcast_message(self.world.snapshot());
         }
     }
 }
