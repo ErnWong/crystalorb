@@ -12,7 +12,12 @@ use bevy::prelude::*;
 use bevy_networking_turbulence::{
     ConnectionHandle, NetworkEvent, NetworkResource, NetworkingPlugin,
 };
-use std::{collections::BinaryHeap, convert::TryInto, marker::PhantomData, net::SocketAddr};
+use std::{
+    collections::{BinaryHeap, HashMap},
+    convert::TryInto,
+    marker::PhantomData,
+    net::SocketAddr,
+};
 
 pub struct Server<WorldType: World> {
     world: Timestamped<WorldType>,
@@ -149,15 +154,31 @@ pub struct ServerSystemState {
     network_event_reader: EventReader<NetworkEvent>,
 }
 
+#[derive(Default)]
+pub struct TimeRemainingBeforeDisconnect(HashMap<ConnectionHandle, f64>);
+
 pub fn server_system<WorldType: World>(
     mut state: Local<ServerSystemState>,
     mut server: ResMut<Server<WorldType>>,
+    mut client_time_remaining_before_disconnect: Local<TimeRemainingBeforeDisconnect>,
     time: Res<Time>,
     mut net: ResMut<NetworkResource>,
     network_events: Res<Events<NetworkEvent>>,
     mut client_connection_events: ResMut<Events<ClientConnectionEvent>>,
 ) {
     for network_event in state.network_event_reader.iter(&network_events) {
+        let handle = match network_event {
+            NetworkEvent::Packet(handle, ..) => handle,
+            NetworkEvent::Connected(handle) => handle,
+            NetworkEvent::Disconnected(handle) => handle,
+        };
+
+        // TODO: Deduplicate code with below.
+        client_time_remaining_before_disconnect.0.insert(
+            *handle,
+            time.seconds_since_startup() + server.config.connection_timeout_seconds as f64,
+        );
+
         if let Ok(client_connection_event) = network_event.try_into() {
             info!("Connection event: {:?}", client_connection_event);
             client_connection_events.send(client_connection_event);
@@ -171,6 +192,12 @@ pub fn server_system<WorldType: World>(
     let mut clock_syncs = Vec::new();
     for (handle, connection) in net.connections.iter_mut() {
         let channels = connection.channels().unwrap();
+
+        // For diagnostic purposes:
+        if !channels.is_connected() {
+            warn!("Channels to client {} disconnected", handle);
+        }
+
         while let Some(command) = channels.recv::<Timestamped<WorldType::CommandType>>() {
             new_commands.push((command.into(), *handle));
         }
@@ -179,6 +206,12 @@ pub fn server_system<WorldType: World>(
             clock_sync_message.server_seconds_since_startup = time.seconds_since_startup();
             clock_sync_message.client_id = *handle as usize;
             clock_syncs.push((*handle, clock_sync_message));
+
+            // TODO: Deduplicate code with above.
+            client_time_remaining_before_disconnect.0.insert(
+                *handle,
+                time.seconds_since_startup() + server.config.connection_timeout_seconds as f64,
+            );
         }
     }
     while let Some((command, handle)) = new_commands.pop() {
@@ -205,6 +238,25 @@ pub fn server_system<WorldType: World>(
     }
 
     server.send_snapshot(&*time, &mut *net);
+
+    // Disconnect from clients that have timed out, since turbulence's disconnection mechanism
+    // doesn't seem to work at time of writing.
+    let mut clients_to_disconnect = Vec::new();
+    for (connection_handle, disconnect_time) in &client_time_remaining_before_disconnect.0 {
+        if time.seconds_since_startup() > *disconnect_time {
+            clients_to_disconnect.push(*connection_handle);
+        }
+    }
+    for connection_handle in clients_to_disconnect {
+        info!("Client timed-out, disconnecting: {:?}", connection_handle);
+        net.connections.remove(&connection_handle);
+        client_time_remaining_before_disconnect
+            .0
+            .remove(&connection_handle);
+        client_connection_events.send(ClientConnectionEvent::Disconnected(
+            connection_handle as usize,
+        ));
+    }
 }
 
 pub fn server_setup<WorldType: World>(

@@ -42,6 +42,10 @@ pub struct Config {
 
     pub initial_clock_sync_period: f32,
 
+    pub heartbeat_period: f32,
+
+    pub connection_timeout_seconds: f32,
+
     pub snapshot_send_period: f32,
 
     pub update_delta_seconds_max: f32,
@@ -59,6 +63,8 @@ impl Config {
             timestep_seconds: 1.0 / 60.0,
             timestamp_sync_needed_sample_count: 4,
             initial_clock_sync_period: 0.2,
+            heartbeat_period: 1.0,
+            connection_timeout_seconds: 10.0,
             snapshot_send_period: 0.2,
             update_delta_seconds_max: 0.25,
             timestamp_skip_threshold_seconds: 1.0,

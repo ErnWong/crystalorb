@@ -21,3 +21,12 @@ impl TryFrom<&NetworkEvent> for ClientConnectionEvent {
         }
     }
 }
+
+impl ClientConnectionEvent {
+    pub fn client_id(&self) -> usize {
+        match self {
+            ClientConnectionEvent::Connected(client_id) => *client_id,
+            ClientConnectionEvent::Disconnected(client_id) => *client_id,
+        }
+    }
+}

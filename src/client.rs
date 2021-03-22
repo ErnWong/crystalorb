@@ -14,15 +14,19 @@ use bevy_networking_turbulence::{NetworkResource, NetworkingPlugin};
 use std::{marker::PhantomData, net::SocketAddr};
 
 pub struct Client<WorldType: World> {
+    config: Config,
     state: Option<ClientState<WorldType>>,
+    seconds_since_last_heartbeat: f32,
 }
 
 impl<WorldType: World> Client<WorldType> {
     fn new(config: Config) -> Self {
         Self {
+            config: config.clone(),
             state: Some(ClientState::SyncingInitialTimestamp(
                 SyncingInitialTimestampClient::new(config),
             )),
+            seconds_since_last_heartbeat: 0.0,
         }
     }
 
@@ -32,6 +36,17 @@ impl<WorldType: World> Client<WorldType> {
         net: &mut NetworkResource,
         client_connection_events: &mut Events<ClientConnectionEvent>,
     ) {
+        self.seconds_since_last_heartbeat += time.delta_seconds();
+        if self.seconds_since_last_heartbeat > self.config.heartbeat_period {
+            self.seconds_since_last_heartbeat = 0.0;
+            info!("Sending heartbeat");
+            net.broadcast_message(ClockSyncMessage {
+                client_send_seconds_since_startup: time.seconds_since_startup(),
+                server_seconds_since_startup: 0.0,
+                client_id: 0,
+            });
+        }
+
         let should_transition = match &mut self.state.as_mut().unwrap() {
             ClientState::SyncingInitialTimestamp(client) => client.update(time, net),
             ClientState::SyncingInitialState(client) => client.update(time, net),
@@ -49,6 +64,14 @@ impl<WorldType: World> Client<WorldType> {
                     .into_next_state(net, client_connection_events)
                     .unwrap(),
             });
+        }
+
+        // Drop any remaining unhandled clock sync replies from the server.
+        // This is, for some reason, to prevent our heartbeats from being blocked.
+        // TODO: Use these replies to keep client in sync with server.
+        for (_, connection) in net.connections.iter_mut() {
+            let channels = connection.channels().unwrap();
+            while let Some(_) = channels.recv::<ClockSyncMessage>() {}
         }
     }
 
@@ -91,6 +114,10 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
     fn update(&mut self, time: &Time, net: &mut NetworkResource) -> bool {
         for (_, connection) in net.connections.iter_mut() {
             let channels = connection.channels().unwrap();
+            if !channels.is_connected() {
+                // TODO: rely on this to initiate reconnection? Or rely on timeouts?
+                warn!("Channels disconnected!");
+            }
             while let Some(sync) = channels.recv::<ClockSyncMessage>() {
                 let received_time = time.seconds_since_startup();
                 let corresponding_client_time =
@@ -336,6 +363,10 @@ impl<WorldType: World> ActiveClient<WorldType> {
     fn update(&mut self, time: &Time, net: &mut NetworkResource) {
         for (_, connection) in net.connections.iter_mut() {
             let channels = connection.channels().unwrap();
+            if !channels.is_connected() {
+                // TODO: rely on this to initiate reconnection? Or rely on timeouts?
+                warn!("Channels disconnected!");
+            }
             while let Some(command) = channels.recv::<Timestamped<WorldType::CommandType>>() {
                 self.receive_command(command);
             }
