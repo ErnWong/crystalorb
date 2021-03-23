@@ -531,10 +531,9 @@ pub fn client_system<WorldType: World>(
 }
 
 pub fn client_setup<WorldType: World>(mut net: ResMut<NetworkResource>) {
-    // TODO: Configurable port number and IP address.
-    let socket_address = SocketAddr::new("127.0.0.1".parse().unwrap(), 9001);
+    let socket_address = "dango-daikazoku.herokuapp.com";
     info!("Starting client - connecting to {}", socket_address);
-    net.connect(socket_address);
+    net.connect(socket_address.to_string());
 }
 
 #[derive(Default)]
