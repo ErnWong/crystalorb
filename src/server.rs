@@ -291,7 +291,7 @@ impl<WorldType: World> NetworkedPhysicsServerPlugin<WorldType> {
 
 impl<WorldType: World> Plugin for NetworkedPhysicsServerPlugin<WorldType> {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_plugin(NetworkingPlugin)
+        app.add_plugin(NetworkingPlugin::default())
             .add_event::<ClientConnectionEvent>()
             .add_resource(Server::<WorldType>::new(self.config.clone()))
             .add_startup_system(network_setup::<WorldType>.system())
