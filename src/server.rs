@@ -266,8 +266,10 @@ pub fn server_setup<WorldType: World>(
 ) {
     server.update_timestamp(&*time);
 
-    // TODO: Configurable port number and IP address.
-    let socket_address = SocketAddr::new("127.0.0.1".parse().unwrap(), 9001);
+    let socket_address = SocketAddr::new(
+        "0.0.0.0".parse().unwrap(),
+        std::env::var("PORT").map_or(9001, |port| port.parse().unwrap()),
+    );
     info!("Starting server - listening at {}", socket_address);
     net.listen(socket_address);
 }
