@@ -531,7 +531,8 @@ pub fn client_system<WorldType: World>(
 }
 
 pub fn client_setup<WorldType: World>(mut net: ResMut<NetworkResource>) {
-    let socket_address = "dango-daikazoku.herokuapp.com";
+    // let socket_address = "http://dango-daikazoku.herokuapp.com/join/1234";
+    let socket_address = "http://192.168.1.9:8080/join/1234";
     info!("Starting client - connecting to {}", socket_address);
     net.connect(socket_address.to_string());
 }

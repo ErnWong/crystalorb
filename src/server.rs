@@ -266,12 +266,14 @@ pub fn server_setup<WorldType: World>(
 ) {
     server.update_timestamp(&*time);
 
-    let socket_address = SocketAddr::new(
-        "0.0.0.0".parse().unwrap(),
-        std::env::var("PORT").map_or(9001, |port| port.parse().unwrap()),
-    );
+    // let socket_address = "http://dango-daikazoku.herokuapp.com/host";
+    let socket_address = "http://192.168.1.9/host";
+    //let socket_address = SocketAddr::new(
+    //    "192.168.1.9".parse().unwrap(),
+    //    std::env::var("PORT").map_or(9001, |port| port.parse().unwrap()),
+    //);
     info!("Starting server - listening at {}", socket_address);
-    net.listen(socket_address);
+    net.listen(socket_address.to_string());
 }
 
 #[derive(Default)]
