@@ -267,7 +267,7 @@ pub fn server_setup<WorldType: World>(
     server.update_timestamp(&*time);
 
     // let socket_address = "http://dango-daikazoku.herokuapp.com/host";
-    let socket_address = "http://192.168.1.9/host";
+    let socket_address = "ws://192.168.1.9:8080/host";
     //let socket_address = SocketAddr::new(
     //    "192.168.1.9".parse().unwrap(),
     //    std::env::var("PORT").map_or(9001, |port| port.parse().unwrap()),
