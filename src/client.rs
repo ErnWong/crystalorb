@@ -530,23 +530,30 @@ pub fn client_system<WorldType: World>(
     client.update(&*time, &mut *net, &mut *client_connection_events);
 }
 
-pub fn client_setup<WorldType: World>(mut net: ResMut<NetworkResource>) {
+pub struct EndpointUrl(pub String);
+
+pub fn client_setup<WorldType: World>(
+    mut net: ResMut<NetworkResource>,
+    endpoint_url: Res<EndpointUrl>,
+) {
     // let socket_address = "http://dango-daikazoku.herokuapp.com/join/1234";
-    let socket_address = "http://192.168.1.9:8080/join/1234";
-    info!("Starting client - connecting to {}", socket_address);
-    net.connect(socket_address.to_string());
+    // let socket_address = "http://192.168.1.9:8080/join/1234";
+    info!("Starting client - connecting to {}", endpoint_url.0.clone());
+    net.connect(endpoint_url.0.clone());
 }
 
 #[derive(Default)]
 pub struct NetworkedPhysicsClientPlugin<WorldType: World> {
     config: Config,
+    endpoint_url: String,
     _world_type: PhantomData<WorldType>,
 }
 
 impl<WorldType: World> NetworkedPhysicsClientPlugin<WorldType> {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, endpoint_url: String) -> Self {
         Self {
             config,
+            endpoint_url,
             _world_type: PhantomData,
         }
     }
@@ -557,6 +564,7 @@ impl<WorldType: World> Plugin for NetworkedPhysicsClientPlugin<WorldType> {
         app.add_plugin(NetworkingPlugin::default())
             .add_event::<ClientConnectionEvent>()
             .add_resource(Client::<WorldType>::new(self.config.clone()))
+            .add_resource(EndpointUrl(self.endpoint_url.clone()))
             .add_startup_system(network_setup::<WorldType>.system())
             .add_startup_system(client_setup::<WorldType>.system())
             .add_system(client_system::<WorldType>.system());
