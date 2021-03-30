@@ -171,6 +171,7 @@ pub fn server_system<WorldType: World>(
             NetworkEvent::Packet(handle, ..) => handle,
             NetworkEvent::Connected(handle) => handle,
             NetworkEvent::Disconnected(handle) => handle,
+            _ => continue,
         };
 
         // TODO: Deduplicate code with below.

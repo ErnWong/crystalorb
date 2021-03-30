@@ -18,6 +18,7 @@ impl TryFrom<&NetworkEvent> for ClientConnectionEvent {
                 Ok(ClientConnectionEvent::Disconnected(*handle as usize))
             }
             NetworkEvent::Packet(..) => Err("Packet is not a client connection event"),
+            NetworkEvent::Hosted(..) => Err("Hosted is not a client connection event"),
         }
     }
 }
