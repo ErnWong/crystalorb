@@ -243,22 +243,22 @@ pub fn server_system<WorldType: World>(
 
     // Disconnect from clients that have timed out, since turbulence's disconnection mechanism
     // doesn't seem to work at time of writing.
-    let mut clients_to_disconnect = Vec::new();
-    for (connection_handle, disconnect_time) in &client_time_remaining_before_disconnect.0 {
-        if time.seconds_since_startup() > *disconnect_time {
-            clients_to_disconnect.push(*connection_handle);
-        }
-    }
-    for connection_handle in clients_to_disconnect {
-        info!("Client timed-out, disconnecting: {:?}", connection_handle);
-        net.connections.remove(&connection_handle);
-        client_time_remaining_before_disconnect
-            .0
-            .remove(&connection_handle);
-        client_connection_events.send(ClientConnectionEvent::Disconnected(
-            connection_handle as usize,
-        ));
-    }
+    // let mut clients_to_disconnect = Vec::new();
+    // for (connection_handle, disconnect_time) in &client_time_remaining_before_disconnect.0 {
+    //     if time.seconds_since_startup() > *disconnect_time {
+    //         clients_to_disconnect.push(*connection_handle);
+    //     }
+    // }
+    // for connection_handle in clients_to_disconnect {
+    //     info!("Client timed-out, disconnecting: {:?}", connection_handle);
+    //     net.connections.remove(&connection_handle);
+    //     client_time_remaining_before_disconnect
+    //         .0
+    //         .remove(&connection_handle);
+    //     client_connection_events.send(ClientConnectionEvent::Disconnected(
+    //         connection_handle as usize,
+    //     ));
+    // }
 }
 
 pub struct EndpointUrl(pub String);
