@@ -167,16 +167,15 @@ pub fn server_system<WorldType: World>(
     mut client_connection_events: ResMut<Events<ClientConnectionEvent>>,
 ) {
     for network_event in state.network_event_reader.iter(&network_events) {
-        let handle = match network_event {
+        let handle_to_connection_with_activity = match network_event {
             NetworkEvent::Packet(handle, ..) => handle,
             NetworkEvent::Connected(handle) => handle,
-            NetworkEvent::Disconnected(handle) => handle,
             _ => continue,
         };
 
         // TODO: Deduplicate code with below.
         client_time_remaining_before_disconnect.0.insert(
-            *handle,
+            *handle_to_connection_with_activity,
             time.seconds_since_startup() + server.config.connection_timeout_seconds as f64,
         );
 
