@@ -230,10 +230,12 @@ pub fn server_system<WorldType: World>(
 
     // If drift is too large and we still couldn't keep up, do a time skip.
     if server.timestamp_drift_seconds(&time) > server.config.timestamp_skip_threshold_seconds {
-        // Note: only skip on the old world's timestamp.
-        // If new world couldn't catch up, then it can simply grab the next server snapshot
-        // when it arrives.
         let corrected_timestamp = server.timestamp() - server.timestamp_drift(&time);
+        warn!(
+            "Server is too far behind. Skipping timestamp from {:?} to {:?}",
+            server.timestamp(),
+            corrected_timestamp
+        );
         server.world.set_timestamp(corrected_timestamp);
     }
 
