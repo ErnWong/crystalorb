@@ -383,7 +383,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
         self.advance(next_delta_seconds);
 
         // If drift is too large and we still couldn't keep up, do a time skip.
-        if self.timestamp_drift_seconds(time) < -self.config.timestamp_skip_threshold_seconds {
+        if -self.timestamp_drift_seconds(time) < -self.config.timestamp_skip_threshold_seconds {
             // Note: only skip on the old world's timestamp.
             // If new world couldn't catch up, then it can simply grab the next server snapshot
             // when it arrives.

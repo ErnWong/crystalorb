@@ -209,7 +209,7 @@ pub fn server_system<WorldType: World>(
     server.advance(next_delta_seconds);
 
     // If drift is too large and we still couldn't keep up, do a time skip.
-    if server.timestamp_drift_seconds(&time) > server.config.timestamp_skip_threshold_seconds {
+    if -server.timestamp_drift_seconds(&time) > server.config.timestamp_skip_threshold_seconds {
         let corrected_timestamp = server.timestamp() - server.timestamp_drift(&time);
         warn!(
             "Server is too far behind. Skipping timestamp from {:?} to {:?}",
