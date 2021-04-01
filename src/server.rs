@@ -154,30 +154,16 @@ pub struct ServerSystemState {
     network_event_reader: EventReader<NetworkEvent>,
 }
 
-#[derive(Default)]
-pub struct TimeRemainingBeforeDisconnect(HashMap<ConnectionHandle, f64>);
-
 pub fn server_system<WorldType: World>(
     mut state: Local<ServerSystemState>,
     mut server: ResMut<Server<WorldType>>,
-    mut client_time_remaining_before_disconnect: Local<TimeRemainingBeforeDisconnect>,
     time: Res<Time>,
     mut net: ResMut<NetworkResource>,
     network_events: Res<Events<NetworkEvent>>,
     mut client_connection_events: ResMut<Events<ClientConnectionEvent>>,
 ) {
     for network_event in state.network_event_reader.iter(&network_events) {
-        let handle_to_connection_with_activity = match network_event {
-            NetworkEvent::Packet(handle, ..) => handle,
-            NetworkEvent::Connected(handle) => handle,
-            _ => continue,
-        };
-
-        // TODO: Deduplicate code with below.
-        client_time_remaining_before_disconnect.0.insert(
-            *handle_to_connection_with_activity,
-            time.seconds_since_startup() + server.config.connection_timeout_seconds as f64,
-        );
+        info!("Server NetworkEvent - {:?}", network_event);
 
         if let Ok(client_connection_event) = network_event.try_into() {
             info!("Connection event: {:?}", client_connection_event);
@@ -206,12 +192,6 @@ pub fn server_system<WorldType: World>(
             clock_sync_message.server_seconds_since_startup = time.seconds_since_startup();
             clock_sync_message.client_id = *handle as usize;
             clock_syncs.push((*handle, clock_sync_message));
-
-            // TODO: Deduplicate code with above.
-            client_time_remaining_before_disconnect.0.insert(
-                *handle,
-                time.seconds_since_startup() + server.config.connection_timeout_seconds as f64,
-            );
         }
     }
     while let Some((command, handle)) = new_commands.pop() {
@@ -240,25 +220,6 @@ pub fn server_system<WorldType: World>(
     }
 
     server.send_snapshot(&*time, &mut *net);
-
-    // Disconnect from clients that have timed out, since turbulence's disconnection mechanism
-    // doesn't seem to work at time of writing.
-    // let mut clients_to_disconnect = Vec::new();
-    // for (connection_handle, disconnect_time) in &client_time_remaining_before_disconnect.0 {
-    //     if time.seconds_since_startup() > *disconnect_time {
-    //         clients_to_disconnect.push(*connection_handle);
-    //     }
-    // }
-    // for connection_handle in clients_to_disconnect {
-    //     info!("Client timed-out, disconnecting: {:?}", connection_handle);
-    //     net.connections.remove(&connection_handle);
-    //     client_time_remaining_before_disconnect
-    //         .0
-    //         .remove(&connection_handle);
-    //     client_connection_events.send(ClientConnectionEvent::Disconnected(
-    //         connection_handle as usize,
-    //     ));
-    // }
 }
 
 pub struct EndpointUrl(pub String);
