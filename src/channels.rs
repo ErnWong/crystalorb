@@ -34,8 +34,8 @@ pub fn network_setup<WorldType: World>(mut net: ResMut<NetworkResource>) {
                     },
                     max_chunk_len: 1024,
                 },
-                message_buffer_size: 8,
-                packet_buffer_size: 8,
+                message_buffer_size: 64,
+                packet_buffer_size: 64,
             })
             .unwrap();
 
@@ -43,8 +43,8 @@ pub fn network_setup<WorldType: World>(mut net: ResMut<NetworkResource>) {
             .register::<Timestamped<WorldType::SnapshotType>>(MessageChannelSettings {
                 channel: 1,
                 channel_mode: MessageChannelMode::Unreliable,
-                message_buffer_size: 8,
-                packet_buffer_size: 8,
+                message_buffer_size: 64,
+                packet_buffer_size: 64,
             })
             .unwrap();
 
@@ -52,8 +52,8 @@ pub fn network_setup<WorldType: World>(mut net: ResMut<NetworkResource>) {
             .register::<ClockSyncMessage>(MessageChannelSettings {
                 channel: 2,
                 channel_mode: MessageChannelMode::Unreliable,
-                message_buffer_size: 8,
-                packet_buffer_size: 8,
+                message_buffer_size: 64,
+                packet_buffer_size: 64,
             })
             .unwrap();
     });
