@@ -10,7 +10,7 @@ use crate::{
     Config,
 };
 use bevy::prelude::*;
-use bevy_networking_turbulence::{NetworkResource, NetworkingPlugin};
+use bevy_networking_turbulence::{NetworkEvent, NetworkResource, NetworkingPlugin};
 use std::marker::PhantomData;
 
 pub struct Client<WorldType: World> {
@@ -627,11 +627,25 @@ impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
 }
 
 pub fn client_system<WorldType: World>(
+    mut network_event_reader: Local<EventReader<NetworkEvent>>,
     mut client: ResMut<Client<WorldType>>,
     time: Res<Time>,
     mut net: ResMut<NetworkResource>,
+    network_events: Res<Events<NetworkEvent>>,
     mut client_connection_events: ResMut<Events<ClientConnectionEvent>>,
 ) {
+    // TODO: For now, disconnection events are fatal and we do not attempt to reconnect. This
+    // is why it is handled specially, in this location, rather than as a ClientState
+    // transition.
+    for network_event in network_event_reader.iter(&network_events) {
+        match network_event {
+            NetworkEvent::Disconnected(handle) => {
+                client_connection_events
+                    .send(ClientConnectionEvent::Disconnected(*handle as usize));
+            }
+            _ => {}
+        }
+    }
     client.update(&*time, &mut *net, &mut *client_connection_events);
 }
 
