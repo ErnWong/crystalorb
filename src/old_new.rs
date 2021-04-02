@@ -13,6 +13,11 @@ pub enum OldNewState {
     LeftNewRightOld,
 }
 
+pub struct OldNewResult<T> {
+    pub old: T,
+    pub new: T,
+}
+
 impl<T> OldNew<T>
 where
     T: Default,
@@ -39,17 +44,29 @@ where
         }
     }
 
-    pub fn get(&self) -> (&T, &T) {
+    pub fn get(&self) -> OldNewResult<&T> {
         match &self.state {
-            OldNewState::LeftNewRightOld => (&self.right, &self.left),
-            OldNewState::LeftOldRightNew => (&self.left, &self.right),
+            OldNewState::LeftNewRightOld => OldNewResult {
+                old: &self.right,
+                new: &self.left,
+            },
+            OldNewState::LeftOldRightNew => OldNewResult {
+                old: &self.left,
+                new: &self.right,
+            },
         }
     }
 
-    pub fn get_mut(&mut self) -> (&mut T, &mut T) {
+    pub fn get_mut(&mut self) -> OldNewResult<&mut T> {
         match &self.state {
-            OldNewState::LeftNewRightOld => (&mut self.right, &mut self.left),
-            OldNewState::LeftOldRightNew => (&mut self.left, &mut self.right),
+            OldNewState::LeftNewRightOld => OldNewResult {
+                old: &mut self.right,
+                new: &mut self.left,
+            },
+            OldNewState::LeftOldRightNew => OldNewResult {
+                old: &mut self.left,
+                new: &mut self.right,
+            },
         }
     }
 

@@ -4,14 +4,14 @@ use crate::{
     events::ClientConnectionEvent,
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
-    old_new::OldNew,
+    old_new::{OldNew, OldNewResult},
     timestamp::{Timestamp, Timestamped},
-    world::{DisplayState, World},
+    world::{DisplayState, World, WorldSimulation},
     Config,
 };
 use bevy::prelude::*;
 use bevy_networking_turbulence::{NetworkResource, NetworkingPlugin};
-use std::{marker::PhantomData, net::SocketAddr};
+use std::marker::PhantomData;
 
 pub struct Client<WorldType: World> {
     config: Config,
@@ -39,7 +39,7 @@ impl<WorldType: World> Client<WorldType> {
         self.seconds_since_last_heartbeat += time.delta_seconds();
         if self.seconds_since_last_heartbeat > self.config.heartbeat_period {
             self.seconds_since_last_heartbeat = 0.0;
-            info!("Sending heartbeat");
+            trace!("Sending heartbeat");
             net.broadcast_message(ClockSyncMessage {
                 client_send_seconds_since_startup: time.seconds_since_startup(),
                 server_seconds_since_startup: 0.0,
@@ -47,10 +47,46 @@ impl<WorldType: World> Client<WorldType> {
             });
         }
 
+        let mut server_seconds_offset_sum: f64 = 0.0;
+        let mut sample_count: usize = 0;
+        let mut client_id: usize = 0;
+        for (_, connection) in net.connections.iter_mut() {
+            let channels = connection.channels().unwrap();
+            if !channels.is_connected() {
+                // TODO: rely on this to initiate reconnection? Or rely on timeouts?
+                warn!("Channels disconnected!");
+            }
+            while let Some(sync) = channels.recv::<ClockSyncMessage>() {
+                let received_time = time.seconds_since_startup();
+                let corresponding_client_time =
+                    (sync.client_send_seconds_since_startup + received_time) / 2.0;
+                let offset = sync.server_seconds_since_startup - corresponding_client_time;
+                trace!(
+                    "Received clock sync message. ClientId: {}. Estimated clock offset: {}",
+                    sync.client_id,
+                    offset,
+                );
+                server_seconds_offset_sum += offset;
+                sample_count += 1;
+                client_id = sync.client_id;
+            }
+        }
+        let offset_update = if sample_count > 0 {
+            Some(server_seconds_offset_sum / sample_count as f64)
+        } else {
+            None
+        };
+
         let should_transition = match &mut self.state.as_mut().unwrap() {
-            ClientState::SyncingInitialTimestamp(client) => client.update(time, net),
-            ClientState::SyncingInitialState(client) => client.update(time, net),
-            ClientState::Ready(client) => client.update(time, net),
+            ClientState::SyncingInitialTimestamp(client) => client.update(
+                time,
+                net,
+                server_seconds_offset_sum,
+                sample_count,
+                client_id,
+            ),
+            ClientState::SyncingInitialState(client) => client.update(time, net, offset_update),
+            ClientState::Ready(client) => client.update(time, net, offset_update),
         };
         if should_transition {
             self.state = Some(match self.state.take().unwrap() {
@@ -64,14 +100,6 @@ impl<WorldType: World> Client<WorldType> {
                     .into_next_state(net, client_connection_events)
                     .unwrap(),
             });
-        }
-
-        // Drop any remaining unhandled clock sync replies from the server.
-        // This is, for some reason, to prevent our heartbeats from being blocked.
-        // TODO: Use these replies to keep client in sync with server.
-        for (_, connection) in net.connections.iter_mut() {
-            let channels = connection.channels().unwrap();
-            while let Some(_) = channels.recv::<ClockSyncMessage>() {}
         }
     }
 
@@ -111,28 +139,17 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
             _world_type: PhantomData,
         }
     }
-    fn update(&mut self, time: &Time, net: &mut NetworkResource) -> bool {
-        for (_, connection) in net.connections.iter_mut() {
-            let channels = connection.channels().unwrap();
-            if !channels.is_connected() {
-                // TODO: rely on this to initiate reconnection? Or rely on timeouts?
-                warn!("Channels disconnected!");
-            }
-            while let Some(sync) = channels.recv::<ClockSyncMessage>() {
-                let received_time = time.seconds_since_startup();
-                let corresponding_client_time =
-                    (sync.client_send_seconds_since_startup + received_time) / 2.0;
-                let offset = sync.server_seconds_since_startup - corresponding_client_time;
-                trace!(
-                    "Received clock sync message. ClientId: {}. Estimated clock offset: {}",
-                    sync.client_id,
-                    offset,
-                );
-                self.server_seconds_offset_sum += offset;
-                self.sample_count += 1;
-                self.client_id = sync.client_id;
-            }
-        }
+    fn update(
+        &mut self,
+        time: &Time,
+        net: &mut NetworkResource,
+        server_seconds_offset_addition: f64,
+        new_sample_count: usize,
+        client_id: usize,
+    ) -> bool {
+        self.server_seconds_offset_sum += server_seconds_offset_addition;
+        self.sample_count += new_sample_count;
+        self.client_id = client_id;
 
         self.seconds_since_last_send += time.delta_seconds();
         if self.seconds_since_last_send > self.config.initial_clock_sync_period {
@@ -192,8 +209,13 @@ impl<WorldType: World> SyncingInitialStateClient<WorldType> {
             client: ActiveClient::new(config, initial_timestamp, server_seconds_offset, client_id),
         }
     }
-    fn update(&mut self, time: &Time, net: &mut NetworkResource) -> bool {
-        self.client.update(time, net);
+    fn update(
+        &mut self,
+        time: &Time,
+        net: &mut NetworkResource,
+        offset_update: Option<f64>,
+    ) -> bool {
+        self.client.update(time, net, offset_update);
         self.should_transition()
     }
 
@@ -219,17 +241,22 @@ pub struct ReadyClient<WorldType: World> {
 }
 
 impl<WorldType: World> ReadyClient<WorldType> {
-    pub fn timestamp(&self) -> Timestamp {
-        self.client.timestamp()
+    pub fn last_completed_timestamp(&self) -> Timestamp {
+        self.client.last_completed_timestamp()
+    }
+
+    pub fn simulating_timestamp(&self) -> Timestamp {
+        self.client.simulating_timestamp()
     }
 
     pub fn client_id(&self) -> usize {
         self.client.client_id
     }
 
-    /// Issue a command from this client's player to the world.
+    /// Issue a command from this client's player to the world. The command will be scheduled
+    /// to the current simulating timestamp (the previously completed timestamp + 1).
     pub fn issue_command(&mut self, command: WorldType::CommandType, net: &mut NetworkResource) {
-        let command = Timestamped::new(command, self.timestamp());
+        let command = Timestamped::new(command, self.simulating_timestamp());
         self.client.receive_command(command.clone());
         net.broadcast_message(command);
     }
@@ -243,8 +270,13 @@ impl<WorldType: World> ReadyClient<WorldType> {
         Self { client }
     }
 
-    fn update(&mut self, time: &Time, net: &mut NetworkResource) -> bool {
-        self.client.update(time, net);
+    fn update(
+        &mut self,
+        time: &Time,
+        net: &mut NetworkResource,
+        offset_update: Option<f64>,
+    ) -> bool {
+        self.client.update(time, net, offset_update);
         self.should_transition(net)
     }
 
@@ -271,8 +303,14 @@ impl<WorldType: World> ReadyClient<WorldType> {
 }
 
 pub struct ActiveClient<WorldType: World> {
+    /// An identifier issued by the server for us to identify ourselves from other clients. Used,
+    /// for example, for issuing our player's commands to the server.
     client_id: usize,
 
+    /// The difference in seconds between client's time.seconds_since_startup() and server's
+    /// time.seconds_since_startup(), where a positive value refers that an earlier client time
+    /// value corresponds to the same instant as a later server time value. Since servers start
+    /// earlier than clients, this value should in theory always be positive.
     server_seconds_offset: f64,
 
     /// The next server snapshot that needs applying after the current latest snapshot has been
@@ -284,11 +322,18 @@ pub struct ActiveClient<WorldType: World> {
     /// snapshot has been cleared after it has been applied to the world.
     last_queued_snapshot_timestamp: Option<Timestamp>,
 
+    /// The command buffer that is used to initialize the new world simulation's command
+    /// buffers whenever a queued snapshot is applied to it. Contains older commands that the
+    /// individual world simulation's internal command buffers would have already dropped, but
+    /// would otherwise need to replay onto the server snapshot to get it back to the current
+    /// timestamp.
+    base_command_buffer: CommandBuffer<WorldType::CommandType>,
+
     /// The physics world simulation with and without the latest server snapshot applied.
-    /// `world.get_new()` has the latest server snapshot applied.
-    /// `world.get_old()` does not have the latest server snapshot applied.
+    /// `world_simulation.get().new` has the latest server snapshot applied.
+    /// `world_simulation.get().old` does not have the latest server snapshot applied.
     /// Old and new gets swapped every time a new queued server snapshot is applied.
-    worlds: OldNew<Timestamped<WorldType>>,
+    world_simulations: OldNew<WorldSimulation<WorldType>>,
 
     /// The interpolation paramater to blend the `old_world` and `new_world` together into a
     /// single world state. The parameter is in the range [0,1] where 0 represents using only
@@ -309,10 +354,6 @@ pub struct ActiveClient<WorldType: World> {
     /// timestamp.
     display_state: WorldType::DisplayStateType,
 
-    /// Buffers user commands from all players that are needed to be replayed after receiving the
-    /// server's snapshot, since the server snapshot is behind the actual timestamp.
-    command_buffer: CommandBuffer<WorldType::CommandType>,
-
     config: Config,
 }
 
@@ -328,29 +369,34 @@ impl<WorldType: World> ActiveClient<WorldType> {
             server_seconds_offset,
             queued_snapshot: None,
             last_queued_snapshot_timestamp: None,
-            worlds: OldNew::new(),
+            base_command_buffer: Default::default(),
+            world_simulations: OldNew::new(),
             old_new_interpolation_t: 1.0,
             states: OldNew::new(),
             display_state: Default::default(),
             timestep_overshoot_seconds: 0.0,
-            command_buffer: CommandBuffer::new(),
             config,
         };
-        let (old_world, new_world) = client.worlds.get_mut();
-        old_world.set_timestamp(initial_timestamp);
-        new_world.set_timestamp(initial_timestamp);
+        let OldNewResult { old, new } = client.world_simulations.get_mut();
+        old.reset_last_completed_timestamp(initial_timestamp);
+        new.reset_last_completed_timestamp(initial_timestamp);
         client
     }
 
-    fn timestamp(&self) -> Timestamp {
-        self.worlds.get().0.timestamp()
+    fn last_completed_timestamp(&self) -> Timestamp {
+        self.world_simulations.get().old.last_completed_timestamp()
+    }
+
+    fn simulating_timestamp(&self) -> Timestamp {
+        self.world_simulations.get().old.simulating_timestamp()
     }
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
     fn timestamp_drift(&self, time: &Time) -> Timestamp {
         let server_time = time.seconds_since_startup() + self.server_seconds_offset;
-        self.timestamp() - Timestamp::from_seconds(server_time, self.config.timestep_seconds)
+        self.last_completed_timestamp()
+            - Timestamp::from_seconds(server_time, self.config.timestep_seconds)
     }
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
@@ -360,7 +406,18 @@ impl<WorldType: World> ActiveClient<WorldType> {
             .as_seconds(self.config.timestep_seconds)
     }
 
-    fn update(&mut self, time: &Time, net: &mut NetworkResource) {
+    fn update(&mut self, time: &Time, net: &mut NetworkResource, offset_update: Option<f64>) {
+        if let Some(offset) = offset_update {
+            let old_server_seconds_offset = self.server_seconds_offset;
+            self.server_seconds_offset +=
+                (offset - self.server_seconds_offset) * self.config.clock_offset_update_factor;
+            trace!(
+                "Client updated its clock offset from {:?} to {:?}",
+                old_server_seconds_offset,
+                self.server_seconds_offset
+            );
+        }
+
         for (_, connection) in net.connections.iter_mut() {
             let channels = connection.channels().unwrap();
             if !channels.is_connected() {
@@ -383,32 +440,36 @@ impl<WorldType: World> ActiveClient<WorldType> {
         self.advance(next_delta_seconds);
 
         // If drift is too large and we still couldn't keep up, do a time skip.
+        trace!("Timestamp drift: {:?}", self.timestamp_drift_seconds(time));
         if -self.timestamp_drift_seconds(time) < -self.config.timestamp_skip_threshold_seconds {
             // Note: only skip on the old world's timestamp.
             // If new world couldn't catch up, then it can simply grab the next server snapshot
             // when it arrives.
-            let corrected_timestamp = self.timestamp() - self.timestamp_drift(time);
+            let corrected_timestamp = self.last_completed_timestamp() - self.timestamp_drift(time);
             warn!(
                 "Client is too far behind. Skipping timestamp from {:?} to {:?}",
-                self.timestamp(),
+                self.last_completed_timestamp(),
                 corrected_timestamp
             );
-            self.worlds.get_mut().0.set_timestamp(corrected_timestamp);
+            self.world_simulations
+                .get_mut()
+                .old
+                .reset_last_completed_timestamp(corrected_timestamp);
         }
     }
 
     fn receive_command(&mut self, command: Timestamped<WorldType::CommandType>) {
         info!("Received command {:?}", command);
-        let (old_world, new_world) = self.worlds.get_mut();
-        old_world.apply_command(command.inner());
-        new_world.apply_command(command.inner());
-        self.command_buffer.insert(command);
+        let OldNewResult { old, new } = self.world_simulations.get_mut();
+        self.base_command_buffer.insert(command.clone());
+        old.schedule_command(command.clone());
+        new.schedule_command(command);
     }
 
     fn receive_snapshot(&mut self, snapshot: Timestamped<WorldType::SnapshotType>) {
         trace!(
             "Received snapshot: {:?} frames behind",
-            self.timestamp() - snapshot.timestamp()
+            self.last_completed_timestamp() - snapshot.timestamp()
         );
         match &self.last_queued_snapshot_timestamp {
             None => self.queued_snapshot = Some(snapshot),
@@ -433,12 +494,30 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
         // TODO: This logic needs tidying up and untangling.
         let has_finished_interpolating_to_new_world = self.old_new_interpolation_t >= 1.0;
         let (is_fastforwarding_and_snapshot_is_newer, is_interpolating) = {
-            let (old_world, new_world) = self.worlds.get();
-            let is_fastforwarding = new_world.timestamp() < old_world.timestamp();
+            let OldNewResult {
+                old: old_world_simulation,
+                new: new_world_simulation,
+            } = self.world_simulations.get();
+            let is_fastforwarding = new_world_simulation.last_completed_timestamp()
+                < old_world_simulation.last_completed_timestamp();
+            trace!(
+                "Old New Interpolation t: {:?}",
+                self.old_new_interpolation_t
+            );
+            trace!(
+                "Old world timestamp: {:?}",
+                old_world_simulation.last_completed_timestamp()
+            );
+            trace!(
+                "New world timestamp: {:?}",
+                new_world_simulation.last_completed_timestamp()
+            );
             let snapshot_is_newer = self.queued_snapshot.as_ref().map_or(false, |snapshot| {
-                snapshot.timestamp() > new_world.timestamp()
+                trace!("Snapshot timestamp:  {:?}", snapshot.timestamp());
+                snapshot.timestamp() > new_world_simulation.last_completed_timestamp()
             });
-            let is_interpolating = new_world.timestamp() == old_world.timestamp();
+            let is_interpolating = new_world_simulation.last_completed_timestamp()
+                == old_world_simulation.last_completed_timestamp();
             (is_fastforwarding && snapshot_is_newer, is_interpolating)
         };
 
@@ -453,37 +532,60 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
                 trace!("Applying new snapshot from server");
 
                 if has_finished_interpolating_to_new_world {
-                    self.worlds.swap();
+                    self.world_simulations.swap();
                 } else {
                     warn!("Abandoning previous snapshot for newer shapshot! Couldn't fastforward the previous snapshot in time,");
                 }
 
-                let (old_world, new_world) = self.worlds.get_mut();
-                new_world.apply_snapshot(snapshot);
+                let OldNewResult {
+                    old: old_world_simulation,
+                    new: new_world_simulation,
+                } = self.world_simulations.get_mut();
 
                 // We can now safely discard commands from the buffer that are older than
                 // this server snapshot.
-                self.command_buffer.discard_old(new_world.timestamp());
+                // Off-by-one check:
+                // snapshot has completed the frame at t=snapshot.timestamp(), and therefore has
+                // already applied commands that are scheduled for t=snapshot.timestamp().
+                self.base_command_buffer.drain_up_to(snapshot.timestamp());
 
-                if new_world.timestamp() > old_world.timestamp() {
+                new_world_simulation
+                    .apply_completed_snapshot(snapshot, self.base_command_buffer.clone());
+
+                if new_world_simulation.last_completed_timestamp()
+                    > old_world_simulation.last_completed_timestamp()
+                {
+                    // The server should always be behind the client, even excluding the network
+                    // latency. The client may momentarily fall behind due to, e.g., browser tab
+                    // sleeping, but once the browser tab wakes up, the client should automatically
+                    // compensate, and if necessary, time skip to the correct timestamp to be ahead
+                    // of the server. If even then the server continues to be ahead, then it might
+                    // suggest that the client and the server's clocks are running at different
+                    // rates, and some additional time syncing mechanism is needed.
                     warn!("Server's snapshot is newer than client!");
                 }
+
+                // We reset the old/new interpolation factor and begin slowly blending in from the
+                // old world to the new world once the new world has caught up (aka
+                // "fast-forwarded") to the old world's timestamp.
                 self.old_new_interpolation_t = 0.0;
             }
         }
 
         trace!("Stepping old world by one frame");
-        let (old_world, new_world) = self.worlds.get_mut();
-        old_world.step();
+        let OldNewResult {
+            old: old_world_simulation,
+            new: new_world_simulation,
+        } = self.world_simulations.get_mut();
+        old_world_simulation.step();
 
         trace!(
             "Fastforwarding new world from timestamp {:?} to current timestamp {:?}",
-            new_world.timestamp(),
-            old_world.timestamp()
+            new_world_simulation.last_completed_timestamp(),
+            old_world_simulation.last_completed_timestamp()
         );
-        new_world.fast_forward_to_timestamp(
-            &old_world.timestamp(),
-            &self.command_buffer,
+        new_world_simulation.try_completing_simulations_up_to(
+            &old_world_simulation.last_completed_timestamp(),
             self.config.fastforward_max_per_step,
         );
 
@@ -493,8 +595,8 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
         self.states.swap();
         self.states
             .set_new(WorldType::DisplayStateType::from_interpolation(
-                &old_world.display_state(),
-                &new_world.display_state(),
+                &old_world_simulation.display_state(),
+                &new_world_simulation.display_state(),
                 self.old_new_interpolation_t,
             ));
 
@@ -510,7 +612,10 @@ impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
 
         // We display an interpolation between the undershot and overshot states.
         trace!("Interpolating undershot/overshot states");
-        let (undershot_state, overshot_state) = self.states.get();
+        let OldNewResult {
+            old: undershot_state,
+            new: overshot_state,
+        } = self.states.get();
         self.display_state = WorldType::DisplayStateType::from_interpolation(
             undershot_state,
             overshot_state,
@@ -536,8 +641,6 @@ pub fn client_setup<WorldType: World>(
     mut net: ResMut<NetworkResource>,
     endpoint_url: Res<EndpointUrl>,
 ) {
-    // let socket_address = "http://dango-daikazoku.herokuapp.com/join/1234";
-    // let socket_address = "http://192.168.1.9:8080/join/1234";
     info!("Starting client - connecting to {}", endpoint_url.0.clone());
     net.connect(endpoint_url.0.clone());
 }

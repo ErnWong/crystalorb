@@ -4,15 +4,22 @@ use std::{cmp::Reverse, collections::BTreeMap, fmt::Debug};
 
 pub trait Command: Clone + Sync + Send + 'static + Serialize + DeserializeOwned + Debug {}
 
+#[derive(Clone)]
 pub struct CommandBuffer<CommandType: Command> {
     map: BTreeMap<Reverse<Timestamp>, Vec<CommandType>>,
 }
 
-impl<CommandType: Command> CommandBuffer<CommandType> {
-    pub fn new() -> Self {
+impl<CommandType: Command> Default for CommandBuffer<CommandType> {
+    fn default() -> Self {
         Self {
             map: Default::default(),
         }
+    }
+}
+
+impl<CommandType: Command> CommandBuffer<CommandType> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn insert(&mut self, command: Timestamped<CommandType>) {
@@ -24,8 +31,13 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
         }
     }
 
-    pub fn discard_old(&mut self, oldest_timestamp_to_keep: Timestamp) {
-        self.map.split_off(&Reverse(oldest_timestamp_to_keep - 1));
+    pub fn drain_up_to(&mut self, newest_timestamp_to_drain: Timestamp) -> Vec<CommandType> {
+        self.map
+            .split_off(&Reverse(newest_timestamp_to_drain))
+            .values()
+            .flatten()
+            .map(|command| command.clone())
+            .collect()
     }
 
     pub fn commands_at(&self, timestamp: Timestamp) -> Option<impl Iterator<Item = &CommandType>> {
@@ -34,5 +46,9 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
         } else {
             None
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
     }
 }

@@ -1,27 +1,20 @@
 use crate::{
     channels::{network_setup, ClockSyncMessage},
-    command::CommandBuffer,
     events::ClientConnectionEvent,
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
     timestamp::{EarliestPrioritized, Timestamp, Timestamped},
-    world::World,
+    world::{World, WorldSimulation},
     Config,
 };
 use bevy::prelude::*;
 use bevy_networking_turbulence::{
     ConnectionHandle, NetworkEvent, NetworkResource, NetworkingPlugin,
 };
-use std::{
-    collections::{BinaryHeap, HashMap},
-    convert::TryInto,
-    marker::PhantomData,
-    net::SocketAddr,
-};
+use std::{collections::BinaryHeap, convert::TryInto, marker::PhantomData};
 
 pub struct Server<WorldType: World> {
-    world: Timestamped<WorldType>,
-    command_buffer: CommandBuffer<WorldType::CommandType>,
+    world_simulation: WorldSimulation<WorldType>,
     timestep_overshoot_seconds: f32,
     seconds_since_last_snapshot: f32,
     config: Config,
@@ -30,22 +23,24 @@ pub struct Server<WorldType: World> {
 impl<WorldType: World> Server<WorldType> {
     fn new(config: Config) -> Self {
         Self {
-            world: Default::default(),
-            command_buffer: CommandBuffer::new(),
+            world_simulation: Default::default(),
             timestep_overshoot_seconds: 0.0,
             seconds_since_last_snapshot: 0.0,
             config,
         }
     }
 
-    fn timestamp(&self) -> Timestamp {
-        self.world.timestamp() + self.config.lag_compensation_frame_count()
+    /// The timestamp that clients are supposed to be at (which should always be ahead of the
+    /// server to compensate for the latency between the server and the clients).
+    fn estimated_client_timestamp(&self) -> Timestamp {
+        self.world_simulation.last_completed_timestamp()
+            + self.config.lag_compensation_frame_count()
     }
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
     fn timestamp_drift(&self, time: &Time) -> Timestamp {
-        self.timestamp()
+        self.estimated_client_timestamp()
             - Timestamp::from_seconds(time.seconds_since_startup(), self.config.timestep_seconds)
     }
 
@@ -65,7 +60,8 @@ impl<WorldType: World> Server<WorldType> {
             timestamp,
             self.config.lag_compensation_frame_count()
         );
-        self.world.set_timestamp(timestamp);
+        self.world_simulation
+            .reset_last_completed_timestamp(timestamp);
     }
 
     fn apply_validated_command(
@@ -77,7 +73,7 @@ impl<WorldType: World> Server<WorldType> {
         info!("Received command from {:?} - {:?}", command_source, command);
 
         // Apply this command to our world later on.
-        self.command_buffer.insert(command.clone());
+        self.world_simulation.schedule_command(command.clone());
 
         // Relay command to every other client.
         for (handle, connection) in net.connections.iter_mut() {
@@ -103,42 +99,50 @@ impl<WorldType: World> Server<WorldType> {
         net: &mut NetworkResource,
     ) {
         if WorldType::command_is_valid(command.inner(), command_source as usize)
-            && command.timestamp() >= self.world.timestamp()
-            && command.timestamp() <= self.timestamp()
+        // TODO: Is it valid to validate the timestamps?
+        // && command.timestamp() >= self.world_simulation.last_completed_timestamp()
+        // && command.timestamp() <= self.estimated_client_timestamp()
         {
             self.apply_validated_command(command, Some(command_source), net);
         }
     }
 
+    /// Issue a command from the server to the world. The command will be scheduled to the
+    /// estimated client's current timestamp.
     pub fn issue_command(&mut self, command: WorldType::CommandType, net: &mut NetworkResource) {
-        self.apply_validated_command(Timestamped::new(command, self.timestamp()), None, net);
+        self.apply_validated_command(
+            Timestamped::new(command, self.estimated_client_timestamp()),
+            None,
+            net,
+        );
     }
 
     pub fn display_state(&self) -> WorldType::DisplayStateType {
-        self.world.inner().display_state()
+        self.world_simulation.display_state()
     }
 
-    fn send_snapshot(&mut self, time: &Time, net: &mut NetworkResource) {
+    fn send_snapshot_if_needed(&mut self, time: &Time, net: &mut NetworkResource) {
         self.seconds_since_last_snapshot += time.delta_seconds();
         if self.seconds_since_last_snapshot > self.config.snapshot_send_period {
             trace!(
                 "Broadcasting snapshot at timestamp: {:?} (note: drift error: {})",
-                self.world.timestamp(),
+                self.world_simulation.last_completed_timestamp(),
                 self.timestamp_drift_seconds(time),
             );
             self.seconds_since_last_snapshot = 0.0;
-            net.broadcast_message(self.world.snapshot());
+            net.broadcast_message(self.world_simulation.last_completed_snapshot());
         }
     }
 }
 
 impl<WorldType: World> Stepper for Server<WorldType> {
     fn step(&mut self) -> f32 {
-        self.command_buffer.discard_old(self.world.timestamp());
-        self.world.apply_commands(&self.command_buffer);
-        self.world.step();
-
-        self.config.timestep_seconds
+        trace!(
+            "Server world timestamp: {:?}, estimated client timestamp: {:?}",
+            self.world_simulation.last_completed_timestamp(),
+            self.estimated_client_timestamp(),
+        );
+        self.world_simulation.step()
     }
 }
 
@@ -209,17 +213,24 @@ pub fn server_system<WorldType: World>(
     server.advance(next_delta_seconds);
 
     // If drift is too large and we still couldn't keep up, do a time skip.
+    trace!(
+        "Timestamp drift: {:?}",
+        server.timestamp_drift_seconds(&time)
+    );
     if -server.timestamp_drift_seconds(&time) > server.config.timestamp_skip_threshold_seconds {
-        let corrected_timestamp = server.timestamp() - server.timestamp_drift(&time);
+        let corrected_timestamp =
+            server.world_simulation.last_completed_timestamp() - server.timestamp_drift(&time);
         warn!(
             "Server is too far behind. Skipping timestamp from {:?} to {:?}",
-            server.timestamp(),
+            server.world_simulation.last_completed_timestamp(),
             corrected_timestamp
         );
-        server.world.set_timestamp(corrected_timestamp);
+        server
+            .world_simulation
+            .reset_last_completed_timestamp(corrected_timestamp);
     }
 
-    server.send_snapshot(&*time, &mut *net);
+    server.send_snapshot_if_needed(&*time, &mut *net);
 }
 
 pub struct EndpointUrl(pub String);
@@ -231,13 +242,6 @@ pub fn server_setup<WorldType: World>(
     endpoint_url: Res<EndpointUrl>,
 ) {
     server.update_timestamp(&*time);
-
-    // let socket_address = "http://dango-daikazoku.herokuapp.com/host";
-    //let socket_address = "ws://192.168.1.9:8080/host";
-    //let socket_address = SocketAddr::new(
-    //    "192.168.1.9".parse().unwrap(),
-    //    std::env::var("PORT").map_or(9001, |port| port.parse().unwrap()),
-    //);
     info!("Starting server - listening at {}", endpoint_url.0.clone());
     net.listen(endpoint_url.0.clone());
 }

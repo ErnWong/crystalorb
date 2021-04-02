@@ -53,22 +53,25 @@ pub struct Config {
     pub timestamp_skip_threshold_seconds: f32,
 
     pub fastforward_max_per_step: usize,
+
+    pub clock_offset_update_factor: f64,
 }
 
 impl Config {
     pub const fn new() -> Self {
         Self {
-            lag_compensation_latency: 0.4,
-            interpolation_latency: 0.4,
+            lag_compensation_latency: 0.3,
+            interpolation_latency: 0.2,
             timestep_seconds: 1.0 / 60.0,
-            timestamp_sync_needed_sample_count: 4,
+            timestamp_sync_needed_sample_count: 10,
             initial_clock_sync_period: 0.2,
-            heartbeat_period: 1.0,
+            heartbeat_period: 0.7,
             connection_timeout_seconds: 10.0,
-            snapshot_send_period: 0.2,
+            snapshot_send_period: 0.1,
             update_delta_seconds_max: 0.25,
             timestamp_skip_threshold_seconds: 1.0,
             fastforward_max_per_step: 10,
+            clock_offset_update_factor: 0.1,
         }
     }
     pub fn lag_compensation_frame_count(&self) -> i16 {
