@@ -63,7 +63,7 @@ impl Config {
             lag_compensation_latency: 0.3,
             interpolation_latency: 0.2,
             timestep_seconds: 1.0 / 60.0,
-            timestamp_sync_needed_sample_count: 10,
+            timestamp_sync_needed_sample_count: 32,
             initial_clock_sync_period: 0.2,
             heartbeat_period: 0.7,
             connection_timeout_seconds: 10.0,
