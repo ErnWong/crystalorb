@@ -1,4 +1,5 @@
 #![feature(const_fn_floating_point_arithmetic)]
+#![feature(map_first_last)]
 
 pub mod channels;
 pub mod client;

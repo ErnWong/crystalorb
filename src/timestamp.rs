@@ -4,13 +4,16 @@ use std::{
     cmp::Ordering,
     fmt::Debug,
     num::Wrapping,
-    ops::{Add, Deref, DerefMut, Sub},
+    ops::{Add, Deref, DerefMut, Range, Sub},
 };
 
 #[derive(Eq, PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub struct Timestamp(Wrapping<i16>);
 
 impl Timestamp {
+    /// See note about transitivity for Timestamp's Ord implementation.
+    pub const MAX_COMPARABLE_RANGE: i16 = std::i16::MAX;
+
     pub fn from_seconds(seconds: f64, timestep_seconds: f32) -> Self {
         let frames_f64 = seconds / timestep_seconds as f64;
         let frames_wrapped = ((frames_f64 + 2.0f64.powi(15)) % 2.0f64.powi(16)) - 2.0f64.powi(15);
@@ -23,6 +26,12 @@ impl Timestamp {
 
     pub fn as_seconds(&self, timestep_seconds: f32) -> f32 {
         self.0 .0 as f32 * timestep_seconds
+    }
+
+    /// See note about transitivity for Timestamp's Ord implementation.
+    pub fn comparable_range_with_midpoint(midpoint: Timestamp) -> Range<Timestamp> {
+        let max_distance_from_midpoint = Self::MAX_COMPARABLE_RANGE / 2;
+        (midpoint - max_distance_from_midpoint)..(midpoint + max_distance_from_midpoint)
     }
 }
 
@@ -48,6 +57,10 @@ impl Sub<Timestamp> for Timestamp {
 }
 
 impl Ord for Timestamp {
+    /// Note: This is technically not transitive, since we are doing wrapped differences.
+    /// To guarantee transitivity (for example, to use in BTreeMaps), ensure that all values being
+    /// compared against each other are at most std::i16::MAX length of each other.
+    /// (Maybe std::i16::MAX is off by one, but it is at least on the conservative side)
     fn cmp(&self, other: &Self) -> Ordering {
         let difference: Wrapping<i16> = self.0 - other.0;
         match difference {

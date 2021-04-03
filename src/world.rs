@@ -24,7 +24,6 @@ pub trait World: Stepper + Default + Send + Sync + 'static {
 
 pub struct WorldSimulation<WorldType: World> {
     world: WorldType,
-    last_completed_timestamp: Timestamp,
     command_buffer: CommandBuffer<WorldType::CommandType>,
 }
 
@@ -32,7 +31,6 @@ impl<WorldType: World> Default for WorldSimulation<WorldType> {
     fn default() -> Self {
         Self {
             world: Default::default(),
-            last_completed_timestamp: Default::default(),
             command_buffer: Default::default(),
         }
     }
@@ -46,16 +44,17 @@ impl<WorldType: World> WorldSimulation<WorldType> {
     /// The timestamp for the frame that has completed simulation, and whose resulting state is
     /// now available.
     pub fn last_completed_timestamp(&self) -> Timestamp {
-        self.last_completed_timestamp
+        self.command_buffer.timestamp()
     }
 
     /// Useful for initializing the timestamp, syncing the timestamp, and, when necessary,
     /// (i.e. when the world is drifting too far behind and can't catch up), jump to a
     /// corrected timestamp in the future without running any simulation. Note that any
     /// leftover stale commands won't be dropped - they will still be applied in the next
-    /// frame.
+    /// frame, unless they are too stale that the must be dropped to maintain the transitivity
+    /// laws.
     pub fn reset_last_completed_timestamp(&mut self, timestamp: Timestamp) {
-        self.last_completed_timestamp = timestamp;
+        self.command_buffer.update_timestamp(timestamp);
     }
 
     /// The timestamp for the next frame that is either about to be simulated, of is currently
@@ -99,10 +98,11 @@ impl<WorldType: World> WorldSimulation<WorldType> {
         completed_snapshot: Timestamped<WorldType::SnapshotType>,
         rewound_command_buffer: CommandBuffer<WorldType::CommandType>,
     ) {
-        self.reset_last_completed_timestamp(completed_snapshot.timestamp());
         self.world
             .apply_snapshot(completed_snapshot.inner().clone());
         self.command_buffer = rewound_command_buffer;
+        self.command_buffer
+            .update_timestamp(completed_snapshot.timestamp());
     }
 
     /// Generates a timestamped snapshot of the world for the latest frame that has completed
@@ -128,8 +128,10 @@ impl<WorldType: World> Stepper for WorldSimulation<WorldType> {
         // We then advance the world simulation by one frame.
         let delta_seconds = self.world.step();
 
-        // The simulation for this frame has been completed.
-        self.last_completed_timestamp.increment();
+        // The simulation for this frame has been completed, so we can now increment the
+        // timestamp.
+        self.command_buffer
+            .update_timestamp(self.last_completed_timestamp() + 1);
 
         delta_seconds
     }

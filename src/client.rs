@@ -622,6 +622,10 @@ impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
             1.0 - self.timestep_overshoot_seconds / self.config.timestep_seconds,
         );
 
+        trace!("Update the base command buffer's timestamp and accept-window");
+        self.base_command_buffer
+            .update_timestamp(self.last_completed_timestamp());
+
         trace!("Done advancing");
     }
 }
