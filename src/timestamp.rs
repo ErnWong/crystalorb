@@ -12,7 +12,7 @@ pub struct Timestamp(Wrapping<i16>);
 
 impl Timestamp {
     /// See note about transitivity for Timestamp's Ord implementation.
-    pub const MAX_COMPARABLE_RANGE: i16 = std::i16::MAX;
+    pub const MAX_COMPARABLE_RANGE: i16 = i16::MAX;
 
     pub fn from_seconds(seconds: f64, timestep_seconds: f32) -> Self {
         let frames_f64 = seconds / timestep_seconds as f64;
