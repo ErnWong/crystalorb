@@ -67,7 +67,8 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
             if let Some((key, value)) = self.map.first_key_value() {
                 if key.0 >= acceptable_timestamp_range.end {
                     warn!("Discarding future command {:?} after timestamp update! This should rarely happen", value);
-                    self.map.remove(&key.clone());
+                    let key_to_remove = key.clone();
+                    self.map.remove(&key_to_remove);
                     continue;
                 }
             }
