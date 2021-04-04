@@ -6,7 +6,7 @@ edition = "2018"
 
 [features]
 default = [
-    "use-udp",
+    "use-webrtc",
 ]
 use-udp = [
     "bevy_networking_turbulence/use-udp",
