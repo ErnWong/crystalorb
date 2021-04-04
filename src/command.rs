@@ -63,7 +63,8 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
 
         // In case we rewind the midpoint timestamp, discard commands too far in the future.
         loop {
-            if let Some((key, value)) = self.map.last_key_value() {
+            // Note: since the map is reversed, the latest command is ordered first.
+            if let Some((key, value)) = self.map.first_key_value() {
                 if key.0 >= acceptable_timestamp_range.end {
                     warn!("Discarding future command {:?} after timestamp update! This should rarely happen", value);
                     self.map.remove(&key.clone());
@@ -99,6 +100,7 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
         self.map
             .split_off(&Reverse(newest_timestamp_to_drain))
             .values()
+            .rev() // Our map is in reverse order.
             .flatten()
             .map(|command| command.clone())
             .collect()
