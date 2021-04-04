@@ -167,3 +167,166 @@ impl<T> PartialEq for EarliestPrioritized<T> {
 }
 
 impl<T> Eq for EarliestPrioritized<T> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn interesting_timestamps() -> [Timestamp; 7] {
+        [
+            Timestamp::default() + std::i16::MIN,
+            Timestamp::default() + std::i16::MIN / 2,
+            Timestamp::default() - 1,
+            Timestamp::default(),
+            Timestamp::default() + 1,
+            Timestamp::default() + std::i16::MAX / 2,
+            Timestamp::default() + std::i16::MAX,
+        ]
+    }
+
+    struct InterestingOffsets {
+        plus_one: Timestamp,
+        plus_limit: Timestamp,
+        plus_wrapped: Timestamp,
+        plus_wrapped_limit: Timestamp,
+        plus_wrapped_full: Timestamp,
+        minus_one: Timestamp,
+        minus_limit: Timestamp,
+        minus_wrapped: Timestamp,
+        minus_wrapped_limit: Timestamp,
+        minus_wrapped_full: Timestamp,
+    }
+
+    fn generate_interesting_offsets(initial: Timestamp) -> InterestingOffsets {
+        let plus_one = initial + 1;
+        let plus_limit = initial + i16::MAX;
+        let plus_wrapped = plus_limit + 1;
+        let plus_wrapped_limit = plus_limit - i16::MIN;
+        let plus_wrapped_full = plus_wrapped_limit + 1;
+
+        let minus_one = initial - 1;
+        let minus_limit = initial + i16::MIN;
+        let minus_wrapped = minus_limit - 1;
+        let minus_wrapped_limit = minus_limit - i16::MAX;
+        let minus_wrapped_full = minus_wrapped_limit - 1;
+
+        InterestingOffsets {
+            plus_one,
+            plus_limit,
+            plus_wrapped,
+            plus_wrapped_limit,
+            plus_wrapped_full,
+            minus_one,
+            minus_limit,
+            minus_wrapped,
+            minus_wrapped_limit,
+            minus_wrapped_full,
+        }
+    }
+
+    #[test]
+    fn test_timestamp_ord() {
+        fn test_timestamp_ord_with_initial(initial: Timestamp) {
+            let offsets = generate_interesting_offsets(initial);
+            assert!(offsets.plus_one > initial);
+            assert!(offsets.plus_limit > initial);
+            assert!(offsets.plus_wrapped < initial);
+            assert!(offsets.plus_wrapped_limit < initial);
+            assert!(offsets.plus_wrapped_full == initial);
+            assert!(offsets.minus_one < initial);
+            assert!(offsets.minus_limit < initial);
+            assert!(offsets.minus_wrapped > initial);
+            assert!(offsets.minus_wrapped_limit > initial);
+            assert!(offsets.minus_wrapped_full == initial);
+        }
+
+        for timestamp in &interesting_timestamps() {
+            test_timestamp_ord_with_initial(*timestamp);
+        }
+    }
+
+    #[test]
+    fn test_timestamp_difference() {
+        fn test_timestamp_difference_with_initial(initial: Timestamp) {
+            let offsets = generate_interesting_offsets(initial);
+            assert_eq!(offsets.plus_one - initial, Timestamp::default() + 1);
+            assert_eq!(
+                offsets.plus_limit - initial,
+                Timestamp::default() + i16::MAX
+            );
+            assert_eq!(
+                offsets.plus_wrapped - initial,
+                Timestamp::default() + i16::MIN
+            );
+            assert_eq!(
+                offsets.plus_wrapped_limit - initial,
+                Timestamp::default() - 1
+            );
+            assert_eq!(offsets.plus_wrapped_full - initial, Timestamp::default());
+            assert_eq!(offsets.minus_one - initial, Timestamp::default() - 1);
+            assert_eq!(
+                offsets.minus_limit - initial,
+                Timestamp::default() + i16::MIN
+            );
+            assert_eq!(
+                offsets.minus_wrapped - initial,
+                Timestamp::default() + i16::MAX
+            );
+            assert_eq!(
+                offsets.minus_wrapped_limit - initial,
+                Timestamp::default() + 1
+            );
+            assert_eq!(offsets.minus_wrapped_full - initial, Timestamp::default());
+        }
+
+        for timestamp in &interesting_timestamps() {
+            test_timestamp_difference_with_initial(*timestamp);
+        }
+    }
+
+    #[test]
+    fn test_timestamp_increment() {
+        for timestamp in &interesting_timestamps() {
+            let mut incremented = timestamp.clone();
+            incremented.increment();
+            assert!(incremented > *timestamp);
+            assert_eq!(incremented - *timestamp, Timestamp::default() + 1);
+        }
+    }
+
+    #[test]
+    fn test_timestamp_from_seconds() {
+        assert_eq!(Timestamp::from_seconds(0.0, 1.0), Timestamp::default());
+        assert_eq!(Timestamp::from_seconds(1.0, 1.0), Timestamp::default() + 1);
+        assert_eq!(
+            Timestamp::from_seconds(0.25, 0.25),
+            Timestamp::default() + 1
+        );
+        assert_eq!(Timestamp::from_seconds(-1.0, 1.0), Timestamp::default() - 1);
+        assert_eq!(
+            Timestamp::from_seconds(i16::MAX as f64, 1.0),
+            Timestamp::default() + i16::MAX,
+        );
+        assert_eq!(
+            Timestamp::from_seconds((i16::MAX as f64) + 1.0, 1.0),
+            Timestamp::default() + i16::MIN
+        );
+    }
+
+    #[test]
+    fn test_timestamp_as_seconds() {
+        assert_eq!(Timestamp::from_seconds(0.0, 1.0).as_seconds(1.0), 0.0);
+        assert_eq!(Timestamp::from_seconds(1.0, 1.0).as_seconds(1.0), 1.0);
+        assert_eq!(Timestamp::from_seconds(1.0, 1.0).as_seconds(0.25), 0.25);
+        assert_eq!(Timestamp::from_seconds(0.25, 0.25).as_seconds(0.25), 0.25);
+        assert_eq!(Timestamp::from_seconds(-1.0, 1.0).as_seconds(1.0), -1.0);
+        assert_eq!(
+            Timestamp::from_seconds(i16::MAX as f64, 1.0).as_seconds(1.0),
+            i16::MAX as f32,
+        );
+        assert_eq!(
+            Timestamp::from_seconds((i16::MAX as f64) + 1.0, 1.0).as_seconds(1.0),
+            i16::MIN as f32,
+        );
+    }
+}
