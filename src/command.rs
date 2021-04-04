@@ -116,3 +116,219 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
         self.map.len()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl Command for i32 {}
+
+    #[test]
+    fn when_timestamp_incremented_then_command_buffer_discards_stale_commands() {
+        // GIVEN a command buffer with old commands, one of which is at the lowest extreme of the
+        // acceptable range.
+        let mut command_buffer = CommandBuffer::<i32>::new();
+        let acceptable_range = command_buffer.acceptable_timestamp_range();
+        let t = [
+            acceptable_range.start,
+            acceptable_range.start + 1,
+            acceptable_range.end - 2,
+            acceptable_range.end - 1,
+        ];
+        command_buffer.insert(Timestamped::new(0, t[0]));
+        command_buffer.insert(Timestamped::new(1, t[1]));
+        command_buffer.insert(Timestamped::new(2, t[2]));
+        command_buffer.insert(Timestamped::new(3, t[3]));
+        assert_eq!(
+            *command_buffer.commands_at(t[0]).unwrap().next().unwrap(),
+            0
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[1]).unwrap().next().unwrap(),
+            1
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[2]).unwrap().next().unwrap(),
+            2
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[3]).unwrap().next().unwrap(),
+            3
+        );
+
+        // WHEN we increment the timestamp.
+        command_buffer.update_timestamp(command_buffer.timestamp() + 1);
+
+        // THEN only the one command that now falls outside of the new acceptable range gets
+        // discared.
+        assert!(command_buffer.commands_at(t[0]).is_none());
+        assert_eq!(
+            *command_buffer.commands_at(t[1]).unwrap().next().unwrap(),
+            1
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[2]).unwrap().next().unwrap(),
+            2
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[3]).unwrap().next().unwrap(),
+            3
+        );
+    }
+
+    #[test]
+    fn when_timestamp_decremented_then_command_buffer_discards_unripe_commands() {
+        // GIVEN a command buffer with old commands, one of which is at the highest extreme of the
+        // acceptable range.
+        let mut command_buffer = CommandBuffer::<i32>::new();
+        let acceptable_range = command_buffer.acceptable_timestamp_range();
+        let t = [
+            acceptable_range.start,
+            acceptable_range.start + 1,
+            acceptable_range.end - 2,
+            acceptable_range.end - 1,
+        ];
+        command_buffer.insert(Timestamped::new(0, t[0]));
+        command_buffer.insert(Timestamped::new(1, t[1]));
+        command_buffer.insert(Timestamped::new(2, t[2]));
+        command_buffer.insert(Timestamped::new(3, t[3]));
+        assert_eq!(
+            *command_buffer.commands_at(t[0]).unwrap().next().unwrap(),
+            0
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[1]).unwrap().next().unwrap(),
+            1
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[2]).unwrap().next().unwrap(),
+            2
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[3]).unwrap().next().unwrap(),
+            3
+        );
+
+        // WHEN we decrement the timestamp.
+        command_buffer.update_timestamp(command_buffer.timestamp() - 1);
+
+        // THEN only the one command that now falls outside of the new acceptable range gets
+        // discared.
+        assert_eq!(
+            *command_buffer.commands_at(t[0]).unwrap().next().unwrap(),
+            0
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[1]).unwrap().next().unwrap(),
+            1
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[2]).unwrap().next().unwrap(),
+            2
+        );
+        assert!(command_buffer.commands_at(t[3]).is_none());
+    }
+
+    #[test]
+    fn when_inserting_command_outside_acceptable_range_then_command_is_discarded() {
+        // GIVEN an empty command buffer
+        let mut command_buffer = CommandBuffer::<i32>::new();
+
+        // WHEN we insert commands, some of which are outside the acceptable range.
+        let acceptable_range = command_buffer.acceptable_timestamp_range();
+        let t = [
+            acceptable_range.start - 1,
+            acceptable_range.start,
+            acceptable_range.end - 1,
+            acceptable_range.end,
+            acceptable_range.end + Timestamp::MAX_COMPARABLE_RANGE / 2,
+        ];
+        command_buffer.insert(Timestamped::new(0, t[0]));
+        command_buffer.insert(Timestamped::new(1, t[1]));
+        command_buffer.insert(Timestamped::new(2, t[2]));
+        command_buffer.insert(Timestamped::new(3, t[3]));
+        command_buffer.insert(Timestamped::new(4, t[4]));
+        assert!(command_buffer.commands_at(t[0]).is_none());
+        assert_eq!(
+            *command_buffer.commands_at(t[1]).unwrap().next().unwrap(),
+            1
+        );
+        assert_eq!(
+            *command_buffer.commands_at(t[2]).unwrap().next().unwrap(),
+            2
+        );
+        assert!(command_buffer.commands_at(t[3]).is_none());
+        assert!(command_buffer.commands_at(t[4]).is_none());
+    }
+
+    #[test]
+    fn test_drain_up_to() {
+        // GIVEN a command buffer with several commands.
+        let mut command_buffer = CommandBuffer::<i32>::new();
+        command_buffer.insert(Timestamped::new(0, command_buffer.timestamp() + 1));
+        command_buffer.insert(Timestamped::new(1, command_buffer.timestamp() + 5));
+        command_buffer.insert(Timestamped::new(2, command_buffer.timestamp() + 2));
+        command_buffer.insert(Timestamped::new(3, command_buffer.timestamp() + 4));
+        command_buffer.insert(Timestamped::new(4, command_buffer.timestamp() + 8));
+        command_buffer.insert(Timestamped::new(5, command_buffer.timestamp() + 6));
+        command_buffer.insert(Timestamped::new(6, command_buffer.timestamp() + 7));
+        command_buffer.insert(Timestamped::new(7, command_buffer.timestamp() + 3));
+
+        // WHEN we drain the command buffer up to a certain timestamp.
+        let drained_commands = command_buffer.drain_up_to(command_buffer.timestamp() + 4);
+
+        // THEN we get the commands up to and including the specified timestamp, in order.
+        assert_eq!(drained_commands.len(), 4);
+        assert_eq!(drained_commands[0], 0);
+        assert_eq!(drained_commands[1], 2);
+        assert_eq!(drained_commands[2], 7);
+        assert_eq!(drained_commands[3], 3);
+
+        // THEN we the command buffer will have discarded commands up to and including the
+        // specified timestamp, while keeping the other commands.
+        assert!(command_buffer
+            .commands_at(command_buffer.timestamp() + 1)
+            .is_none());
+        assert!(command_buffer
+            .commands_at(command_buffer.timestamp() + 2)
+            .is_none());
+        assert!(command_buffer
+            .commands_at(command_buffer.timestamp() + 3)
+            .is_none());
+        assert!(command_buffer
+            .commands_at(command_buffer.timestamp() + 4)
+            .is_none());
+        assert_eq!(
+            *command_buffer
+                .commands_at(command_buffer.timestamp() + 5)
+                .unwrap()
+                .next()
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            *command_buffer
+                .commands_at(command_buffer.timestamp() + 6)
+                .unwrap()
+                .next()
+                .unwrap(),
+            5
+        );
+        assert_eq!(
+            *command_buffer
+                .commands_at(command_buffer.timestamp() + 7)
+                .unwrap()
+                .next()
+                .unwrap(),
+            6
+        );
+        assert_eq!(
+            *command_buffer
+                .commands_at(command_buffer.timestamp() + 8)
+                .unwrap()
+                .next()
+                .unwrap(),
+            4
+        );
+    }
+}
