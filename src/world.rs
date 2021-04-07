@@ -3,8 +3,8 @@ use crate::{
     fixed_timestepper::Stepper,
     timestamp::{Timestamp, Timestamped},
 };
+use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
-use turbulence::message_channels::ChannelMessage;
 
 pub trait DisplayState: Default + Send + Sync + Clone {
     fn from_interpolation(state1: &Self, state2: &Self, t: f32) -> Self;
@@ -12,7 +12,7 @@ pub trait DisplayState: Default + Send + Sync + Clone {
 
 pub trait World: Stepper + Default + Send + Sync + 'static {
     type CommandType: Command;
-    type SnapshotType: ChannelMessage + Clone + Debug;
+    type SnapshotType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static;
     type DisplayStateType: DisplayState;
 
     fn command_is_valid(command: &Self::CommandType, client_id: usize) -> bool;

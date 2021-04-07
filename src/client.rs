@@ -1,17 +1,16 @@
 use crate::{
-    channels::{network_setup, ClockSyncMessage},
+    channels::ClockSyncMessage,
     command::CommandBuffer,
-    events::ClientConnectionEvent,
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
+    network_resource::{Connection, NetworkResource},
     old_new::{OldNew, OldNewResult},
     timestamp::{Timestamp, Timestamped},
     world::{DisplayState, World, WorldSimulation},
     Config,
 };
-use bevy::prelude::*;
-use bevy_networking_turbulence::{NetworkEvent, NetworkResource, NetworkingPlugin};
 use std::marker::PhantomData;
+use tracing::{info, trace, warn};
 
 pub struct Client<WorldType: World> {
     config: Config,
@@ -20,7 +19,7 @@ pub struct Client<WorldType: World> {
 }
 
 impl<WorldType: World> Client<WorldType> {
-    fn new(config: Config) -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
             config: config.clone(),
             state: Some(ClientState::SyncingInitialTimestamp(
@@ -30,18 +29,18 @@ impl<WorldType: World> Client<WorldType> {
         }
     }
 
-    fn update(
+    pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        time: &Time,
-        net: &mut NetworkResource,
-        client_connection_events: &mut Events<ClientConnectionEvent>,
+        delta_seconds: f32,
+        seconds_since_startup: f64,
+        net: &mut NetworkResourceType,
     ) {
-        self.seconds_since_last_heartbeat += time.delta_seconds();
+        self.seconds_since_last_heartbeat += delta_seconds;
         if self.seconds_since_last_heartbeat > self.config.heartbeat_period {
             self.seconds_since_last_heartbeat = 0.0;
             trace!("Sending heartbeat");
             net.broadcast_message(ClockSyncMessage {
-                client_send_seconds_since_startup: time.seconds_since_startup(),
+                client_send_seconds_since_startup: seconds_since_startup,
                 server_seconds_since_startup: 0.0,
                 client_id: 0,
             });
@@ -50,14 +49,9 @@ impl<WorldType: World> Client<WorldType> {
         let mut server_seconds_offset_sum: f64 = 0.0;
         let mut sample_count: usize = 0;
         let mut client_id: usize = 0;
-        for (_, connection) in net.connections.iter_mut() {
-            let channels = connection.channels().unwrap();
-            if !channels.is_connected() {
-                // TODO: rely on this to initiate reconnection? Or rely on timeouts?
-                warn!("Channels disconnected!");
-            }
-            while let Some(sync) = channels.recv::<ClockSyncMessage>() {
-                let received_time = time.seconds_since_startup();
+        for (_, mut connection) in net.connections() {
+            while let Some(sync) = connection.recv::<ClockSyncMessage>() {
+                let received_time = seconds_since_startup;
                 let corresponding_client_time =
                     (sync.client_send_seconds_since_startup + received_time) / 2.0;
                 let offset = sync.server_seconds_since_startup - corresponding_client_time;
@@ -79,26 +73,27 @@ impl<WorldType: World> Client<WorldType> {
 
         let should_transition = match &mut self.state.as_mut().unwrap() {
             ClientState::SyncingInitialTimestamp(client) => client.update(
-                time,
+                delta_seconds,
+                seconds_since_startup,
                 net,
                 server_seconds_offset_sum,
                 sample_count,
                 client_id,
             ),
-            ClientState::SyncingInitialState(client) => client.update(time, net, offset_update),
-            ClientState::Ready(client) => client.update(time, net, offset_update),
+            ClientState::SyncingInitialState(client) => {
+                client.update(delta_seconds, seconds_since_startup, net, offset_update)
+            }
+            ClientState::Ready(client) => {
+                client.update(delta_seconds, seconds_since_startup, net, offset_update)
+            }
         };
         if should_transition {
             self.state = Some(match self.state.take().unwrap() {
                 ClientState::SyncingInitialTimestamp(client) => {
-                    client.into_next_state(time).unwrap()
+                    client.into_next_state(seconds_since_startup).unwrap()
                 }
-                ClientState::SyncingInitialState(client) => {
-                    client.into_next_state(client_connection_events).unwrap()
-                }
-                ClientState::Ready(client) => client
-                    .into_next_state(net, client_connection_events)
-                    .unwrap(),
+                ClientState::SyncingInitialState(client) => client.into_next_state().unwrap(),
+                ClientState::Ready(client) => client.into_next_state(net).unwrap(),
             });
         }
     }
@@ -139,10 +134,11 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
             _world_type: PhantomData,
         }
     }
-    fn update(
+    fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        time: &Time,
-        net: &mut NetworkResource,
+        delta_seconds: f32,
+        seconds_since_startup: f64,
+        net: &mut NetworkResourceType,
         server_seconds_offset_addition: f64,
         new_sample_count: usize,
         client_id: usize,
@@ -151,12 +147,12 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
         self.sample_count += new_sample_count;
         self.client_id = client_id;
 
-        self.seconds_since_last_send += time.delta_seconds();
+        self.seconds_since_last_send += delta_seconds;
         if self.seconds_since_last_send > self.config.initial_clock_sync_period {
             self.seconds_since_last_send = 0.0;
             trace!("Sending clock sync message");
             net.broadcast_message(ClockSyncMessage {
-                client_send_seconds_since_startup: time.seconds_since_startup(),
+                client_send_seconds_since_startup: seconds_since_startup,
                 server_seconds_since_startup: 0.0,
                 client_id: 0,
             });
@@ -169,10 +165,10 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
         self.sample_count > self.config.timestamp_sync_needed_sample_count
     }
 
-    fn into_next_state(self, time: &Time) -> Option<ClientState<WorldType>> {
+    fn into_next_state(self, seconds_since_startup: f64) -> Option<ClientState<WorldType>> {
         if self.should_transition() {
             let seconds_offset = self.server_seconds_offset_sum / self.sample_count as f64;
-            let server_time = time.seconds_since_startup() + seconds_offset;
+            let server_time = seconds_since_startup + seconds_offset;
             let initial_timestamp =
                 Timestamp::from_seconds(server_time, self.config.timestep_seconds);
             Some(ClientState::SyncingInitialState(
@@ -209,13 +205,15 @@ impl<WorldType: World> SyncingInitialStateClient<WorldType> {
             client: ActiveClient::new(config, initial_timestamp, server_seconds_offset, client_id),
         }
     }
-    fn update(
+    fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        time: &Time,
-        net: &mut NetworkResource,
+        delta_seconds: f32,
+        seconds_since_startup: f64,
+        net: &mut NetworkResourceType,
         offset_update: Option<f64>,
     ) -> bool {
-        self.client.update(time, net, offset_update);
+        self.client
+            .update(delta_seconds, seconds_since_startup, net, offset_update);
         self.should_transition()
     }
 
@@ -223,12 +221,8 @@ impl<WorldType: World> SyncingInitialStateClient<WorldType> {
         self.client.last_queued_snapshot_timestamp.is_some()
     }
 
-    fn into_next_state(
-        self,
-        client_connection_events: &mut Events<ClientConnectionEvent>,
-    ) -> Option<ClientState<WorldType>> {
+    fn into_next_state(self) -> Option<ClientState<WorldType>> {
         if self.should_transition() {
-            client_connection_events.send(ClientConnectionEvent::Connected(self.client.client_id));
             Some(ClientState::Ready(ReadyClient::new(self.client)))
         } else {
             None
@@ -255,7 +249,11 @@ impl<WorldType: World> ReadyClient<WorldType> {
 
     /// Issue a command from this client's player to the world. The command will be scheduled
     /// to the current simulating timestamp (the previously completed timestamp + 1).
-    pub fn issue_command(&mut self, command: WorldType::CommandType, net: &mut NetworkResource) {
+    pub fn issue_command<NetworkResourceType: NetworkResource>(
+        &mut self,
+        command: WorldType::CommandType,
+        net: &mut NetworkResourceType,
+    ) {
         let command = Timestamped::new(command, self.simulating_timestamp());
         self.client.receive_command(command.clone());
         net.broadcast_message(command);
@@ -270,29 +268,31 @@ impl<WorldType: World> ReadyClient<WorldType> {
         Self { client }
     }
 
-    fn update(
+    fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        time: &Time,
-        net: &mut NetworkResource,
+        delta_seconds: f32,
+        seconds_since_startup: f64,
+        net: &mut NetworkResourceType,
         offset_update: Option<f64>,
     ) -> bool {
-        self.client.update(time, net, offset_update);
+        self.client
+            .update(delta_seconds, seconds_since_startup, net, offset_update);
         self.should_transition(net)
     }
 
-    fn should_transition(&self, _net: &mut NetworkResource) -> bool {
+    fn should_transition<NetworkResourceType: NetworkResource>(
+        &self,
+        _net: &mut NetworkResourceType,
+    ) -> bool {
         // TODO: Check for disconnection.
         false
     }
 
-    fn into_next_state(
+    fn into_next_state<NetworkResourceType: NetworkResource>(
         self,
-        net: &mut NetworkResource,
-        client_connection_events: &mut Events<ClientConnectionEvent>,
+        net: &mut NetworkResourceType,
     ) -> Option<ClientState<WorldType>> {
         if self.should_transition(net) {
-            client_connection_events
-                .send(ClientConnectionEvent::Disconnected(self.client.client_id));
             Some(ClientState::SyncingInitialTimestamp(
                 SyncingInitialTimestampClient::new(self.client.config),
             ))
@@ -393,20 +393,26 @@ impl<WorldType: World> ActiveClient<WorldType> {
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
-    fn timestamp_drift(&self, time: &Time) -> Timestamp {
-        let server_time = time.seconds_since_startup() + self.server_seconds_offset;
+    fn timestamp_drift(&self, seconds_since_startup: f64) -> Timestamp {
+        let server_time = seconds_since_startup + self.server_seconds_offset;
         self.last_completed_timestamp()
             - Timestamp::from_seconds(server_time, self.config.timestep_seconds)
     }
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
-    fn timestamp_drift_seconds(&self, time: &Time) -> f32 {
-        self.timestamp_drift(time)
+    fn timestamp_drift_seconds(&self, seconds_since_startup: f64) -> f32 {
+        self.timestamp_drift(seconds_since_startup)
             .as_seconds(self.config.timestep_seconds)
     }
 
-    fn update(&mut self, time: &Time, net: &mut NetworkResource, offset_update: Option<f64>) {
+    pub fn update<NetworkResourceType: NetworkResource>(
+        &mut self,
+        delta_seconds: f32,
+        seconds_since_startup: f64,
+        net: &mut NetworkResourceType,
+        offset_update: Option<f64>,
+    ) {
         if let Some(offset) = offset_update {
             let old_server_seconds_offset = self.server_seconds_offset;
             self.server_seconds_offset +=
@@ -418,34 +424,36 @@ impl<WorldType: World> ActiveClient<WorldType> {
             );
         }
 
-        for (_, connection) in net.connections.iter_mut() {
-            let channels = connection.channels().unwrap();
-            if !channels.is_connected() {
-                // TODO: rely on this to initiate reconnection? Or rely on timeouts?
-                warn!("Channels disconnected!");
-            }
-            while let Some(command) = channels.recv::<Timestamped<WorldType::CommandType>>() {
+        for (_, mut connection) in net.connections() {
+            while let Some(command) = connection.recv::<Timestamped<WorldType::CommandType>>() {
                 self.receive_command(command);
             }
-            while let Some(snapshot) = channels.recv::<Timestamped<WorldType::SnapshotType>>() {
+            while let Some(snapshot) = connection.recv::<Timestamped<WorldType::SnapshotType>>() {
                 self.receive_snapshot(snapshot);
             }
         }
 
         // Compensate for any drift.
         // TODO: Remove duplicate code between client and server.
-        let next_delta_seconds = (time.delta_seconds() - self.timestamp_drift_seconds(time))
-            .clamp(0.0, self.config.update_delta_seconds_max);
+        let next_delta_seconds = (delta_seconds
+            - self.timestamp_drift_seconds(seconds_since_startup))
+        .clamp(0.0, self.config.update_delta_seconds_max);
 
         self.advance(next_delta_seconds);
 
         // If drift is too large and we still couldn't keep up, do a time skip.
-        trace!("Timestamp drift: {:?}", self.timestamp_drift_seconds(time));
-        if -self.timestamp_drift_seconds(time) < -self.config.timestamp_skip_threshold_seconds {
+        trace!(
+            "Timestamp drift: {:?}",
+            self.timestamp_drift_seconds(seconds_since_startup)
+        );
+        if -self.timestamp_drift_seconds(seconds_since_startup)
+            < -self.config.timestamp_skip_threshold_seconds
+        {
             // Note: only skip on the old world's timestamp.
             // If new world couldn't catch up, then it can simply grab the next server snapshot
             // when it arrives.
-            let corrected_timestamp = self.last_completed_timestamp() - self.timestamp_drift(time);
+            let corrected_timestamp =
+                self.last_completed_timestamp() - self.timestamp_drift(seconds_since_startup);
             warn!(
                 "Client is too far behind. Skipping timestamp from {:?} to {:?}",
                 self.last_completed_timestamp(),
@@ -627,67 +635,5 @@ impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
             .update_timestamp(self.last_completed_timestamp());
 
         trace!("Done advancing");
-    }
-}
-
-pub fn client_system<WorldType: World>(
-    mut network_event_reader: Local<EventReader<NetworkEvent>>,
-    mut client: ResMut<Client<WorldType>>,
-    time: Res<Time>,
-    mut net: ResMut<NetworkResource>,
-    network_events: Res<Events<NetworkEvent>>,
-    mut client_connection_events: ResMut<Events<ClientConnectionEvent>>,
-) {
-    // TODO: For now, disconnection events are fatal and we do not attempt to reconnect. This
-    // is why it is handled specially, in this location, rather than as a ClientState
-    // transition.
-    for network_event in network_event_reader.iter(&network_events) {
-        match network_event {
-            NetworkEvent::Disconnected(handle) => {
-                client_connection_events
-                    .send(ClientConnectionEvent::Disconnected(*handle as usize));
-            }
-            _ => {}
-        }
-    }
-    client.update(&*time, &mut *net, &mut *client_connection_events);
-}
-
-pub struct EndpointUrl(pub String);
-
-pub fn client_setup<WorldType: World>(
-    mut net: ResMut<NetworkResource>,
-    endpoint_url: Res<EndpointUrl>,
-) {
-    info!("Starting client - connecting to {}", endpoint_url.0.clone());
-    net.connect(endpoint_url.0.clone());
-}
-
-#[derive(Default)]
-pub struct NetworkedPhysicsClientPlugin<WorldType: World> {
-    config: Config,
-    endpoint_url: String,
-    _world_type: PhantomData<WorldType>,
-}
-
-impl<WorldType: World> NetworkedPhysicsClientPlugin<WorldType> {
-    pub fn new(config: Config, endpoint_url: String) -> Self {
-        Self {
-            config,
-            endpoint_url,
-            _world_type: PhantomData,
-        }
-    }
-}
-
-impl<WorldType: World> Plugin for NetworkedPhysicsClientPlugin<WorldType> {
-    fn build(&self, app: &mut AppBuilder) {
-        app.add_plugin(NetworkingPlugin::default())
-            .add_event::<ClientConnectionEvent>()
-            .add_resource(Client::<WorldType>::new(self.config.clone()))
-            .add_resource(EndpointUrl(self.endpoint_url.clone()))
-            .add_startup_system(network_setup::<WorldType>.system())
-            .add_startup_system(client_setup::<WorldType>.system())
-            .add_system(client_system::<WorldType>.system());
     }
 }

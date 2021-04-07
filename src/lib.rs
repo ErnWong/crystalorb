@@ -1,23 +1,16 @@
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(map_first_last)]
+#![feature(generic_associated_types)]
 
 pub mod channels;
 pub mod client;
 pub mod command;
-pub mod events;
 pub mod fixed_timestepper;
+pub mod network_resource;
 pub mod old_new;
+pub mod server;
 pub mod timestamp;
 pub mod world;
-
-//#[cfg(not(target_arch = "wasm32"))]
-pub mod server;
-
-pub use bevy_networking_turbulence as net;
-pub use client::NetworkedPhysicsClientPlugin;
-
-//#[cfg(not(target_arch = "wasm32"))]
-pub use server::NetworkedPhysicsServerPlugin;
 
 #[derive(Clone)]
 pub struct Config {

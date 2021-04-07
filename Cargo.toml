@@ -6,17 +6,9 @@ edition = "2018"
 
 [features]
 default = [
-    "use-webrtc",
-]
-use-udp = [
-    "bevy_networking_turbulence/use-udp",
-]
-use-webrtc = [
-    "bevy_networking_turbulence/use-webrtc",
+    "serde/derive"
 ]
 
 [dependencies]
-bevy = {version = "0.4", default-features = false}
-bevy_networking_turbulence = {version = "0.2.0", default-features = false}
-turbulence = "0.3.0"
+tracing = "0.1.22"
 serde="1.0.118"
