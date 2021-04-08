@@ -1,5 +1,5 @@
 [package]
-name = "bevy_prototype_networked_physics"
+name = "crystalorb"
 version = "0.1.0"
 authors = ["Ernest Wong <sudo@ernestwong.nz>"]
 edition = "2018"
