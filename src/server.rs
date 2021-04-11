@@ -3,11 +3,10 @@ use crate::{
     fixed_timestepper,
     fixed_timestepper::{FixedTimestepper, Stepper},
     network_resource::{Connection, ConnectionHandleType, NetworkResource},
-    timestamp::{EarliestPrioritized, Timestamp, Timestamped},
+    timestamp::{Timestamp, Timestamped},
     world::{World, WorldSimulation},
     Config,
 };
-use std::collections::BinaryHeap;
 use tracing::{error, info, trace, warn};
 
 pub struct Server<WorldType: World> {
@@ -127,14 +126,11 @@ impl<WorldType: World> Server<WorldType> {
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
     ) {
-        let mut new_commands: BinaryHeap<(
-            EarliestPrioritized<WorldType::CommandType>,
-            ConnectionHandleType,
-        )> = Default::default();
+        let mut new_commands = Vec::new();
         let mut clock_syncs = Vec::new();
         for (handle, mut connection) in net.connections() {
             while let Some(command) = connection.recv::<Timestamped<WorldType::CommandType>>() {
-                new_commands.push((command.into(), handle));
+                new_commands.push((command, handle));
             }
             while let Some(mut clock_sync_message) = connection.recv::<ClockSyncMessage>() {
                 trace!("Replying to clock sync message. client_id: {}", handle);
@@ -143,8 +139,8 @@ impl<WorldType: World> Server<WorldType> {
                 clock_syncs.push((handle, clock_sync_message));
             }
         }
-        while let Some((command, handle)) = new_commands.pop() {
-            self.receive_command(command.clone(), handle, &mut *net);
+        for (command, command_source) in new_commands {
+            self.receive_command(command.clone(), command_source, &mut *net);
         }
         for (handle, clock_sync_message) in clock_syncs {
             net.send_message(handle, clock_sync_message).unwrap();
