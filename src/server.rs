@@ -26,23 +26,30 @@ impl<WorldType: World> Server<WorldType> {
         }
     }
 
+    pub fn last_completed_timestamp(&self) -> Timestamp {
+        self.world_simulation.last_completed_timestamp()
+    }
+
+    pub fn simulating_timestamp(&self) -> Timestamp {
+        self.world_simulation.simulating_timestamp()
+    }
+
     /// The timestamp that clients are supposed to be at (which should always be ahead of the
     /// server to compensate for the latency between the server and the clients).
-    fn estimated_client_timestamp(&self) -> Timestamp {
-        self.world_simulation.last_completed_timestamp()
-            + self.config.lag_compensation_frame_count()
+    pub fn estimated_client_timestamp(&self) -> Timestamp {
+        self.last_completed_timestamp() + self.config.lag_compensation_frame_count()
     }
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
-    fn timestamp_drift(&self, seconds_since_startup: f64) -> Timestamp {
+    pub fn timestamp_drift(&self, seconds_since_startup: f64) -> Timestamp {
         self.estimated_client_timestamp()
             - Timestamp::from_seconds(seconds_since_startup, self.config.timestep_seconds)
     }
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
-    fn timestamp_drift_seconds(&self, seconds_since_startup: f64) -> f32 {
+    pub fn timestamp_drift_seconds(&self, seconds_since_startup: f64) -> f32 {
         self.timestamp_drift(seconds_since_startup)
             .as_seconds(self.config.timestep_seconds)
     }
