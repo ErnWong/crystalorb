@@ -196,7 +196,6 @@ fn main() {
         timestamp_sync_needed_sample_count: 32,
         initial_clock_sync_period: 0.2,
         heartbeat_period: 0.7,
-        connection_timeout_seconds: 10.0,
         snapshot_send_period: 0.1,
         update_delta_seconds_max: 0.25,
         timestamp_skip_threshold_seconds: 1.0,
