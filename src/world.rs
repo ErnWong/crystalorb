@@ -4,10 +4,69 @@ use crate::{
     timestamp::{Timestamp, Timestamped},
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, ops::Deref};
+use tracing::trace;
 
 pub trait DisplayState: Default + Send + Sync + Clone {
     fn from_interpolation(state1: &Self, state2: &Self, t: f32) -> Self;
+}
+
+impl<T: DisplayState> DisplayState for Timestamped<T> {
+    fn from_interpolation(state1: &Self, state2: &Self, t: f32) -> Self {
+        if t > 0.0 {
+            assert_eq!(state1.timestamp(), state2.timestamp(), "Can only interpolate between timestamped states of the same timestamp. If timestamps differ, you will need to use Tweened::from_interpolation to also interpolate the timestamp value into a float.");
+        }
+        Self::new(
+            DisplayState::from_interpolation(state1.inner(), state2.inner(), t),
+            state1.timestamp(),
+        )
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct Tweened<T> {
+    display_state: T,
+    timestamp: f32,
+}
+
+impl<T: DisplayState> Tweened<T> {
+    pub fn display_state(&self) -> &T {
+        &self.display_state
+    }
+
+    pub fn float_timestamp(&self) -> f32 {
+        self.timestamp
+    }
+}
+
+impl<T: DisplayState> Deref for Tweened<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.display_state
+    }
+}
+
+impl<T: DisplayState> Tweened<T> {
+    pub fn from_interpolation(state1: &Timestamped<T>, state2: &Timestamped<T>, t: f32) -> Self {
+        // Note: timestamps are in modulo arithmetic, so we need to work using the wrapped
+        // difference value.
+        let timestamp_difference: i16 = (state2.timestamp() - state1.timestamp()).into();
+        let timestamp_offset: f32 = t * (timestamp_difference as f32);
+        let timestamp_interpolated = i16::from(state1.timestamp()) as f32 + timestamp_offset;
+        Self {
+            display_state: T::from_interpolation(state1.inner(), state2.inner(), t),
+            timestamp: timestamp_interpolated,
+        }
+    }
+}
+
+impl<T: DisplayState> From<Timestamped<T>> for Tweened<T> {
+    fn from(timestamped: Timestamped<T>) -> Self {
+        Self {
+            display_state: timestamped.inner().clone(),
+            timestamp: i16::from(timestamped.timestamp()) as f32,
+        }
+    }
 }
 
 pub trait World: Stepper + Default + Send + Sync + 'static {
@@ -111,8 +170,8 @@ impl<WorldType: World> WorldSimulation<WorldType> {
         Timestamped::new(self.world.snapshot(), self.last_completed_timestamp())
     }
 
-    pub fn display_state(&self) -> WorldType::DisplayStateType {
-        self.world.display_state()
+    pub fn display_state(&self) -> Timestamped<WorldType::DisplayStateType> {
+        Timestamped::new(self.world.display_state(), self.last_completed_timestamp())
     }
 }
 

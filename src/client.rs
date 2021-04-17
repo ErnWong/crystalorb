@@ -6,7 +6,7 @@ use crate::{
     network_resource::{Connection, NetworkResource},
     old_new::{OldNew, OldNewResult},
     timestamp::{Timestamp, Timestamped},
-    world::{DisplayState, World, WorldSimulation},
+    world::{DisplayState, Tweened, World, WorldSimulation},
     Config,
 };
 use std::marker::PhantomData;
@@ -259,7 +259,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
         net.broadcast_message(command);
     }
 
-    pub fn display_state(&self) -> &WorldType::DisplayStateType {
+    pub fn display_state(&self) -> &Tweened<WorldType::DisplayStateType> {
         &self.client.display_state
     }
 
@@ -345,14 +345,14 @@ pub struct ActiveClient<WorldType: World> {
     /// `states.get_old()` is the state just before the requested timestamp.
     /// `states.get_new()` is the state just after the requested timestamp.
     /// Old and new gets swapped every step.
-    states: OldNew<WorldType::DisplayStateType>,
+    states: OldNew<Timestamped<WorldType::DisplayStateType>>,
 
     /// The number of seconds that `current_state` has overshooted the requested render timestamp.
     timestep_overshoot_seconds: f32,
 
     /// The interpolation between `previous_state` and `current_state` for the requested render
     /// timestamp.
-    display_state: WorldType::DisplayStateType,
+    display_state: Tweened<WorldType::DisplayStateType>,
 
     config: Config,
 }
@@ -602,7 +602,7 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
         trace!("Blending the old and new world states");
         self.states.swap();
         self.states
-            .set_new(WorldType::DisplayStateType::from_interpolation(
+            .set_new(Timestamped::<WorldType::DisplayStateType>::from_interpolation(
                 &old_world_simulation.display_state(),
                 &new_world_simulation.display_state(),
                 self.old_new_interpolation_t,
@@ -626,7 +626,7 @@ impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
             old: undershot_state,
             new: overshot_state,
         } = self.states.get();
-        self.display_state = WorldType::DisplayStateType::from_interpolation(
+        self.display_state = Tweened::from_interpolation(
             undershot_state,
             overshot_state,
             1.0 - self.timestep_overshoot_seconds / self.config.timestep_seconds,

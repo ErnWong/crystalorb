@@ -123,7 +123,7 @@ impl<WorldType: World> Server<WorldType> {
         );
     }
 
-    pub fn display_state(&self) -> WorldType::DisplayStateType {
+    pub fn display_state(&self) -> Timestamped<WorldType::DisplayStateType> {
         self.world_simulation.display_state()
     }
 
