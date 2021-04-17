@@ -218,7 +218,7 @@ impl<WorldType: World> SyncingInitialStateClient<WorldType> {
     }
 
     fn should_transition(&self) -> bool {
-        self.client.last_queued_snapshot_timestamp.is_some()
+        self.client.display_state.is_some()
     }
 
     fn into_next_state(self) -> Option<ClientState<WorldType>> {
@@ -260,7 +260,11 @@ impl<WorldType: World> ReadyClient<WorldType> {
     }
 
     pub fn display_state(&self) -> &Tweened<WorldType::DisplayStateType> {
-        &self.client.display_state
+        &self
+            .client
+            .display_state
+            .as_ref()
+            .expect("Client should be initialised")
     }
 
     fn new(client: ActiveClient<WorldType>) -> Self {
@@ -345,14 +349,16 @@ pub struct ActiveClient<WorldType: World> {
     /// `states.get_old()` is the state just before the requested timestamp.
     /// `states.get_new()` is the state just after the requested timestamp.
     /// Old and new gets swapped every step.
-    states: OldNew<Timestamped<WorldType::DisplayStateType>>,
+    /// They are None until the first world simulation state that is based on a server snapshot is
+    /// ready to be "published".
+    states: OldNew<Option<Timestamped<WorldType::DisplayStateType>>>,
 
     /// The number of seconds that `current_state` has overshooted the requested render timestamp.
     timestep_overshoot_seconds: f32,
 
     /// The interpolation between `previous_state` and `current_state` for the requested render
-    /// timestamp.
-    display_state: Tweened<WorldType::DisplayStateType>,
+    /// timestamp. This remains None until the client is initialised with the server's snapshots.
+    display_state: Option<Tweened<WorldType::DisplayStateType>>,
 
     config: Config,
 }
@@ -597,16 +603,33 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
             self.config.fastforward_max_per_step,
         );
 
-        // TODO: Optimizable - the states only need to be updated at the last step of the
-        // current advance.
-        trace!("Blending the old and new world states");
-        self.states.swap();
-        self.states
-            .set_new(Timestamped::<WorldType::DisplayStateType>::from_interpolation(
-                &old_world_simulation.display_state(),
-                &new_world_simulation.display_state(),
-                self.old_new_interpolation_t,
+        let is_first_initialised_frame = self.last_queued_snapshot_timestamp.is_some()
+            && self.states.get().new.is_none()
+            && new_world_simulation.last_completed_timestamp()
+                == old_world_simulation.last_completed_timestamp();
+        let had_already_initialised = self.states.get().new.is_some();
+
+        if is_first_initialised_frame {
+            // The old world simulation contains the uninitialised state while the new
+            // world simulation is based on the first snapshot from the server.
+            // Therefore, we can skip the interpolation and jump straight to the new
+            // world state.
+            self.old_new_interpolation_t = 1.0;
+        }
+
+        if is_first_initialised_frame || had_already_initialised {
+            // TODO: Optimizable - the states only need to be updated at the last step of the
+            // current advance.
+            trace!("Blending the old and new world states");
+            self.states.swap();
+            self.states.set_new(Some(
+                Timestamped::<WorldType::DisplayStateType>::from_interpolation(
+                    &old_world_simulation.display_state(),
+                    &new_world_simulation.display_state(),
+                    self.old_new_interpolation_t,
+                ),
             ));
+        }
     }
 }
 
@@ -623,18 +646,22 @@ impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
         // We display an interpolation between the undershot and overshot states.
         trace!("Interpolating undershot/overshot states (aka tweening)");
         let OldNewResult {
-            old: undershot_state,
-            new: overshot_state,
+            old: optional_undershot_state,
+            new: optional_overshot_state,
         } = self.states.get();
         let tween_t = self.config.tweening_method.shape_interpolation_t(
             1.0 - self.timestep_overshoot_seconds / self.config.timestep_seconds,
         );
         trace!("tween_t {}", tween_t);
-        self.display_state = Tweened::from_interpolation(
-            undershot_state,
-            overshot_state,
-            tween_t,
-        );
+        if let Some(undershot_state) = optional_undershot_state {
+            if let Some(overshot_state) = optional_overshot_state {
+                self.display_state = Some(Tweened::from_interpolation(
+                    undershot_state,
+                    overshot_state,
+                    tween_t,
+                ));
+            }
+        }
 
         trace!("Update the base command buffer's timestamp and accept-window");
         self.base_command_buffer
