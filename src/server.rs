@@ -194,19 +194,23 @@ impl<WorldType: World> Server<WorldType> {
 }
 
 impl<WorldType: World> Stepper for Server<WorldType> {
-    fn step(&mut self) -> f32 {
+    fn step(&mut self) {
         trace!(
             "Server world timestamp: {:?}, estimated client timestamp: {:?}",
             self.world_simulation.last_completed_timestamp(),
             self.estimated_client_timestamp(),
         );
-        self.world_simulation.step()
+        self.world_simulation.step();
     }
 }
 
 impl<WorldType: World> FixedTimestepper for Server<WorldType> {
     fn advance(&mut self, delta_seconds: f32) {
-        self.timestep_overshoot_seconds =
-            fixed_timestepper::advance(self, delta_seconds, self.timestep_overshoot_seconds);
+        self.timestep_overshoot_seconds = fixed_timestepper::advance_without_overshoot(
+            self,
+            delta_seconds,
+            self.timestep_overshoot_seconds,
+            self.config.timestep_seconds,
+        );
     }
 }

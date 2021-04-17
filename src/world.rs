@@ -117,7 +117,7 @@ impl<WorldType: World> WorldSimulation<WorldType> {
 }
 
 impl<WorldType: World> Stepper for WorldSimulation<WorldType> {
-    fn step(&mut self) -> f32 {
+    fn step(&mut self) {
         // We first drain up to and including the commands that are scheduled for this
         // timestamp that we are trying to simulate.
         let commands = self.command_buffer.drain_up_to(self.simulating_timestamp());
@@ -126,13 +126,11 @@ impl<WorldType: World> Stepper for WorldSimulation<WorldType> {
         }
 
         // We then advance the world simulation by one frame.
-        let delta_seconds = self.world.step();
+        self.world.step();
 
         // The simulation for this frame has been completed, so we can now increment the
         // timestamp.
         self.command_buffer
             .update_timestamp(self.last_completed_timestamp() + 1);
-
-        delta_seconds
     }
 }

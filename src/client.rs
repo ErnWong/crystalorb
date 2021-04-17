@@ -495,7 +495,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
 }
 
 impl<WorldType: World> Stepper for ActiveClient<WorldType> {
-    fn step(&mut self) -> f32 {
+    fn step(&mut self) {
         trace!("Step...");
 
         // Figure out what state we are in.
@@ -607,16 +607,18 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
                 &new_world_simulation.display_state(),
                 self.old_new_interpolation_t,
             ));
-
-        self.config.timestep_seconds
     }
 }
 
 impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
     fn advance(&mut self, delta_seconds: f32) {
         trace!("Advancing by {} seconds", delta_seconds);
-        self.timestep_overshoot_seconds =
-            fixed_timestepper::advance(self, delta_seconds, self.timestep_overshoot_seconds);
+        self.timestep_overshoot_seconds = fixed_timestepper::advance_with_overshoot(
+            self,
+            delta_seconds,
+            self.timestep_overshoot_seconds,
+            self.config.timestep_seconds,
+        );
 
         // We display an interpolation between the undershot and overshot states.
         trace!("Interpolating undershot/overshot states");

@@ -105,12 +105,11 @@ impl World for MyWorld {
 impl Command for MyCommand {}
 
 impl Stepper for MyWorld {
-    fn step(&mut self) -> f32 {
+    fn step(&mut self) {
         const DELTA_SECONDS: f32 = 1.0 / 60.0;
         const MASS: f32 = 2.0;
         self.position += self.velocity * DELTA_SECONDS;
         self.cached_momentum = Some(self.velocity * MASS);
-        DELTA_SECONDS
     }
 }
 

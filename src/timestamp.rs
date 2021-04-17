@@ -107,10 +107,9 @@ impl<T> Timestamped<T> {
 }
 
 impl<T: Stepper> Stepper for Timestamped<T> {
-    fn step(&mut self) -> f32 {
-        let delta_seconds = self.inner.step();
+    fn step(&mut self) {
+        self.inner.step();
         self.timestamp.increment();
-        delta_seconds
     }
 }
 
