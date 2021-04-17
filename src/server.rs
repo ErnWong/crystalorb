@@ -167,11 +167,32 @@ impl<WorldType: World> Server<WorldType> {
 
         // Compensate for any drift.
         // TODO: Remove duplicate code between client and server.
-        let next_delta_seconds = (delta_seconds
-            - self.timestamp_drift_seconds(seconds_since_startup))
-        .clamp(0.0, self.config.update_delta_seconds_max);
+        let timestamp_drift_seconds = self.timestamp_drift_seconds(seconds_since_startup);
+        if timestamp_drift_seconds != 0.0 {
+            warn!(
+                "Timestamp has drifted by {:?} ({} seconds). This should not happen too often.",
+                self.timestamp_drift(seconds_since_startup),
+                timestamp_drift_seconds
+            );
+        }
+        let compensated_delta_seconds = {
+            let uncapped_compensated_delta_seconds =
+                (delta_seconds - timestamp_drift_seconds).max(0.0);
+            if uncapped_compensated_delta_seconds > self.config.update_delta_seconds_max {
+                warn!("Attempted to advance more than the allowed delta seconds ({}). This should not happen too often.", uncapped_compensated_delta_seconds);
+                self.config.update_delta_seconds_max
+            } else {
+                uncapped_compensated_delta_seconds
+            }
+        };
+        trace!(
+            "Timestamp drift before advance: {:?}, delta_seconds: {:?}, adjusted delta_seconds: {:?}",
+            self.timestamp_drift(seconds_since_startup),
+            delta_seconds,
+            compensated_delta_seconds
+        );
 
-        self.advance(next_delta_seconds);
+        self.advance(compensated_delta_seconds);
 
         // If drift is too large and we still couldn't keep up, do a time skip.
         trace!(
