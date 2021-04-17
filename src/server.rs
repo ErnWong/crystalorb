@@ -34,9 +34,15 @@ impl<WorldType: World> Server<WorldType> {
         self.world_simulation.simulating_timestamp()
     }
 
-    /// The timestamp that clients are supposed to be at (which should always be ahead of the
-    /// server to compensate for the latency between the server and the clients).
-    pub fn estimated_client_timestamp(&self) -> Timestamp {
+    /// The timestamp that clients are supposed to be simulating at the moment (which should always
+    /// be ahead of the server to compensate for the latency between the server and the clients).
+    pub fn estimated_client_simulating_timestamp(&self) -> Timestamp {
+        self.simulating_timestamp() + self.config.lag_compensation_frame_count()
+    }
+
+    /// The timestamp that clients have supposed to have completed simulating (which should always
+    /// be ahead of the server to compensate for the latency between the server and the clients).
+    pub fn estimated_client_last_completed_timestamp(&self) -> Timestamp {
         self.last_completed_timestamp() + self.config.lag_compensation_frame_count()
     }
 
@@ -46,7 +52,7 @@ impl<WorldType: World> Server<WorldType> {
     /// account by fixed_timestepper::advance. Timestamp drift only refers to the whole number of
     /// frames that even fixed_timestepper::advance cannot fix.
     pub fn timestamp_drift(&self, seconds_since_startup: f64) -> Timestamp {
-        self.estimated_client_timestamp()
+        self.estimated_client_last_completed_timestamp()
             - Timestamp::from_seconds(
                 seconds_since_startup + self.timestep_overshoot_seconds as f64,
                 self.config.timestep_seconds,
@@ -109,7 +115,7 @@ impl<WorldType: World> Server<WorldType> {
         if WorldType::command_is_valid(command.inner(), command_source)
         // TODO: Is it valid to validate the timestamps?
         // && command.timestamp() >= self.world_simulation.last_completed_timestamp()
-        // && command.timestamp() <= self.estimated_client_timestamp()
+        // && command.timestamp() <= self.estimated_client_simulating_timestamp()
         {
             self.apply_validated_command(command, Some(command_source), net);
         }
@@ -123,7 +129,7 @@ impl<WorldType: World> Server<WorldType> {
         net: &mut NetworkResourceType,
     ) {
         self.apply_validated_command(
-            Timestamped::new(command, self.estimated_client_timestamp()),
+            Timestamped::new(command, self.estimated_client_simulating_timestamp()),
             None,
             net,
         );
@@ -202,9 +208,9 @@ impl<WorldType: World> Server<WorldType> {
 impl<WorldType: World> Stepper for Server<WorldType> {
     fn step(&mut self) {
         trace!(
-            "Server world timestamp: {:?}, estimated client timestamp: {:?}",
-            self.world_simulation.last_completed_timestamp(),
-            self.estimated_client_timestamp(),
+            "Server world simulating timestamp: {:?}, estimated client timestamp: {:?}",
+            self.world_simulation.simulating_timestamp(),
+            self.estimated_client_simulating_timestamp(),
         );
         self.world_simulation.step();
     }
