@@ -78,6 +78,12 @@ impl PartialOrd for Timestamp {
     }
 }
 
+impl From<Timestamp> for i16 {
+    fn from(timestamp: Timestamp) -> i16 {
+        timestamp.0 .0
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Timestamped<T> {
     inner: T,
