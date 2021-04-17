@@ -399,10 +399,16 @@ impl<WorldType: World> ActiveClient<WorldType> {
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
+    /// We exclude the time delay caused by overshoot/undershooting since that is taken into
+    /// account by fixed_timestepper::advance. Timestamp drift only refers to the whole number of
+    /// frames that even fixed_timestepper::advance cannot fix.
     fn timestamp_drift(&self, seconds_since_startup: f64) -> Timestamp {
         let server_time = seconds_since_startup + self.server_seconds_offset;
         self.last_completed_timestamp()
-            - Timestamp::from_seconds(server_time, self.config.timestep_seconds)
+            - Timestamp::from_seconds(
+                server_time + self.timestep_overshoot_seconds as f64,
+                self.config.timestep_seconds,
+            )
     }
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
