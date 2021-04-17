@@ -12,6 +12,39 @@ pub mod server;
 pub mod timestamp;
 pub mod world;
 
+/// Represent how to calculate the current client display state based on the simulated undershot
+/// and overshot frames (since the two frames closest to the current time may not exactly line up
+/// with the current time).
+#[derive(Clone)]
+pub enum TweeningMethod {
+    /// Use the undershot frame if the simulated frames don't exactly line up to the current time.
+    /// This is equivalent to linearly interpolating between the undershot and overshot frame, but
+    /// using an interpolation paramater `t.floor()`.
+    MostRecentlyPassed,
+
+    /// Use the undershot frame or the overshot frame, whichever is closest to the current time.
+    /// This is equivalent to interpolating between the undershot and overshot frame, but
+    /// using an interpolation paramater `t.round()`.
+    Nearest,
+
+    /// Use the display state's interpolation function to find a suitable in-between display state
+    /// between the undershot and overshot frame for the current time.
+    Interpolated,
+}
+
+impl TweeningMethod {
+    /// Depending on the tweening method, conditionally snap the interpolation parameter to 0.0 or
+    /// 1.0.
+    pub fn shape_interpolation_t(&self, t: f32) -> f32 {
+        assert!((0.0..=1.0).contains(&t));
+        match self {
+            TweeningMethod::MostRecentlyPassed => t.floor(),
+            TweeningMethod::Nearest => t.round(),
+            TweeningMethod::Interpolated => t,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Config {
     /// Maximum amount of client lag in seconds that the server will compensate for.
@@ -47,6 +80,12 @@ pub struct Config {
     pub fastforward_max_per_step: usize,
 
     pub clock_offset_update_factor: f64,
+
+    /// In crystalorb, the physics simulation is assumed to be running at a fixed timestep that is
+    /// different to the rendering refresh rate. To suppress some forms of temporal aliasing due to
+    /// these different timesteps, crystalorb allows the interpolate between the simulated physics
+    /// frames to derive the displayed state.
+    pub tweening_method: TweeningMethod,
 }
 
 impl Config {
@@ -63,6 +102,7 @@ impl Config {
             timestamp_skip_threshold_seconds: 1.0,
             fastforward_max_per_step: 10,
             clock_offset_update_factor: 0.1,
+            tweening_method: TweeningMethod::Interpolated,
         }
     }
     pub fn lag_compensation_frame_count(&self) -> i16 {

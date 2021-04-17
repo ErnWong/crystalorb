@@ -621,15 +621,19 @@ impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
         );
 
         // We display an interpolation between the undershot and overshot states.
-        trace!("Interpolating undershot/overshot states");
+        trace!("Interpolating undershot/overshot states (aka tweening)");
         let OldNewResult {
             old: undershot_state,
             new: overshot_state,
         } = self.states.get();
+        let tween_t = self.config.tweening_method.shape_interpolation_t(
+            1.0 - self.timestep_overshoot_seconds / self.config.timestep_seconds,
+        );
+        trace!("tween_t {}", tween_t);
         self.display_state = Tweened::from_interpolation(
             undershot_state,
             overshot_state,
-            1.0 - self.timestep_overshoot_seconds / self.config.timestep_seconds,
+            tween_t,
         );
 
         trace!("Update the base command buffer's timestamp and accept-window");

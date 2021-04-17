@@ -9,7 +9,7 @@ use crystalorb::{
     server::Server,
     timestamp::Timestamped,
     world::{DisplayState, World},
-    Config,
+    Config, TweeningMethod,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
@@ -200,6 +200,7 @@ fn main() {
         timestamp_skip_threshold_seconds: 1.0,
         fastforward_max_per_step: 10,
         clock_offset_update_factor: 0.1,
+        tweening_method: TweeningMethod::Interpolated,
     };
 
     let mut client_1 = Client::<MyWorld>::new(config.clone());
