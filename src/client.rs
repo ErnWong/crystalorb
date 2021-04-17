@@ -10,7 +10,7 @@ use crate::{
     Config,
 };
 use std::marker::PhantomData;
-use tracing::{info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 pub struct Client<WorldType: World> {
     config: Config,
@@ -197,8 +197,8 @@ impl<WorldType: World> SyncingInitialStateClient<WorldType> {
         client_id: usize,
     ) -> Self {
         info!(
-            "Initial timestamp: {:?}, client_id: {}",
-            initial_timestamp, client_id
+            "Initial timestamp: {:?}, client_id: {}, server seconds offset: {}",
+            initial_timestamp, client_id, server_seconds_offset
         );
         info!("Syncing initial state");
         Self {
@@ -500,7 +500,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
     }
 
     fn receive_command(&mut self, command: Timestamped<WorldType::CommandType>) {
-        info!("Received command {:?}", command);
+        debug!("Received command {:?}", command);
         let OldNewResult { old, new } = self.world_simulations.get_mut();
         self.base_command_buffer.insert(command.clone());
         old.schedule_command(command.clone());
@@ -546,12 +546,12 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
                 self.old_new_interpolation_t
             );
             trace!(
-                "Old world timestamp: {:?}",
-                old_world_simulation.last_completed_timestamp()
+                "Old world current simulating timestamp: {:?}",
+                old_world_simulation.simulating_timestamp()
             );
             trace!(
-                "New world timestamp: {:?}",
-                new_world_simulation.last_completed_timestamp()
+                "New world current simulating timestamp: {:?}",
+                new_world_simulation.simulating_timestamp()
             );
             let snapshot_is_newer = self.queued_snapshot.as_ref().map_or(false, |snapshot| {
                 trace!("Snapshot timestamp:  {:?}", snapshot.timestamp());
@@ -662,7 +662,11 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
 
 impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
     fn advance(&mut self, delta_seconds: f32) {
-        trace!("Advancing by {} seconds", delta_seconds);
+        trace!(
+            "Advancing by {} seconds (previous overshoot leftover: {})",
+            delta_seconds,
+            self.timestep_overshoot_seconds
+        );
         self.timestep_overshoot_seconds = fixed_timestepper::advance_with_overshoot(
             self,
             delta_seconds,

@@ -7,7 +7,7 @@ use crate::{
     world::{World, WorldSimulation},
     Config,
 };
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 pub struct Server<WorldType: World> {
     world_simulation: WorldSimulation<WorldType>,
@@ -85,7 +85,7 @@ impl<WorldType: World> Server<WorldType> {
         command_source: Option<ConnectionHandleType>,
         net: &mut NetworkResourceType,
     ) {
-        info!("Received command from {:?} - {:?}", command_source, command);
+        debug!("Received command from {:?} - {:?}", command_source, command);
 
         // Apply this command to our world later on.
         self.world_simulation.schedule_command(command.clone());
@@ -196,7 +196,8 @@ impl<WorldType: World> Server<WorldType> {
 
         // If drift is too large and we still couldn't keep up, do a time skip.
         trace!(
-            "Timestamp drift: {:?}",
+            "Timestamp drift after advance: {:?} ({} sec)",
+            self.timestamp_drift(seconds_since_startup),
             self.timestamp_drift_seconds(seconds_since_startup)
         );
         if -self.timestamp_drift_seconds(seconds_since_startup)
@@ -239,6 +240,11 @@ impl<WorldType: World> Stepper for Server<WorldType> {
 
 impl<WorldType: World> FixedTimestepper for Server<WorldType> {
     fn advance(&mut self, delta_seconds: f32) {
+        trace!(
+            "Advancing by {} seconds (previous overshoot leftover: {})",
+            delta_seconds,
+            self.timestep_overshoot_seconds
+        );
         self.timestep_overshoot_seconds = fixed_timestepper::advance_without_overshoot(
             self,
             delta_seconds,

@@ -181,6 +181,7 @@ impl<WorldType: World> Stepper for WorldSimulation<WorldType> {
         // timestamp that we are trying to simulate.
         let commands = self.command_buffer.drain_up_to(self.simulating_timestamp());
         for command in commands {
+            trace!("Applying command {:?}", &command);
             self.world.apply_command(&command);
         }
 
