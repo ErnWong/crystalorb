@@ -275,6 +275,14 @@ mod tests {
             Timestamp::from_seconds((i16::MAX as f64) + 1.0, 1.0),
             Timestamp::default() + i16::MIN
         );
+        assert_eq!(
+            Timestamp::from_seconds(i16::MIN as f64, 1.0),
+            Timestamp::default() + i16::MIN
+        );
+        assert_eq!(
+            Timestamp::from_seconds((i16::MIN as f64) - 1.0, 1.0),
+            Timestamp::default() + i16::MAX
+        );
     }
 
     #[test]
@@ -291,6 +299,14 @@ mod tests {
         assert_eq!(
             Timestamp::from_seconds((i16::MAX as f64) + 1.0, 1.0).as_seconds(1.0),
             i16::MIN as f64,
+        );
+        assert_eq!(
+            Timestamp::from_seconds(i16::MIN as f64, 1.0).as_seconds(1.0),
+            i16::MIN as f64,
+        );
+        assert_eq!(
+            Timestamp::from_seconds((i16::MIN as f64) - 1.0, 1.0).as_seconds(1.0),
+            i16::MAX as f64,
         );
     }
 }
