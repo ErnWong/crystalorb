@@ -161,6 +161,11 @@ impl<WorldType: World> WorldSimulation<WorldType> {
 
 impl<WorldType: World> Stepper for WorldSimulation<WorldType> {
     fn step(&mut self) {
+        trace!(
+            "World simulation step (simulation timestamp: {:?})",
+            self.simulating_timestamp()
+        );
+
         // We first drain up to and including the commands that are scheduled for this
         // timestamp that we are trying to simulate.
         let commands = self.command_buffer.drain_up_to(self.simulating_timestamp());
