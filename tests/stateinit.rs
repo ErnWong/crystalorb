@@ -2,8 +2,7 @@
 
 use crystalorb::{client::ClientState, Config, TweeningMethod};
 use pretty_assertions::assert_eq;
-use tracing::Level;
-use tracing_subscriber;
+use test_env_log::test;
 
 mod common;
 
@@ -11,8 +10,6 @@ use common::{MockClientServer, MockCommand, TIMESTEP_SECONDS};
 
 #[test]
 fn when_client_becomes_ready_state_should_already_be_initialised() {
-    tracing_subscriber::fmt().with_max_level(Level::WARN).init();
-
     for frames_per_update in &[1.0, 0.5, 0.3, 2.0, 1.5, 10.0] {
         // GIVEN a server and multiple clients in a perfect network.
         const FRAMES_TO_LAG_BEHIND: i32 = 10;

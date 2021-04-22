@@ -16,3 +16,4 @@ serde="1.0.118"
 [dev-dependencies]
 tracing-subscriber = "0.2.17"
 pretty_assertions = "0.7.1"
+test-env-log = {version = "0.2.7", default-features = false, features = ["trace"]}
