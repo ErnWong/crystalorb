@@ -18,7 +18,7 @@ use std::{
     fmt::Debug,
     rc::Rc,
 };
-use tracing::trace;
+use tracing::info;
 
 pub const TIMESTEP_SECONDS: f64 = 1.0 / 60.0;
 
@@ -379,22 +379,25 @@ impl MockClientServer {
             self.update(delta_seconds);
         }
 
-        trace!("##################### Ready #######################");
+        info!("");
+        info!("##################### Ready #######################");
+        info!("");
     }
 
     pub fn update(&mut self, delta_seconds: f64) {
-        trace!(
+        info!("");
+        info!(
             "------------ Update by {} seconds --------------------------",
             delta_seconds
         );
         self.clock += delta_seconds;
-        trace!(
+        info!(
             "------------ >> Update server by {} seconds --------------------------",
             delta_seconds
         );
         self.server
             .update(delta_seconds, self.clock, &mut self.server_net);
-        trace!(
+        info!(
             "------------ >> Update client 1 by {} seconds --------------------------",
             delta_seconds
         );
@@ -403,7 +406,7 @@ impl MockClientServer {
             self.clock + self.client_1_clock_offset,
             &mut self.client_1_net,
         );
-        trace!(
+        info!(
             "------------ >> Update client 2 by {} seconds --------------------------",
             delta_seconds
         );
