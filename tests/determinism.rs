@@ -12,7 +12,7 @@ use common::{MockClientServer, MockCommand, MockWorld, TIMESTEP_SECONDS};
 
 #[test]
 fn while_all_commands_originate_from_single_client_then_that_client_should_match_server_exactly() {
-    for frames_per_update in &[1.0, 0.5, 1.0 / 3.0, 2.0, 1.5] {
+    for frames_per_update in &[1.0, 0.5, 1.0 / 3.0, 1.5, 2.0, 3.0, 4.0, 6.0] {
         // GIVEN a server and multiple clients in a perfect network.
         const FRAMES_TO_LAG_BEHIND: i32 = 12; // A common multiple of frames_per_update so the display states line up.
         let mut mock_client_server = MockClientServer::new(Config {
