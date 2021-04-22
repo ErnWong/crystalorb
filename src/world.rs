@@ -13,7 +13,7 @@ pub trait DisplayState: Default + Send + Sync + Clone {
 
 impl<T: DisplayState> DisplayState for Timestamped<T> {
     fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self {
-        if t > 0.0 {
+        if t != 0.0 && t != 1.0 {
             assert_eq!(state1.timestamp(), state2.timestamp(), "Can only interpolate between timestamped states of the same timestamp. If timestamps differ, you will need to use Tweened::from_interpolation to also interpolate the timestamp value into a float.");
         }
         Self::new(
