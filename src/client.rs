@@ -340,7 +340,7 @@ pub struct ActiveClient<WorldType: World> {
     world_simulations: OldNew<WorldSimulation<WorldType>>,
 
     /// The interpolation paramater to blend the `old_world` and `new_world` together into a
-    /// single world state. The parameter is in the range [0,1] where 0 represents using only
+    /// single world state. The parameter is in the range `[0,1]` where 0 represents using only
     /// the `old_world`, and where 1 represents using only the `new_world`.
     old_new_interpolation_t: f64,
 
