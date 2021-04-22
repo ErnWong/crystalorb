@@ -566,6 +566,9 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
             }
         }
 
+        assert!(is_interpolating || self.old_new_interpolation_t == 0.0,
+            "Interpolation parameter t should be reset and not advanced if the new world has not caught up to the new world yet");
+
         trace!("Stepping old world by one frame");
         let OldNewResult {
             old: old_world_simulation,
