@@ -1,17 +1,16 @@
 use crate::{
     channels::ClockSyncMessage,
-    fixed_timestepper,
-    fixed_timestepper::{FixedTimestepper, Stepper},
+    fixed_timestepper::{FixedTimestepper, TerminationCondition, TimeKeeper},
     network_resource::{Connection, ConnectionHandleType, NetworkResource},
     timestamp::{Timestamp, Timestamped},
     world::{World, WorldSimulation},
     Config,
 };
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace};
 
 pub struct Server<WorldType: World> {
-    world_simulation: WorldSimulation<WorldType>,
-    timestep_overshoot_seconds: f64,
+    timekeeping_simulation:
+        TimeKeeper<WorldSimulation<WorldType>, { TerminationCondition::LastUndershoot }>,
     seconds_since_last_snapshot: f64,
     config: Config,
 }
@@ -19,19 +18,18 @@ pub struct Server<WorldType: World> {
 impl<WorldType: World> Server<WorldType> {
     pub fn new(config: Config) -> Self {
         Self {
-            world_simulation: Default::default(),
-            timestep_overshoot_seconds: 0.0,
+            timekeeping_simulation: TimeKeeper::new(Default::default(), config.clone()),
             seconds_since_last_snapshot: 0.0,
             config,
         }
     }
 
     pub fn last_completed_timestamp(&self) -> Timestamp {
-        self.world_simulation.last_completed_timestamp()
+        self.timekeeping_simulation.last_completed_timestamp()
     }
 
     pub fn simulating_timestamp(&self) -> Timestamp {
-        self.world_simulation.simulating_timestamp()
+        self.timekeeping_simulation.simulating_timestamp()
     }
 
     /// The timestamp that clients are supposed to be simulating at the moment (which should always
@@ -46,26 +44,6 @@ impl<WorldType: World> Server<WorldType> {
         self.last_completed_timestamp() + self.config.lag_compensation_frame_count()
     }
 
-    /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
-    /// negative refers that our world needs to catchup in the next frame.
-    /// We exclude the time delay caused by overshoot/undershooting since that is taken into
-    /// account by fixed_timestepper::advance. Timestamp drift only refers to the whole number of
-    /// frames that even fixed_timestepper::advance cannot fix.
-    pub fn timestamp_drift(&self, seconds_since_startup: f64) -> Timestamp {
-        self.estimated_client_last_completed_timestamp()
-            - Timestamp::from_seconds(
-                seconds_since_startup + self.timestep_overshoot_seconds as f64,
-                self.config.timestep_seconds,
-            )
-    }
-
-    /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
-    /// negative refers that our world needs to catchup in the next frame.
-    pub fn timestamp_drift_seconds(&self, seconds_since_startup: f64) -> f64 {
-        self.timestamp_drift(seconds_since_startup)
-            .as_seconds(self.config.timestep_seconds)
-    }
-
     pub fn update_timestamp(&mut self, seconds_since_startup: f64) {
         let timestamp =
             Timestamp::from_seconds(seconds_since_startup, self.config.timestep_seconds)
@@ -75,7 +53,7 @@ impl<WorldType: World> Server<WorldType> {
             timestamp,
             self.config.lag_compensation_frame_count()
         );
-        self.world_simulation
+        self.timekeeping_simulation
             .reset_last_completed_timestamp(timestamp);
     }
 
@@ -88,7 +66,8 @@ impl<WorldType: World> Server<WorldType> {
         debug!("Received command from {:?} - {:?}", command_source, command);
 
         // Apply this command to our world later on.
-        self.world_simulation.schedule_command(command.clone());
+        self.timekeeping_simulation
+            .schedule_command(command.clone());
 
         // Relay command to every other client.
         for (handle, mut connection) in net.connections() {
@@ -114,7 +93,7 @@ impl<WorldType: World> Server<WorldType> {
     ) {
         if WorldType::command_is_valid(command.inner(), command_source)
         // TODO: Is it valid to validate the timestamps?
-        // && command.timestamp() >= self.world_simulation.last_completed_timestamp()
+        // && command.timestamp() >= self.timekeeping_simulation.last_completed_timestamp()
         // && command.timestamp() <= self.estimated_client_simulating_timestamp()
         {
             self.apply_validated_command(command, Some(command_source), net);
@@ -136,7 +115,7 @@ impl<WorldType: World> Server<WorldType> {
     }
 
     pub fn display_state(&self) -> Timestamped<WorldType::DisplayStateType> {
-        self.world_simulation.display_state()
+        self.timekeeping_simulation.display_state()
     }
 
     pub fn update<NetworkResourceType: NetworkResource>(
@@ -165,91 +144,19 @@ impl<WorldType: World> Server<WorldType> {
             net.send_message(handle, clock_sync_message).unwrap();
         }
 
-        // Compensate for any drift.
-        // TODO: Remove duplicate code between client and server.
-        let timestamp_drift_seconds = self.timestamp_drift_seconds(seconds_since_startup);
-        if timestamp_drift_seconds != 0.0 {
-            warn!(
-                "Timestamp has drifted by {:?} ({} seconds). This should not happen too often.",
-                self.timestamp_drift(seconds_since_startup),
-                timestamp_drift_seconds
-            );
-        }
-        let compensated_delta_seconds = {
-            let uncapped_compensated_delta_seconds =
-                (delta_seconds - timestamp_drift_seconds).max(0.0);
-            if uncapped_compensated_delta_seconds > self.config.update_delta_seconds_max {
-                warn!("Attempted to advance more than the allowed delta seconds ({}). This should not happen too often.", uncapped_compensated_delta_seconds);
-                self.config.update_delta_seconds_max
-            } else {
-                uncapped_compensated_delta_seconds
-            }
-        };
-        trace!(
-            "Timestamp drift before advance: {:?}, delta_seconds: {:?}, adjusted delta_seconds: {:?}",
-            self.timestamp_drift(seconds_since_startup),
-            delta_seconds,
-            compensated_delta_seconds
-        );
-
-        self.advance(compensated_delta_seconds);
-
-        // If drift is too large and we still couldn't keep up, do a time skip.
-        trace!(
-            "Timestamp drift after advance: {:?} ({} sec)",
-            self.timestamp_drift(seconds_since_startup),
-            self.timestamp_drift_seconds(seconds_since_startup)
-        );
-        if -self.timestamp_drift_seconds(seconds_since_startup)
-            > self.config.timestamp_skip_threshold_seconds
-        {
-            let corrected_timestamp = self.world_simulation.last_completed_timestamp()
-                - self.timestamp_drift(seconds_since_startup);
-            warn!(
-                "Server is too far behind. Skipping timestamp from {:?} to {:?}",
-                self.world_simulation.last_completed_timestamp(),
-                corrected_timestamp
-            );
-            self.world_simulation
-                .reset_last_completed_timestamp(corrected_timestamp);
-        }
+        self.timekeeping_simulation
+            .update(delta_seconds, seconds_since_startup);
 
         self.seconds_since_last_snapshot += delta_seconds;
         if self.seconds_since_last_snapshot > self.config.snapshot_send_period {
             trace!(
                 "Broadcasting snapshot at timestamp: {:?} (note: drift error: {})",
-                self.world_simulation.last_completed_timestamp(),
-                self.timestamp_drift_seconds(seconds_since_startup),
+                self.timekeeping_simulation.last_completed_timestamp(),
+                self.timekeeping_simulation
+                    .timestamp_drift_seconds(seconds_since_startup),
             );
             self.seconds_since_last_snapshot = 0.0;
-            net.broadcast_message(self.world_simulation.last_completed_snapshot());
+            net.broadcast_message(self.timekeeping_simulation.last_completed_snapshot());
         }
-    }
-}
-
-impl<WorldType: World> Stepper for Server<WorldType> {
-    fn step(&mut self) {
-        trace!(
-            "Server world simulating timestamp: {:?}, estimated client timestamp: {:?}",
-            self.world_simulation.simulating_timestamp(),
-            self.estimated_client_simulating_timestamp(),
-        );
-        self.world_simulation.step();
-    }
-}
-
-impl<WorldType: World> FixedTimestepper for Server<WorldType> {
-    fn advance(&mut self, delta_seconds: f64) {
-        trace!(
-            "Advancing by {} seconds (previous overshoot leftover: {})",
-            delta_seconds,
-            self.timestep_overshoot_seconds
-        );
-        self.timestep_overshoot_seconds = fixed_timestepper::advance_without_overshoot(
-            self,
-            delta_seconds,
-            self.timestep_overshoot_seconds,
-            self.config.timestep_seconds,
-        );
     }
 }

@@ -1,5 +1,6 @@
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(map_first_last)]
+#![feature(const_generics)]
 #![feature(generic_associated_types)]
 
 pub mod channels;

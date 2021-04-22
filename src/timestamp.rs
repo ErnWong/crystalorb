@@ -176,10 +176,10 @@ impl<T> DerefMut for Timestamped<T> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
-    fn interesting_timestamps() -> [Timestamp; 7] {
+    pub fn interesting_timestamps() -> [Timestamp; 7] {
         [
             Timestamp::default() + std::i16::MIN,
             Timestamp::default() + std::i16::MIN / 2,

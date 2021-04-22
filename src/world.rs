@@ -1,6 +1,6 @@
 use crate::{
     command::{Command, CommandBuffer},
-    fixed_timestepper::Stepper,
+    fixed_timestepper::{FixedTimestepper, Stepper},
     timestamp::{Timestamp, Timestamped},
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -100,22 +100,6 @@ impl<WorldType: World> WorldSimulation<WorldType> {
         Self::default()
     }
 
-    /// The timestamp for the frame that has completed simulation, and whose resulting state is
-    /// now available.
-    pub fn last_completed_timestamp(&self) -> Timestamp {
-        self.command_buffer.timestamp()
-    }
-
-    /// Useful for initializing the timestamp, syncing the timestamp, and, when necessary,
-    /// (i.e. when the world is drifting too far behind and can't catch up), jump to a
-    /// corrected timestamp in the future without running any simulation. Note that any
-    /// leftover stale commands won't be dropped - they will still be applied in the next
-    /// frame, unless they are too stale that the must be dropped to maintain the transitivity
-    /// laws.
-    pub fn reset_last_completed_timestamp(&mut self, timestamp: Timestamp) {
-        self.command_buffer.update_timestamp(timestamp);
-    }
-
     /// The timestamp for the next frame that is either about to be simulated, of is currently
     /// being simulated. This timestamp is useful for issuing commands to be applied to the
     /// world as soon as possible.
@@ -192,5 +176,23 @@ impl<WorldType: World> Stepper for WorldSimulation<WorldType> {
         // timestamp.
         self.command_buffer
             .update_timestamp(self.last_completed_timestamp() + 1);
+    }
+}
+
+impl<WorldType: World> FixedTimestepper for WorldSimulation<WorldType> {
+    /// The timestamp for the frame that has completed simulation, and whose resulting state is
+    /// now available.
+    fn last_completed_timestamp(&self) -> Timestamp {
+        self.command_buffer.timestamp()
+    }
+
+    /// Useful for initializing the timestamp, syncing the timestamp, and, when necessary,
+    /// (i.e. when the world is drifting too far behind and can't catch up), jump to a
+    /// corrected timestamp in the future without running any simulation. Note that any
+    /// leftover stale commands won't be dropped - they will still be applied in the next
+    /// frame, unless they are too stale that the must be dropped to maintain the transitivity
+    /// laws.
+    fn reset_last_completed_timestamp(&mut self, timestamp: Timestamp) {
+        self.command_buffer.update_timestamp(timestamp);
     }
 }
