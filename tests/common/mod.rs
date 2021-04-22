@@ -366,9 +366,12 @@ impl MockClientServer {
             server_net,
             client_1_net,
             client_2_net,
-            clock: 0.0,
             client_1_clock_offset: 0.0,
             client_2_clock_offset: 0.0,
+
+            // Start quarterway to avoid aliasing/precision issues.
+            // Note: not halfway, since that is the threshold for timestamp drift.
+            clock: config.timestep_seconds * 0.25,
         }
     }
 
