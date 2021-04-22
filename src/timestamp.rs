@@ -16,7 +16,7 @@ impl Timestamp {
 
     pub fn from_seconds(seconds: f64, timestep_seconds: f64) -> Self {
         let frames = seconds / timestep_seconds;
-        let frames_wrapped = ((frames + 2.0f64.powi(15)) % 2.0f64.powi(16)) - 2.0f64.powi(15);
+        let frames_wrapped = (frames + 2.0f64.powi(15)).rem_euclid(2.0f64.powi(16)) - 2.0f64.powi(15);
         Self(Wrapping(frames_wrapped as i16))
     }
 
