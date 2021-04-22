@@ -15,9 +15,7 @@ impl Timestamp {
     pub const MAX_COMPARABLE_RANGE: i16 = i16::MAX;
 
     pub fn from_seconds(seconds: f64, timestep_seconds: f64) -> Self {
-        let frames = seconds / timestep_seconds;
-        let frames_wrapped = (frames + 2.0f64.powi(15)).rem_euclid(2.0f64.powi(16)) - 2.0f64.powi(15);
-        Self(Wrapping(frames_wrapped as i16))
+        Self::from(FloatTimestamp::from_seconds(seconds, timestep_seconds))
     }
 
     pub fn increment(&mut self) {
@@ -32,6 +30,12 @@ impl Timestamp {
     pub fn comparable_range_with_midpoint(midpoint: Timestamp) -> Range<Timestamp> {
         let max_distance_from_midpoint = Self::MAX_COMPARABLE_RANGE / 2;
         (midpoint - max_distance_from_midpoint)..(midpoint + max_distance_from_midpoint)
+    }
+}
+
+impl From<FloatTimestamp> for Timestamp {
+    fn from(float_timestamp: FloatTimestamp) -> Self {
+        Self(Wrapping(float_timestamp.0 as i16))
     }
 }
 
@@ -81,6 +85,45 @@ impl PartialOrd for Timestamp {
 impl From<Timestamp> for i16 {
     fn from(timestamp: Timestamp) -> i16 {
         timestamp.0 .0
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Default)]
+pub struct FloatTimestamp(f64);
+
+impl FloatTimestamp {
+    pub fn from_seconds(seconds: f64, timestep_seconds: f64) -> Self {
+        Self::from_unwrapped(seconds / timestep_seconds)
+    }
+
+    pub fn from_unwrapped(frames: f64) -> Self {
+        let frames_wrapped = (frames + 15.0f64.exp2()).rem_euclid(16.0f64.exp2()) - 15.0f64.exp2();
+        Self(frames_wrapped)
+    }
+
+    pub fn as_seconds(&self, timestep_seconds: f64) -> f64 {
+        self.0 * timestep_seconds
+    }
+
+    pub fn ceil(&self) -> Timestamp {
+        Timestamp(Wrapping(self.0.ceil() as i16))
+    }
+
+    pub fn floor(&self) -> Timestamp {
+        Timestamp(Wrapping(self.0.floor() as i16))
+    }
+}
+
+impl Sub<FloatTimestamp> for FloatTimestamp {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::from_unwrapped(self.0 - rhs.0)
+    }
+}
+
+impl From<Timestamp> for FloatTimestamp {
+    fn from(timestamp: Timestamp) -> FloatTimestamp {
+        FloatTimestamp(timestamp.0 .0 as f64)
     }
 }
 
