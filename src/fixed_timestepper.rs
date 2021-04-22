@@ -3,7 +3,7 @@ pub trait Stepper {
 }
 
 pub trait FixedTimestepper: Stepper {
-    fn advance(&mut self, delta_seconds: f32);
+    fn advance(&mut self, delta_seconds: f64);
 }
 
 pub enum TerminationCondition {
@@ -13,11 +13,11 @@ pub enum TerminationCondition {
 
 pub fn advance<T>(
     stepper: &mut T,
-    delta_seconds: f32,
-    initial_overshoot_seconds: f32,
-    timestep: f32,
+    delta_seconds: f64,
+    initial_overshoot_seconds: f64,
+    timestep: f64,
     termination_condition: TerminationCondition,
-) -> f32
+) -> f64
 where
     T: FixedTimestepper,
 {
@@ -39,10 +39,10 @@ where
 
 pub fn advance_without_overshoot<T>(
     stepper: &mut T,
-    delta_seconds: f32,
-    initial_overshoot_seconds: f32,
-    timestep: f32,
-) -> f32
+    delta_seconds: f64,
+    initial_overshoot_seconds: f64,
+    timestep: f64,
+) -> f64
 where
     T: FixedTimestepper,
 {
@@ -57,10 +57,10 @@ where
 
 pub fn advance_with_overshoot<T>(
     stepper: &mut T,
-    delta_seconds: f32,
-    initial_overshoot_seconds: f32,
-    timestep: f32,
-) -> f32
+    delta_seconds: f64,
+    initial_overshoot_seconds: f64,
+    timestep: f64,
+) -> f64
 where
     T: FixedTimestepper,
 {

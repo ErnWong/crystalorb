@@ -20,7 +20,7 @@ use std::{
 };
 use tracing::trace;
 
-pub const TIMESTEP_SECONDS: f32 = 1.0 / 60.0;
+pub const TIMESTEP_SECONDS: f64 = 1.0 / 60.0;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct MockWorld {
@@ -91,7 +91,7 @@ impl Stepper for MockWorld {
 }
 
 impl DisplayState for MockWorld {
-    fn from_interpolation(state1: &Self, state2: &Self, t: f32) -> Self {
+    fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self {
         if t == 1.0 {
             state2.clone()
         } else {
@@ -372,7 +372,7 @@ impl MockClientServer {
         }
     }
 
-    pub fn update_until_clients_ready(&mut self, delta_seconds: f32) {
+    pub fn update_until_clients_ready(&mut self, delta_seconds: f64) {
         while !matches!(self.client_1.state(), ClientState::Ready(_))
             || !matches!(self.client_2.state(), ClientState::Ready(_))
         {
@@ -382,12 +382,12 @@ impl MockClientServer {
         trace!("##################### Ready #######################");
     }
 
-    pub fn update(&mut self, delta_seconds: f32) {
+    pub fn update(&mut self, delta_seconds: f64) {
         trace!(
             "------------ Update by {} seconds --------------------------",
             delta_seconds
         );
-        self.clock += delta_seconds as f64;
+        self.clock += delta_seconds;
         trace!(
             "------------ >> Update server by {} seconds --------------------------",
             delta_seconds

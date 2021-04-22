@@ -26,11 +26,11 @@ use tracing_subscriber;
 
 #[derive(Default)]
 pub struct MyWorld {
-    position: f32,
-    velocity: f32,
+    position: f64,
+    velocity: f64,
 
     // Your World implementation might contain cached state/calculations, for example.
-    cached_momentum: Option<f32>,
+    cached_momentum: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -47,16 +47,16 @@ pub enum MyCommand {
 pub struct MySnapshot {
     // Here, you would probably want to put down the minimal subset of states that can be used to
     // describe the whole physics simulation at any point of time.
-    position: f32,
-    velocity: f32,
+    position: f64,
+    velocity: f64,
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct MyDisplayState {
-    position: f32,
+    position: f64,
     // Unless you use the velocity value for rendering in some way (e.g. motion blur), you might
     // not need to include it here in this display state.
-    velocity: f32,
+    velocity: f64,
     // You might also include other derived state that are useful for rendering.
 }
 
@@ -106,15 +106,15 @@ impl Command for MyCommand {}
 
 impl Stepper for MyWorld {
     fn step(&mut self) {
-        const DELTA_SECONDS: f32 = 1.0 / 60.0;
-        const MASS: f32 = 2.0;
+        const DELTA_SECONDS: f64 = 1.0 / 60.0;
+        const MASS: f64 = 2.0;
         self.position += self.velocity * DELTA_SECONDS;
         self.cached_momentum = Some(self.velocity * MASS);
     }
 }
 
 impl DisplayState for MyDisplayState {
-    fn from_interpolation(state1: &Self, state2: &Self, t: f32) -> Self {
+    fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self {
         MyDisplayState {
             position: (1.0 - t) * state1.position + t * state2.position,
             velocity: (1.0 - t) * state1.velocity + t * state2.velocity,
@@ -212,7 +212,7 @@ fn main() {
 
     loop {
         let current_time = Instant::now();
-        let delta_seconds = current_time.duration_since(previous_time).as_secs_f32();
+        let delta_seconds = current_time.duration_since(previous_time).as_secs_f64();
         let seconds_since_startup = current_time.duration_since(startup_time).as_secs_f64();
 
         let server_display_state = server.display_state();

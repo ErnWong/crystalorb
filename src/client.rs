@@ -15,7 +15,7 @@ use tracing::{debug, info, trace, warn};
 pub struct Client<WorldType: World> {
     config: Config,
     state: Option<ClientState<WorldType>>,
-    seconds_since_last_heartbeat: f32,
+    seconds_since_last_heartbeat: f64,
 }
 
 impl<WorldType: World> Client<WorldType> {
@@ -31,7 +31,7 @@ impl<WorldType: World> Client<WorldType> {
 
     pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        delta_seconds: f32,
+        delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
     ) {
@@ -117,7 +117,7 @@ pub struct SyncingInitialTimestampClient<WorldType: World> {
     config: Config,
     server_seconds_offset_sum: f64,
     sample_count: usize,
-    seconds_since_last_send: f32,
+    seconds_since_last_send: f64,
     client_id: usize,
     _world_type: PhantomData<WorldType>,
 }
@@ -136,7 +136,7 @@ impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
     }
     fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        delta_seconds: f32,
+        delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
         server_seconds_offset_addition: f64,
@@ -207,7 +207,7 @@ impl<WorldType: World> SyncingInitialStateClient<WorldType> {
     }
     fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        delta_seconds: f32,
+        delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
         offset_update: Option<f64>,
@@ -274,7 +274,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
 
     fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        delta_seconds: f32,
+        delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
         offset_update: Option<f64>,
@@ -342,7 +342,7 @@ pub struct ActiveClient<WorldType: World> {
     /// The interpolation paramater to blend the `old_world` and `new_world` together into a
     /// single world state. The parameter is in the range [0,1] where 0 represents using only
     /// the `old_world`, and where 1 represents using only the `new_world`.
-    old_new_interpolation_t: f32,
+    old_new_interpolation_t: f64,
 
     /// The latest interpolated state between `old_world` and `new_world` just before and just
     /// after the current requested render timestamp.
@@ -354,7 +354,7 @@ pub struct ActiveClient<WorldType: World> {
     states: OldNew<Option<Timestamped<WorldType::DisplayStateType>>>,
 
     /// The number of seconds that `current_state` has overshooted the requested render timestamp.
-    timestep_overshoot_seconds: f32,
+    timestep_overshoot_seconds: f64,
 
     /// The interpolation between `previous_state` and `current_state` for the requested render
     /// timestamp. This remains None until the client is initialised with the server's snapshots.
@@ -406,21 +406,21 @@ impl<WorldType: World> ActiveClient<WorldType> {
         let server_time = seconds_since_startup + self.server_seconds_offset;
         self.last_completed_timestamp()
             - Timestamp::from_seconds(
-                server_time + self.timestep_overshoot_seconds as f64,
+                server_time + self.timestep_overshoot_seconds,
                 self.config.timestep_seconds,
             )
     }
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
-    fn timestamp_drift_seconds(&self, seconds_since_startup: f64) -> f32 {
+    fn timestamp_drift_seconds(&self, seconds_since_startup: f64) -> f64 {
         self.timestamp_drift(seconds_since_startup)
             .as_seconds(self.config.timestep_seconds)
     }
 
     pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        delta_seconds: f32,
+        delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
         offset_update: Option<f64>,
@@ -661,7 +661,7 @@ impl<WorldType: World> Stepper for ActiveClient<WorldType> {
 }
 
 impl<WorldType: World> FixedTimestepper for ActiveClient<WorldType> {
-    fn advance(&mut self, delta_seconds: f32) {
+    fn advance(&mut self, delta_seconds: f64) {
         trace!(
             "Advancing by {} seconds (previous overshoot leftover: {})",
             delta_seconds,

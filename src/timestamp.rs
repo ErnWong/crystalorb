@@ -14,9 +14,9 @@ impl Timestamp {
     /// See note about transitivity for Timestamp's Ord implementation.
     pub const MAX_COMPARABLE_RANGE: i16 = i16::MAX;
 
-    pub fn from_seconds(seconds: f64, timestep_seconds: f32) -> Self {
-        let frames_f64 = seconds / timestep_seconds as f64;
-        let frames_wrapped = ((frames_f64 + 2.0f64.powi(15)) % 2.0f64.powi(16)) - 2.0f64.powi(15);
+    pub fn from_seconds(seconds: f64, timestep_seconds: f64) -> Self {
+        let frames = seconds / timestep_seconds;
+        let frames_wrapped = ((frames + 2.0f64.powi(15)) % 2.0f64.powi(16)) - 2.0f64.powi(15);
         Self(Wrapping(frames_wrapped as i16))
     }
 
@@ -24,8 +24,8 @@ impl Timestamp {
         self.0 += Wrapping(1);
     }
 
-    pub fn as_seconds(&self, timestep_seconds: f32) -> f32 {
-        self.0 .0 as f32 * timestep_seconds
+    pub fn as_seconds(&self, timestep_seconds: f64) -> f64 {
+        self.0 .0 as f64 * timestep_seconds
     }
 
     /// See note about transitivity for Timestamp's Ord implementation.
@@ -286,11 +286,11 @@ mod tests {
         assert_eq!(Timestamp::from_seconds(-1.0, 1.0).as_seconds(1.0), -1.0);
         assert_eq!(
             Timestamp::from_seconds(i16::MAX as f64, 1.0).as_seconds(1.0),
-            i16::MAX as f32,
+            i16::MAX as f64,
         );
         assert_eq!(
             Timestamp::from_seconds((i16::MAX as f64) + 1.0, 1.0).as_seconds(1.0),
-            i16::MIN as f32,
+            i16::MIN as f64,
         );
     }
 }

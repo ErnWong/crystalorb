@@ -35,7 +35,7 @@ pub enum TweeningMethod {
 impl TweeningMethod {
     /// Depending on the tweening method, conditionally snap the interpolation parameter to 0.0 or
     /// 1.0.
-    pub fn shape_interpolation_t(&self, t: f32) -> f32 {
+    pub fn shape_interpolation_t(&self, t: f64) -> f64 {
         assert!((0.0..=1.0).contains(&t));
         match self {
             TweeningMethod::MostRecentlyPassed => t.floor(),
@@ -53,7 +53,7 @@ pub struct Config {
     /// The server will only simulate `lag_compensation_latency` seconds in the past,
     /// and let each client predict `lag_compensation_latency` seconds ahead of the server
     /// using the command buffers.
-    pub lag_compensation_latency: f32,
+    pub lag_compensation_latency: f64,
 
     /// When a client receives a snapshot update of the entire world from the server, the client
     /// uses this snapshot to update their simulation. However, immediately displaying the result
@@ -61,21 +61,21 @@ pub struct Config {
     /// we keep simulating the world without the new snapshot information, and slowly fade into the
     /// world with the new snapshot information. We linearly interpolate from the old and new
     /// worlds in `interpolation_latency` seconds.
-    pub interpolation_latency: f32,
+    pub interpolation_latency: f64,
 
-    pub timestep_seconds: f32,
+    pub timestep_seconds: f64,
 
     pub timestamp_sync_needed_sample_count: usize,
 
-    pub initial_clock_sync_period: f32,
+    pub initial_clock_sync_period: f64,
 
-    pub heartbeat_period: f32,
+    pub heartbeat_period: f64,
 
-    pub snapshot_send_period: f32,
+    pub snapshot_send_period: f64,
 
-    pub update_delta_seconds_max: f32,
+    pub update_delta_seconds_max: f64,
 
-    pub timestamp_skip_threshold_seconds: f32,
+    pub timestamp_skip_threshold_seconds: f64,
 
     pub fastforward_max_per_step: usize,
 
@@ -105,11 +105,12 @@ impl Config {
             tweening_method: TweeningMethod::Interpolated,
         }
     }
+
     pub fn lag_compensation_frame_count(&self) -> i16 {
         return (self.lag_compensation_latency / self.timestep_seconds).round() as i16;
     }
 
-    pub fn interpolation_progress_per_frame(&self) -> f32 {
+    pub fn interpolation_progress_per_frame(&self) -> f64 {
         return self.timestep_seconds / self.interpolation_latency;
     }
 }

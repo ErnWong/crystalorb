@@ -8,11 +8,11 @@ use std::{fmt::Debug, ops::Deref};
 use tracing::trace;
 
 pub trait DisplayState: Default + Send + Sync + Clone {
-    fn from_interpolation(state1: &Self, state2: &Self, t: f32) -> Self;
+    fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self;
 }
 
 impl<T: DisplayState> DisplayState for Timestamped<T> {
-    fn from_interpolation(state1: &Self, state2: &Self, t: f32) -> Self {
+    fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self {
         if t > 0.0 {
             assert_eq!(state1.timestamp(), state2.timestamp(), "Can only interpolate between timestamped states of the same timestamp. If timestamps differ, you will need to use Tweened::from_interpolation to also interpolate the timestamp value into a float.");
         }
@@ -26,7 +26,7 @@ impl<T: DisplayState> DisplayState for Timestamped<T> {
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Tweened<T> {
     display_state: T,
-    timestamp: f32,
+    timestamp: f64,
 }
 
 impl<T: DisplayState> Tweened<T> {
@@ -34,7 +34,7 @@ impl<T: DisplayState> Tweened<T> {
         &self.display_state
     }
 
-    pub fn float_timestamp(&self) -> f32 {
+    pub fn float_timestamp(&self) -> f64 {
         self.timestamp
     }
 }
@@ -47,12 +47,12 @@ impl<T: DisplayState> Deref for Tweened<T> {
 }
 
 impl<T: DisplayState> Tweened<T> {
-    pub fn from_interpolation(state1: &Timestamped<T>, state2: &Timestamped<T>, t: f32) -> Self {
+    pub fn from_interpolation(state1: &Timestamped<T>, state2: &Timestamped<T>, t: f64) -> Self {
         // Note: timestamps are in modulo arithmetic, so we need to work using the wrapped
         // difference value.
         let timestamp_difference: i16 = (state2.timestamp() - state1.timestamp()).into();
-        let timestamp_offset: f32 = t * (timestamp_difference as f32);
-        let timestamp_interpolated = i16::from(state1.timestamp()) as f32 + timestamp_offset;
+        let timestamp_offset: f64 = t * (timestamp_difference as f64);
+        let timestamp_interpolated = i16::from(state1.timestamp()) as f64 + timestamp_offset;
         Self {
             display_state: T::from_interpolation(state1.inner(), state2.inner(), t),
             timestamp: timestamp_interpolated,
@@ -64,7 +64,7 @@ impl<T: DisplayState> From<Timestamped<T>> for Tweened<T> {
     fn from(timestamped: Timestamped<T>) -> Self {
         Self {
             display_state: timestamped.inner().clone(),
-            timestamp: i16::from(timestamped.timestamp()) as f32,
+            timestamp: i16::from(timestamped.timestamp()) as f64,
         }
     }
 }

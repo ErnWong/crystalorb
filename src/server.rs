@@ -11,8 +11,8 @@ use tracing::{debug, error, info, trace, warn};
 
 pub struct Server<WorldType: World> {
     world_simulation: WorldSimulation<WorldType>,
-    timestep_overshoot_seconds: f32,
-    seconds_since_last_snapshot: f32,
+    timestep_overshoot_seconds: f64,
+    seconds_since_last_snapshot: f64,
     config: Config,
 }
 
@@ -61,7 +61,7 @@ impl<WorldType: World> Server<WorldType> {
 
     /// Positive refers that our world is ahead of the timestamp it is supposed to be, and
     /// negative refers that our world needs to catchup in the next frame.
-    pub fn timestamp_drift_seconds(&self, seconds_since_startup: f64) -> f32 {
+    pub fn timestamp_drift_seconds(&self, seconds_since_startup: f64) -> f64 {
         self.timestamp_drift(seconds_since_startup)
             .as_seconds(self.config.timestep_seconds)
     }
@@ -141,7 +141,7 @@ impl<WorldType: World> Server<WorldType> {
 
     pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
-        delta_seconds: f32,
+        delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
     ) {
@@ -239,7 +239,7 @@ impl<WorldType: World> Stepper for Server<WorldType> {
 }
 
 impl<WorldType: World> FixedTimestepper for Server<WorldType> {
-    fn advance(&mut self, delta_seconds: f32) {
+    fn advance(&mut self, delta_seconds: f64) {
         trace!(
             "Advancing by {} seconds (previous overshoot leftover: {})",
             delta_seconds,

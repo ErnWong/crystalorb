@@ -16,7 +16,7 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
         // GIVEN a server and multiple clients in a perfect network.
         const FRAMES_TO_LAG_BEHIND: i32 = 12; // A common multiple of frames_per_update so the display states line up.
         let mut mock_client_server = MockClientServer::new(Config {
-            lag_compensation_latency: FRAMES_TO_LAG_BEHIND as f32 * TIMESTEP_SECONDS,
+            lag_compensation_latency: FRAMES_TO_LAG_BEHIND as f64 * TIMESTEP_SECONDS,
             interpolation_latency: 0.2,
             timestep_seconds: TIMESTEP_SECONDS,
             timestamp_sync_needed_sample_count: 8,
