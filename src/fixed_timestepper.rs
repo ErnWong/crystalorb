@@ -55,6 +55,17 @@ impl TerminationCondition {
             (FloatTimestamp::from(timestamp) - float_timestamp).as_seconds(timestep_seconds);
         (timestamp, overshoot_seconds)
     }
+
+    pub fn should_terminate(
+        &self,
+        current_overshoot_seconds: f64,
+        next_overshoot_seconds: f64,
+    ) -> bool {
+        match self {
+            TerminationCondition::LastUndershoot => next_overshoot_seconds > 0.0,
+            TerminationCondition::FirstOvershoot => current_overshoot_seconds >= 0.0,
+        }
+    }
 }
 
 /// Given something that can be stepped through in fixed timesteps (aka a [FixedTimestepper]), the
@@ -194,11 +205,9 @@ impl<T: FixedTimestepper, const TERMINATION_CONDITION: TerminationCondition>
         loop {
             let next_overshoot_seconds =
                 self.timestep_overshoot_seconds + self.config.timestep_seconds;
-            let termination_compare_value = match &TERMINATION_CONDITION {
-                TerminationCondition::LastUndershoot => next_overshoot_seconds,
-                TerminationCondition::FirstOvershoot => self.timestep_overshoot_seconds,
-            };
-            if termination_compare_value >= 0.0 {
+            if TERMINATION_CONDITION
+                .should_terminate(self.timestep_overshoot_seconds, next_overshoot_seconds)
+            {
                 break;
             }
             self.stepper.step();
