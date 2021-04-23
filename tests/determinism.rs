@@ -57,11 +57,8 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
             start_timestamp + (commands.len() as i16).max(*frames_per_update as i16);
         let mut client_state_history: Vec<Tweened<MockWorld>> = Vec::new();
         let mut server_state_history: Vec<Tweened<MockWorld>> = Vec::new();
-        loop {
-            if mock_client_server.server.display_state().timestamp() >= target_timestamp {
-                break;
-            }
 
+        while mock_client_server.server.display_state().timestamp() < target_timestamp {
             let current_client_timestamp = match mock_client_server.client_1.state() {
                 ClientState::Ready(client) => {
                     Timestamp::default() + client.display_state().float_timestamp() as i16
