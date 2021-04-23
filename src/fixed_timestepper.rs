@@ -298,6 +298,54 @@ mod tests {
     }
 
     #[test]
+    fn test_termination_condition_last_undershoot_exact() {
+        let mut timekeeper: TimeKeeper<MockStepper, { TerminationCondition::LastUndershoot }> =
+            TimeKeeper::new(MockStepper::new(Timestamp::default()), CONFIG);
+        timekeeper.update(CONFIG.timestep_seconds, CONFIG.timestep_seconds);
+        assert_eq!(timekeeper.steps, 1);
+    }
+
+    #[test]
+    fn test_termination_condition_last_undershoot_below() {
+        let mut timekeeper: TimeKeeper<MockStepper, { TerminationCondition::LastUndershoot }> =
+            TimeKeeper::new(MockStepper::new(Timestamp::default()), CONFIG);
+        timekeeper.update(CONFIG.timestep_seconds * 0.5, CONFIG.timestep_seconds * 0.5);
+        assert_eq!(timekeeper.steps, 0);
+    }
+
+    #[test]
+    fn test_termination_condition_last_undershoot_above() {
+        let mut timekeeper: TimeKeeper<MockStepper, { TerminationCondition::LastUndershoot }> =
+            TimeKeeper::new(MockStepper::new(Timestamp::default()), CONFIG);
+        timekeeper.update(CONFIG.timestep_seconds * 1.5, CONFIG.timestep_seconds * 1.5);
+        assert_eq!(timekeeper.steps, 1);
+    }
+
+    #[test]
+    fn test_termination_condition_first_overshoot_exact() {
+        let mut timekeeper: TimeKeeper<MockStepper, { TerminationCondition::FirstOvershoot }> =
+            TimeKeeper::new(MockStepper::new(Timestamp::default()), CONFIG);
+        timekeeper.update(CONFIG.timestep_seconds, CONFIG.timestep_seconds);
+        assert_eq!(timekeeper.steps, 1);
+    }
+
+    #[test]
+    fn test_termination_condition_first_overshoot_below() {
+        let mut timekeeper: TimeKeeper<MockStepper, { TerminationCondition::FirstOvershoot }> =
+            TimeKeeper::new(MockStepper::new(Timestamp::default()), CONFIG);
+        timekeeper.update(CONFIG.timestep_seconds * 0.5, CONFIG.timestep_seconds * 0.5);
+        assert_eq!(timekeeper.steps, 1);
+    }
+
+    #[test]
+    fn test_termination_condition_first_overshoot_above() {
+        let mut timekeeper: TimeKeeper<MockStepper, { TerminationCondition::FirstOvershoot }> =
+            TimeKeeper::new(MockStepper::new(Timestamp::default()), CONFIG);
+        timekeeper.update(CONFIG.timestep_seconds * 1.5, CONFIG.timestep_seconds * 1.5);
+        assert_eq!(timekeeper.steps, 2);
+    }
+
+    #[test]
     fn when_update_with_timestamp_drifted_within_the_frame_then_timestamp_drift_is_ignored() {
         for (small_drift_seconds, initial_wrapped_count, initial_timestamp, frames_per_update) in iproduct!(
             &[
