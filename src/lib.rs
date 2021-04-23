@@ -3,8 +3,8 @@
 #![feature(const_generics)]
 #![feature(generic_associated_types)]
 
-pub mod channels;
 pub mod client;
+pub mod clocksync;
 pub mod command;
 pub mod fixed_timestepper;
 pub mod network_resource;
@@ -66,11 +66,27 @@ pub struct Config {
 
     pub timestep_seconds: f64,
 
-    pub timestamp_sync_needed_sample_count: usize,
+    /// The number of of clock sync responses from the server before the client averages them
+    /// to update the client's clock. The higher this number, the more resilient it is to
+    /// jitter, but the longer it takes before the client becomes ready.
+    pub clock_sync_needed_sample_count: usize,
 
-    pub initial_clock_sync_period: f64,
+    /// The assumed probability that the next clock_sync response sample is an outlier. Before
+    /// the samples are averaged, outliers are ignored from the calculation. The number of
+    /// samples to ignore is determined by this numebr, with a minimum of one sample ignored
+    /// from each extreme (i.e. the max and the min sample gets ignored).
+    pub clock_sync_assumed_outlier_rate: f64,
 
-    pub heartbeat_period: f64,
+    /// This determines how rapid the client sends clock_sync requests to the server,
+    /// represented as the number of seconds before sending the next request.
+    pub clock_sync_request_period: f64,
+
+    /// How big the difference needs to be between the following two before updating:
+    /// (1) the server clock offset value that the client is currently using for its
+    /// calculations, compared with
+    /// (2) the current rolling average server clock offset that was measured using clock_sync
+    /// messages,
+    pub max_tolerable_clock_deviation: f64,
 
     pub snapshot_send_period: f64,
 
@@ -79,8 +95,6 @@ pub struct Config {
     pub timestamp_skip_threshold_seconds: f64,
 
     pub fastforward_max_per_step: usize,
-
-    pub clock_offset_update_factor: f64,
 
     /// In crystalorb, the physics simulation is assumed to be running at a fixed timestep that is
     /// different to the rendering refresh rate. To suppress some forms of temporal aliasing due to
@@ -95,14 +109,14 @@ impl Config {
             lag_compensation_latency: 0.3,
             interpolation_latency: 0.2,
             timestep_seconds: 1.0 / 60.0,
-            timestamp_sync_needed_sample_count: 32,
-            initial_clock_sync_period: 0.2,
-            heartbeat_period: 0.7,
+            clock_sync_needed_sample_count: 32,
+            clock_sync_request_period: 0.2,
+            clock_sync_assumed_outlier_rate: 0.2,
+            max_tolerable_clock_deviation: 0.1,
             snapshot_send_period: 0.1,
             update_delta_seconds_max: 0.25,
             timestamp_skip_threshold_seconds: 1.0,
             fastforward_max_per_step: 10,
-            clock_offset_update_factor: 0.1,
             tweening_method: TweeningMethod::Interpolated,
         }
     }
@@ -113,6 +127,22 @@ impl Config {
 
     pub fn interpolation_progress_per_frame(&self) -> f64 {
         return self.timestep_seconds / self.interpolation_latency;
+    }
+
+    /// The number of samples N so that, before we calculate the rolling average, we skip the N
+    /// lowest and N highest samples.
+    pub fn clock_sync_samples_to_discard_per_extreme(&self) -> usize {
+        return (self.clock_sync_needed_sample_count as f64 * self.clock_sync_assumed_outlier_rate
+            / 2.0)
+            .max(1.0)
+            .ceil() as usize;
+    }
+
+    /// The total number of samples that need to be kept in the ring buffer, so that, after
+    /// discarding the outliers, there is enough samples to calculate the rolling average.
+    pub fn clock_sync_samples_needed_to_store(&self) -> usize {
+        return self.clock_sync_needed_sample_count
+            + self.clock_sync_samples_to_discard_per_extreme() * 2;
     }
 }
 

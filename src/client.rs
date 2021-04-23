@@ -1,5 +1,5 @@
 use crate::{
-    channels::ClockSyncMessage,
+    clocksync::ClockSyncer,
     command::CommandBuffer,
     fixed_timestepper::{FixedTimestepper, Stepper, TerminationCondition, TimeKeeper},
     network_resource::{Connection, NetworkResource},
@@ -8,23 +8,20 @@ use crate::{
     world::{DisplayState, Tweened, World, WorldSimulation},
     Config,
 };
-use std::marker::PhantomData;
 use tracing::{debug, info, trace, warn};
 
 pub struct Client<WorldType: World> {
     config: Config,
     state: Option<ClientState<WorldType>>,
-    seconds_since_last_heartbeat: f64,
 }
 
 impl<WorldType: World> Client<WorldType> {
     pub fn new(config: Config) -> Self {
         Self {
             config: config.clone(),
-            state: Some(ClientState::SyncingInitialTimestamp(
-                SyncingInitialTimestampClient::new(config),
-            )),
-            seconds_since_last_heartbeat: 0.0,
+            state: Some(ClientState::SyncingClock(SyncingClockClient(
+                ClockSyncer::new(config.clone()),
+            ))),
         }
     }
 
@@ -34,65 +31,33 @@ impl<WorldType: World> Client<WorldType> {
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
     ) {
-        self.seconds_since_last_heartbeat += delta_seconds;
-        if self.seconds_since_last_heartbeat > self.config.heartbeat_period {
-            self.seconds_since_last_heartbeat = 0.0;
-            trace!("Sending heartbeat");
-            net.broadcast_message(ClockSyncMessage {
-                client_send_seconds_since_startup: seconds_since_startup,
-                server_seconds_since_startup: 0.0,
-                client_id: 0,
-            });
-        }
-
-        let mut server_seconds_offset_sum: f64 = 0.0;
-        let mut sample_count: usize = 0;
-        let mut client_id: usize = 0;
-        for (_, mut connection) in net.connections() {
-            while let Some(sync) = connection.recv::<ClockSyncMessage>() {
-                let received_time = seconds_since_startup;
-                let corresponding_client_time =
-                    (sync.client_send_seconds_since_startup + received_time) / 2.0;
-                let offset = sync.server_seconds_since_startup - corresponding_client_time;
-                trace!(
-                    "Received clock sync message. ClientId: {}. Estimated clock offset: {}",
-                    sync.client_id,
-                    offset,
-                );
-                server_seconds_offset_sum += offset;
-                sample_count += 1;
-                client_id = sync.client_id;
-            }
-        }
-        let offset_update = if sample_count > 0 {
-            Some(server_seconds_offset_sum / sample_count as f64)
-        } else {
-            None
-        };
-
         let should_transition = match &mut self.state.as_mut().unwrap() {
-            ClientState::SyncingInitialTimestamp(client) => client.update(
-                delta_seconds,
-                seconds_since_startup,
-                net,
-                server_seconds_offset_sum,
-                sample_count,
-                client_id,
-            ),
-            ClientState::SyncingInitialState(client) => {
-                client.update(delta_seconds, seconds_since_startup, net, offset_update)
+            ClientState::SyncingClock(SyncingClockClient(clocksyncer)) => {
+                clocksyncer.update(delta_seconds, seconds_since_startup, net);
+                clocksyncer.is_ready()
             }
-            ClientState::Ready(client) => {
-                client.update(delta_seconds, seconds_since_startup, net, offset_update)
+            ClientState::SyncingInitialState(SyncingInitialStateClient(client)) => {
+                client.update(delta_seconds, seconds_since_startup, net);
+                client.is_ready()
+            }
+            ClientState::Ready(ReadyClient(client)) => {
+                client.update(delta_seconds, seconds_since_startup, net);
+                false
             }
         };
         if should_transition {
             self.state = Some(match self.state.take().unwrap() {
-                ClientState::SyncingInitialTimestamp(client) => {
-                    client.into_next_state(seconds_since_startup).unwrap()
+                ClientState::SyncingClock(SyncingClockClient(clocksyncer)) => {
+                    ClientState::SyncingInitialState(SyncingInitialStateClient(ActiveClient::new(
+                        seconds_since_startup,
+                        self.config.clone(),
+                        clocksyncer,
+                    )))
                 }
-                ClientState::SyncingInitialState(client) => client.into_next_state().unwrap(),
-                ClientState::Ready(client) => client.into_next_state(net).unwrap(),
+                ClientState::SyncingInitialState(SyncingInitialStateClient(client)) => {
+                    ClientState::Ready(ReadyClient(client))
+                }
+                ClientState::Ready(_) => unreachable!(),
             });
         }
     }
@@ -107,143 +72,31 @@ impl<WorldType: World> Client<WorldType> {
 }
 
 pub enum ClientState<WorldType: World> {
-    SyncingInitialTimestamp(SyncingInitialTimestampClient<WorldType>),
+    SyncingClock(SyncingClockClient),
     SyncingInitialState(SyncingInitialStateClient<WorldType>),
     Ready(ReadyClient<WorldType>),
 }
 
-pub struct SyncingInitialTimestampClient<WorldType: World> {
-    config: Config,
-    server_seconds_offset_sum: f64,
-    sample_count: usize,
-    seconds_since_last_send: f64,
-    client_id: usize,
-    _world_type: PhantomData<WorldType>,
-}
+pub struct SyncingClockClient(ClockSyncer);
 
-impl<WorldType: World> SyncingInitialTimestampClient<WorldType> {
-    fn new(config: Config) -> Self {
-        info!("Syncing timestamp");
-        SyncingInitialTimestampClient {
-            config,
-            server_seconds_offset_sum: 0.0,
-            sample_count: 0,
-            seconds_since_last_send: 0.0,
-            client_id: 0,
-            _world_type: PhantomData,
-        }
-    }
-    fn update<NetworkResourceType: NetworkResource>(
-        &mut self,
-        delta_seconds: f64,
-        seconds_since_startup: f64,
-        net: &mut NetworkResourceType,
-        server_seconds_offset_addition: f64,
-        new_sample_count: usize,
-        client_id: usize,
-    ) -> bool {
-        self.server_seconds_offset_sum += server_seconds_offset_addition;
-        self.sample_count += new_sample_count;
-        self.client_id = client_id;
+pub struct SyncingInitialStateClient<WorldType: World>(ActiveClient<WorldType>);
 
-        self.seconds_since_last_send += delta_seconds;
-        if self.seconds_since_last_send > self.config.initial_clock_sync_period {
-            self.seconds_since_last_send = 0.0;
-            trace!("Sending clock sync message");
-            net.broadcast_message(ClockSyncMessage {
-                client_send_seconds_since_startup: seconds_since_startup,
-                server_seconds_since_startup: 0.0,
-                client_id: 0,
-            });
-        }
-
-        self.should_transition()
-    }
-
-    fn should_transition(&self) -> bool {
-        self.sample_count > self.config.timestamp_sync_needed_sample_count
-    }
-
-    fn into_next_state(self, seconds_since_startup: f64) -> Option<ClientState<WorldType>> {
-        if self.should_transition() {
-            let seconds_offset = self.server_seconds_offset_sum / self.sample_count as f64;
-            let server_time = seconds_since_startup + seconds_offset;
-            let initial_timestamp =
-                Timestamp::from_seconds(server_time, self.config.timestep_seconds);
-            Some(ClientState::SyncingInitialState(
-                SyncingInitialStateClient::new(
-                    self.config,
-                    initial_timestamp,
-                    seconds_offset,
-                    self.client_id,
-                ),
-            ))
-        } else {
-            None
-        }
-    }
-}
-
-pub struct SyncingInitialStateClient<WorldType: World> {
-    client: ActiveClient<WorldType>,
-}
-
-impl<WorldType: World> SyncingInitialStateClient<WorldType> {
-    fn new(
-        config: Config,
-        initial_timestamp: Timestamp,
-        server_seconds_offset: f64,
-        client_id: usize,
-    ) -> Self {
-        info!(
-            "Initial timestamp: {:?}, client_id: {}, server seconds offset: {}",
-            initial_timestamp, client_id, server_seconds_offset
-        );
-        info!("Syncing initial state");
-        Self {
-            client: ActiveClient::new(config, initial_timestamp, server_seconds_offset, client_id),
-        }
-    }
-    fn update<NetworkResourceType: NetworkResource>(
-        &mut self,
-        delta_seconds: f64,
-        seconds_since_startup: f64,
-        net: &mut NetworkResourceType,
-        offset_update: Option<f64>,
-    ) -> bool {
-        self.client
-            .update(delta_seconds, seconds_since_startup, net, offset_update);
-        self.should_transition()
-    }
-
-    fn should_transition(&self) -> bool {
-        self.client.timekeeping_simulations.display_state.is_some()
-    }
-
-    fn into_next_state(self) -> Option<ClientState<WorldType>> {
-        if self.should_transition() {
-            Some(ClientState::Ready(ReadyClient::new(self.client)))
-        } else {
-            None
-        }
-    }
-}
-
-pub struct ReadyClient<WorldType: World> {
-    client: ActiveClient<WorldType>,
-}
+pub struct ReadyClient<WorldType: World>(ActiveClient<WorldType>);
 
 impl<WorldType: World> ReadyClient<WorldType> {
     pub fn last_completed_timestamp(&self) -> Timestamp {
-        self.client.last_completed_timestamp()
+        self.0.last_completed_timestamp()
     }
 
     pub fn simulating_timestamp(&self) -> Timestamp {
-        self.client.simulating_timestamp()
+        self.0.simulating_timestamp()
     }
 
     pub fn client_id(&self) -> usize {
-        self.client.client_id
+        self.0
+            .clocksyncer
+            .client_id()
+            .expect("Client should be connected by the time it is ready")
     }
 
     /// Issue a command from this client's player to the world. The command will be scheduled
@@ -254,7 +107,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
         net: &mut NetworkResourceType,
     ) {
         let command = Timestamped::new(command, self.simulating_timestamp());
-        self.client
+        self.0
             .timekeeping_simulations
             .receive_command(command.clone());
         net.broadcast_message(command);
@@ -262,79 +115,39 @@ impl<WorldType: World> ReadyClient<WorldType> {
 
     pub fn display_state(&self) -> &Tweened<WorldType::DisplayStateType> {
         &self
-            .client
+            .0
             .timekeeping_simulations
             .display_state
             .as_ref()
             .expect("Client should be initialised")
     }
-
-    fn new(client: ActiveClient<WorldType>) -> Self {
-        info!("Client ready");
-        Self { client }
-    }
-
-    fn update<NetworkResourceType: NetworkResource>(
-        &mut self,
-        delta_seconds: f64,
-        seconds_since_startup: f64,
-        net: &mut NetworkResourceType,
-        offset_update: Option<f64>,
-    ) -> bool {
-        self.client
-            .update(delta_seconds, seconds_since_startup, net, offset_update);
-        self.should_transition(net)
-    }
-
-    fn should_transition<NetworkResourceType: NetworkResource>(
-        &self,
-        _net: &mut NetworkResourceType,
-    ) -> bool {
-        // TODO: Check for disconnection.
-        false
-    }
-
-    fn into_next_state<NetworkResourceType: NetworkResource>(
-        self,
-        net: &mut NetworkResourceType,
-    ) -> Option<ClientState<WorldType>> {
-        if self.should_transition(net) {
-            Some(ClientState::SyncingInitialTimestamp(
-                SyncingInitialTimestampClient::new(
-                    self.client.timekeeping_simulations.config.clone(),
-                ),
-            ))
-        } else {
-            None
-        }
-    }
 }
 
 pub struct ActiveClient<WorldType: World> {
-    /// An identifier issued by the server for us to identify ourselves from other clients. Used,
-    /// for example, for issuing our player's commands to the server.
-    client_id: usize,
-
-    /// The difference in seconds between client's time.seconds_since_startup() and server's
-    /// time.seconds_since_startup(), where a positive value refers that an earlier client time
-    /// value corresponds to the same instant as a later server time value. Since servers start
-    /// earlier than clients, this value should in theory always be positive.
-    server_seconds_offset: f64,
+    clocksyncer: ClockSyncer,
 
     timekeeping_simulations:
         TimeKeeper<ClientWorldSimulations<WorldType>, { TerminationCondition::FirstOvershoot }>,
 }
 
 impl<WorldType: World> ActiveClient<WorldType> {
-    fn new(
-        config: Config,
-        initial_timestamp: Timestamp,
-        server_seconds_offset: f64,
-        client_id: usize,
-    ) -> Self {
+    fn new(seconds_since_startup: f64, config: Config, clocksyncer: ClockSyncer) -> Self {
+        let server_time = clocksyncer
+            .server_seconds_since_startup(seconds_since_startup)
+            .expect("Active client can only be constructed with a synchronized clock");
+
+        let initial_timestamp = Timestamp::from_seconds(server_time, config.timestep_seconds);
+
+        info!(
+            "Initial timestamp: {:?}, client_id: {}",
+            initial_timestamp,
+            clocksyncer
+                .client_id()
+                .expect("Active client can only be constructed once connected"),
+        );
+
         Self {
-            client_id,
-            server_seconds_offset,
+            clocksyncer,
             timekeeping_simulations: TimeKeeper::new(
                 ClientWorldSimulations::new(config.clone(), initial_timestamp),
                 config.clone(),
@@ -355,21 +168,9 @@ impl<WorldType: World> ActiveClient<WorldType> {
         delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
-        offset_update: Option<f64>,
     ) {
-        if let Some(offset) = offset_update {
-            let old_server_seconds_offset = self.server_seconds_offset;
-            self.server_seconds_offset += (offset - self.server_seconds_offset)
-                * self
-                    .timekeeping_simulations
-                    .config
-                    .clock_offset_update_factor;
-            trace!(
-                "Client updated its clock offset from {:?} to {:?}",
-                old_server_seconds_offset,
-                self.server_seconds_offset
-            );
-        }
+        self.clocksyncer
+            .update(delta_seconds, seconds_since_startup, net);
 
         for (_, mut connection) in net.connections() {
             while let Some(command) = connection.recv::<Timestamped<WorldType::CommandType>>() {
@@ -380,13 +181,23 @@ impl<WorldType: World> ActiveClient<WorldType> {
             }
         }
 
-        trace!("client server clock offset {}", self.server_seconds_offset);
+        trace!(
+            "client server clock offset {}",
+            self.clocksyncer
+                .server_seconds_offset()
+                .expect("Clock should be synced")
+        );
         self.timekeeping_simulations.update(
             delta_seconds,
-            seconds_since_startup
-                + self.server_seconds_offset
+            self.clocksyncer
+                .server_seconds_since_startup(seconds_since_startup)
+                .expect("Clock should be synced")
                 + self.timekeeping_simulations.config.lag_compensation_latency,
         );
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.timekeeping_simulations.display_state.is_some()
     }
 }
 

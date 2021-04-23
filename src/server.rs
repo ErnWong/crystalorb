@@ -1,5 +1,5 @@
 use crate::{
-    channels::ClockSyncMessage,
+    clocksync::ClockSyncMessage,
     fixed_timestepper::{FixedTimestepper, TerminationCondition, TimeKeeper},
     network_resource::{Connection, ConnectionHandleType, NetworkResource},
     timestamp::{Timestamp, Timestamped},

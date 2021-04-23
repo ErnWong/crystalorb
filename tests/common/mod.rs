@@ -1,6 +1,6 @@
 use crystalorb::{
-    channels::ClockSyncMessage,
     client::{Client, ClientState},
+    clocksync::ClockSyncMessage,
     command::Command,
     fixed_timestepper::Stepper,
     network_resource::{Connection, ConnectionHandleType, NetworkResource},

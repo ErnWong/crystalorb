@@ -17,14 +17,14 @@ fn when_client_becomes_ready_state_should_already_be_initialised() {
             lag_compensation_latency: FRAMES_TO_LAG_BEHIND as f64 * TIMESTEP_SECONDS,
             interpolation_latency: 0.2,
             timestep_seconds: TIMESTEP_SECONDS,
-            timestamp_sync_needed_sample_count: 8,
-            initial_clock_sync_period: 0.0,
-            heartbeat_period: 0.7,
+            clock_sync_needed_sample_count: 8,
+            clock_sync_request_period: 0.0,
+            clock_sync_assumed_outlier_rate: 0.2,
+            max_tolerable_clock_deviation: 0.1,
             snapshot_send_period: 0.1,
             update_delta_seconds_max: 0.25,
             timestamp_skip_threshold_seconds: 1.0,
             fastforward_max_per_step: 10,
-            clock_offset_update_factor: 0.1,
             tweening_method: TweeningMethod::MostRecentlyPassed,
         });
 
