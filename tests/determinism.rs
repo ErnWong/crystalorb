@@ -110,11 +110,89 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
 }
 
 #[test]
-#[ignore = "not yet implemented"]
 fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
-    // GIVEN a server and multiple clients in a perfect network.
-    // GIVEN that the clients are ready.
-    // WHEN no commands are issued.
-    // THEN the recorded server states should perfectly match every client's states.
-    unimplemented!();
+    for frames_per_update in &[1.0, 0.5, 1.0 / 3.0, 1.5, 2.0, 3.0, 4.0, 6.0] {
+        // GIVEN a server and multiple clients in a perfect network.
+        const FRAMES_TO_LAG_BEHIND: i32 = 12;
+        assert_eq!(
+            (FRAMES_TO_LAG_BEHIND as f64 / frames_per_update).fract(),
+            0.0,
+            "lag needs to be multiple of frames_per_update so the display states line up.",
+        );
+        let mut mock_client_server = MockClientServer::new(Config {
+            lag_compensation_latency: FRAMES_TO_LAG_BEHIND as f64 * TIMESTEP_SECONDS,
+            interpolation_latency: 0.2,
+            timestep_seconds: TIMESTEP_SECONDS,
+            timestamp_sync_needed_sample_count: 8,
+            initial_clock_sync_period: 0.0,
+            heartbeat_period: 0.7,
+            snapshot_send_period: 0.1,
+            update_delta_seconds_max: 0.5,
+            timestamp_skip_threshold_seconds: 1.0,
+            fastforward_max_per_step: 10,
+            clock_offset_update_factor: 0.1,
+            tweening_method: TweeningMethod::MostRecentlyPassed,
+        });
+        mock_client_server.client_1_net.connect();
+        mock_client_server.client_2_net.connect();
+
+        mock_client_server
+            .server
+            .issue_command(MockCommand(123), &mut mock_client_server.server_net);
+
+        // WHEN no commands are issued.
+        mock_client_server.update_until_clients_ready(TIMESTEP_SECONDS * frames_per_update);
+
+        // WHEN a single chosen client issue commands.
+        let start_timestamp = match mock_client_server.client_1.state() {
+            ClientState::Ready(client) => client.simulating_timestamp(),
+            _ => unreachable!(),
+        };
+        let target_timestamp = start_timestamp + 100;
+        let mut client_1_state_history: Vec<Tweened<MockWorld>> = Vec::new();
+        let mut client_2_state_history: Vec<Tweened<MockWorld>> = Vec::new();
+        let mut server_state_history: Vec<Tweened<MockWorld>> = Vec::new();
+
+        while mock_client_server.server.display_state().timestamp() < target_timestamp {
+            let current_client_timestamp = match mock_client_server.client_1.state() {
+                ClientState::Ready(client) => {
+                    Timestamp::default() + client.display_state().float_timestamp() as i16
+                }
+                _ => unreachable!(),
+            };
+            let update_client = current_client_timestamp < target_timestamp;
+
+            mock_client_server.update(TIMESTEP_SECONDS * frames_per_update);
+            server_state_history.push(mock_client_server.server.display_state().into());
+
+            if update_client {
+                match mock_client_server.client_1.state_mut() {
+                    ClientState::Ready(client) => {
+                        client_1_state_history.push(client.display_state().clone())
+                    }
+                    _ => unreachable!(),
+                }
+                match mock_client_server.client_2.state_mut() {
+                    ClientState::Ready(client) => {
+                        client_2_state_history.push(client.display_state().clone())
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+
+        // THEN the recorded server states should perfectly match every client's states.
+        assert_eq!(
+            server_state_history[server_state_history.len() - client_1_state_history.len()..],
+            client_1_state_history[..],
+            "client_1, frames per update: {}",
+            frames_per_update
+        );
+        assert_eq!(
+            server_state_history[server_state_history.len() - client_2_state_history.len()..],
+            client_2_state_history[..],
+            "client_2, frames per update: {}",
+            frames_per_update
+        );
+    }
 }
