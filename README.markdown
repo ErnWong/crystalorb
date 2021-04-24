@@ -27,6 +27,17 @@ Doubt it. This is my first time doing game networking, so expect it to be all gl
 
 (Yes, those are where I absorbed most of my small game-networking knowledge from. Yes, their designs are probably much better than crystalorb)
 
+## Unstable Rust Features
+
+Crystalorb currently uses the following unstable features:
+
+```rust
+#![feature(const_fn_floating_point_arithmetic)]
+#![feature(map_first_last)]
+#![feature(const_generics)]
+#![feature(generic_associated_types)]
+```
+
 ## Demo
 
 Using Bevy game engine + Rapier physics engine + Turbulence message channels + Naia sockets.
