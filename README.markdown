@@ -23,7 +23,7 @@ Doubt it. This is my first time doing game networking, so expect it to be all gl
 - [Gaffer On Games articles](https://gafferongames.com/#posts).
 - Gabriel Gambetta's [Fast-Paced Multiplayer](https://www.gabrielgambetta.com/client-server-game-architecture.html) series.
 - The GDC Talk [It IS Rocket Science! The Physics of Rocket League Detailed](https://www.youtube.com/watch?v=ueEmiDM94IE) by Jared Cone.
-- The GDC Talk [Overwatch Gameplay Architecture and Netcode] by Timothy Ford.
+- The GDC Talk [Overwatch Gameplay Architecture and Netcode](https://www.youtube.com/watch?v=W3aieHjyNvw) by Timothy Ford.
 
 (Yes, those are where I absorbed most of my small game-networking knowledge from. Yes, their designs are probably much better than crystalorb)
 
