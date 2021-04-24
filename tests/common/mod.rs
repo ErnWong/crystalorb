@@ -20,8 +20,6 @@ use std::{
 };
 use tracing::info;
 
-pub const TIMESTEP_SECONDS: f64 = 1.0 / 60.0;
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct MockWorld {
     pub initial_empty_ticks: usize,

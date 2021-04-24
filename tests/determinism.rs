@@ -8,10 +8,12 @@ use test_env_log::test;
 
 mod common;
 
-use common::{MockClientServer, MockCommand, MockWorld, TIMESTEP_SECONDS};
+use common::{MockClientServer, MockCommand, MockWorld};
 
 #[test]
 fn while_all_commands_originate_from_single_client_then_that_client_should_match_server_exactly() {
+    const TIMESTEP_SECONDS: f64 = 1.0 / 60.0;
+
     for frames_per_update in &[1.0, 0.5, 1.0 / 3.0, 1.5, 2.0, 3.0, 4.0, 6.0] {
         // GIVEN a server and multiple clients in a perfect network.
         const FRAMES_TO_LAG_BEHIND: i32 = 12;
@@ -111,6 +113,8 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
 
 #[test]
 fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
+    const TIMESTEP_SECONDS: f64 = 1.0 / 60.0;
+
     for frames_per_update in &[1.0, 0.5, 1.0 / 3.0, 1.5, 2.0, 3.0, 4.0, 6.0] {
         // GIVEN a server and multiple clients in a perfect network.
         const FRAMES_TO_LAG_BEHIND: i32 = 12;
