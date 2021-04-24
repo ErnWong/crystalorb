@@ -2,7 +2,7 @@
 
 Game networking is hard, because we usually want to give the illusion that the physics simulation is responsive, fair, and consistent between multiple game clients despite having significant network latency between the clients and the server. There are many different ways to solve the game networking problem. Crystalorb tries implementing one of such ways.
 
-***Crystalorb*** is a small networking library that implements:
+***Crystalorb*** is a young networking library that implements:
 
 - **Client-side prediction.** Clients immediately apply their local input to their simulation before waiting for the server, so that the player's inputs feel responsive.
 - **Server reconciliation.** Server runs a delayed, authoritative version of the simulation, and periodically sends authoritative snapshots to each client. Each client fast-forwards the snapshot they receive until it matches the same timestamp as what's being shown on screen. Once the timestamps match, clients smoothly blend their states to the snapshot states.
@@ -25,7 +25,7 @@ Doubt it. This is my first time doing game networking, so expect it to be all gl
 - The GDC Talk [It IS Rocket Science! The Physics of Rocket League Detailed](https://www.youtube.com/watch?v=ueEmiDM94IE) by Jared Cone.
 - The GDC Talk [Overwatch Gameplay Architecture and Netcode](https://www.youtube.com/watch?v=W3aieHjyNvw) by Timothy Ford.
 
-(Yes, those are where I absorbed most of my small game-networking knowledge from. Yes, their designs are probably much better than crystalorb)
+(Yes, those were where I absorbed most of my small game-networking knowledge from. Yes, their designs are probably much better than crystalorb)
 
 ## Unstable Rust Features
 
