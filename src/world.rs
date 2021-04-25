@@ -13,13 +13,18 @@ pub trait DisplayState: Default + Send + Sync + Clone {
 
 impl<T: DisplayState> DisplayState for Timestamped<T> {
     fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self {
-        if t != 0.0 && t != 1.0 {
+        if t == 0.0 {
+            state1.clone()
+        } else if t == 1.0 {
+            state2.clone()
+        } else {
             assert_eq!(state1.timestamp(), state2.timestamp(), "Can only interpolate between timestamped states of the same timestamp. If timestamps differ, you will need to use Tweened::from_interpolation to also interpolate the timestamp value into a float.");
+
+            Self::new(
+                DisplayState::from_interpolation(state1.inner(), state2.inner(), t),
+                state1.timestamp(),
+            )
         }
-        Self::new(
-            DisplayState::from_interpolation(state1.inner(), state2.inner(), t),
-            state1.timestamp(),
-        )
     }
 }
 
@@ -199,5 +204,44 @@ impl<WorldType: World> FixedTimestepper for WorldSimulation<WorldType> {
     /// laws.
     fn reset_last_completed_timestamp(&mut self, timestamp: Timestamp) {
         self.command_buffer.update_timestamp(timestamp);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[derive(Clone, Default, Debug, PartialEq)]
+    struct MockDisplayState(f64);
+    impl DisplayState for MockDisplayState {
+        fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self {
+            Self(state1.0 * t + state2.0 * (1.0 - t))
+        }
+    }
+
+    #[test]
+    fn when_interpolating_displaystate_with_t_0_then_state1_is_returned() {
+        // GIVEN
+        let state1 = Timestamped::new(MockDisplayState(4.0), Timestamp::default() + 2);
+        let state2 = Timestamped::new(MockDisplayState(8.0), Timestamp::default() + 5);
+
+        // WHEN
+        let interpolated = DisplayState::from_interpolation(&state1, &state2, 0.0);
+
+        // THEN
+        assert_eq!(state1, interpolated);
+    }
+
+    #[test]
+    fn when_interpolating_displaystate_with_t_1_then_state2_is_returned() {
+        // GIVEN
+        let state1 = Timestamped::new(MockDisplayState(4.0), Timestamp::default() + 2);
+        let state2 = Timestamped::new(MockDisplayState(8.0), Timestamp::default() + 5);
+
+        // WHEN
+        let interpolated = DisplayState::from_interpolation(&state1, &state2, 1.0);
+
+        // THEN
+        assert_eq!(state2, interpolated);
     }
 }

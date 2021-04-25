@@ -127,7 +127,7 @@ impl From<Timestamp> for FloatTimestamp {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Timestamped<T> {
     inner: T,
     timestamp: Timestamp,
