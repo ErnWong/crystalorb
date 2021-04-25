@@ -15,7 +15,7 @@ impl<T: DisplayState> DisplayState for Timestamped<T> {
     fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self {
         if t == 0.0 {
             state1.clone()
-        } else if t == 1.0 {
+        } else if (t - 1.0).abs() < f64::EPSILON {
             state2.clone()
         } else {
             assert_eq!(state1.timestamp(), state2.timestamp(), "Can only interpolate between timestamped states of the same timestamp. If timestamps differ, you will need to use Tweened::from_interpolation to also interpolate the timestamp value into a float.");

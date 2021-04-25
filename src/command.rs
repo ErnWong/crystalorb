@@ -67,7 +67,7 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
             if let Some((key, value)) = self.map.first_key_value() {
                 if key.0 >= acceptable_timestamp_range.end {
                     warn!("Discarding future command {:?} after timestamp update! This should rarely happen", value);
-                    let key_to_remove = key.clone();
+                    let key_to_remove = *key;
                     self.map.remove(&key_to_remove);
                     continue;
                 }
@@ -103,20 +103,22 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
             .values()
             .rev() // Our map is in reverse order.
             .flatten()
-            .map(|command| command.clone())
+            .cloned()
             .collect()
     }
 
     pub fn commands_at(&self, timestamp: Timestamp) -> Option<impl Iterator<Item = &CommandType>> {
-        if let Some(commands) = self.map.get(&Reverse(timestamp)) {
-            Some(commands.iter())
-        } else {
-            None
-        }
+        self.map
+            .get(&Reverse(timestamp))
+            .map(|commands| commands.iter())
     }
 
     pub fn len(&self) -> usize {
         self.map.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 }
 

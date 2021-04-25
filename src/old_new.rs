@@ -18,6 +18,15 @@ pub struct OldNewResult<T> {
     pub new: T,
 }
 
+impl<T> Default for OldNew<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> OldNew<T>
 where
     T: Default,

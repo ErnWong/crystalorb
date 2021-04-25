@@ -122,27 +122,25 @@ impl Config {
     }
 
     pub fn lag_compensation_frame_count(&self) -> i16 {
-        return (self.lag_compensation_latency / self.timestep_seconds).round() as i16;
+        (self.lag_compensation_latency / self.timestep_seconds).round() as i16
     }
 
     pub fn interpolation_progress_per_frame(&self) -> f64 {
-        return self.timestep_seconds / self.interpolation_latency;
+        self.timestep_seconds / self.interpolation_latency
     }
 
     /// The number of samples N so that, before we calculate the rolling average, we skip the N
     /// lowest and N highest samples.
     pub fn clock_sync_samples_to_discard_per_extreme(&self) -> usize {
-        return (self.clock_sync_needed_sample_count as f64 * self.clock_sync_assumed_outlier_rate
-            / 2.0)
+        (self.clock_sync_needed_sample_count as f64 * self.clock_sync_assumed_outlier_rate / 2.0)
             .max(1.0)
-            .ceil() as usize;
+            .ceil() as usize
     }
 
     /// The total number of samples that need to be kept in the ring buffer, so that, after
     /// discarding the outliers, there is enough samples to calculate the rolling average.
     pub fn clock_sync_samples_needed_to_store(&self) -> usize {
-        return self.clock_sync_needed_sample_count
-            + self.clock_sync_samples_to_discard_per_extreme() * 2;
+        self.clock_sync_needed_sample_count + self.clock_sync_samples_to_discard_per_extreme() * 2
     }
 }
 

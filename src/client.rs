@@ -20,7 +20,7 @@ impl<WorldType: World> Client<WorldType> {
         Self {
             config: config.clone(),
             state: Some(ClientState::SyncingClock(SyncingClockClient(
-                ClockSyncer::new(config.clone()),
+                ClockSyncer::new(config),
             ))),
         }
     }
@@ -150,7 +150,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
             clocksyncer,
             timekeeping_simulations: TimeKeeper::new(
                 ClientWorldSimulations::new(config.clone(), initial_timestamp),
-                config.clone(),
+                config,
             ),
         }
     }

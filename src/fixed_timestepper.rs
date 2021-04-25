@@ -234,7 +234,7 @@ impl<T: FixedTimestepper, const TERMINATION_CONDITION: TerminationCondition>
                 corrected_overshoot_seconds,
             );
             self.stepper
-                .reset_last_completed_timestamp(corrected_timestamp.into());
+                .reset_last_completed_timestamp(corrected_timestamp);
             self.timestep_overshoot_seconds = corrected_overshoot_seconds;
         }
     }
