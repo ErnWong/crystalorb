@@ -81,6 +81,16 @@ pub struct SyncingClockClient(ClockSyncer);
 
 pub struct SyncingInitialStateClient<WorldType: World>(ActiveClient<WorldType>);
 
+impl<WorldType: World> SyncingInitialStateClient<WorldType> {
+    pub fn last_completed_timestamp(&self) -> Timestamp {
+        self.0.last_completed_timestamp()
+    }
+
+    pub fn simulating_timestamp(&self) -> Timestamp {
+        self.0.simulating_timestamp()
+    }
+}
+
 pub struct ReadyClient<WorldType: World>(ActiveClient<WorldType>);
 
 impl<WorldType: World> ReadyClient<WorldType> {
