@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::Deref};
 use tracing::trace;
 
-pub trait DisplayState: Default + Send + Sync + Clone {
+pub trait DisplayState: Send + Sync + Clone {
     fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self;
 }
 
