@@ -2,7 +2,7 @@ use crate::fixed_timestepper::Stepper;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    fmt::Debug,
+    fmt::{Debug, Display, Formatter, Result},
     num::Wrapping,
     ops::{Add, Deref, DerefMut, Range, Sub},
 };
@@ -85,6 +85,12 @@ impl PartialOrd for Timestamp {
 impl From<Timestamp> for i16 {
     fn from(timestamp: Timestamp) -> i16 {
         timestamp.0 .0
+    }
+}
+
+impl Display for Timestamp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "T={:+05}", self.0 .0)
     }
 }
 
