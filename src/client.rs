@@ -133,6 +133,12 @@ impl<WorldType: World> ReadyClient<WorldType> {
         net.broadcast_message(command);
     }
 
+    pub fn buffered_commands(
+        &self,
+    ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {
+        self.0.timekeeping_simulations.base_command_buffer.iter()
+    }
+
     pub fn display_state(&self) -> &Tweened<WorldType::DisplayStateType> {
         &self
             .0

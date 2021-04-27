@@ -114,6 +114,12 @@ impl<WorldType: World> Server<WorldType> {
         );
     }
 
+    pub fn buffered_commands(
+        &self,
+    ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {
+        self.timekeeping_simulation.buffered_commands()
+    }
+
     pub fn display_state(&self) -> Timestamped<WorldType::DisplayStateType> {
         self.timekeeping_simulation.display_state()
     }

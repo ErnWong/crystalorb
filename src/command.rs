@@ -120,6 +120,13 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (Timestamp, &Vec<CommandType>)> {
+        self.map
+            .iter()
+            .rev()
+            .map(|(timestamp, commands)| (timestamp.0, commands))
+    }
 }
 
 #[cfg(test)]

@@ -162,6 +162,12 @@ impl<WorldType: World> WorldSimulation<WorldType> {
     pub fn display_state(&self) -> Timestamped<WorldType::DisplayStateType> {
         Timestamped::new(self.world.display_state(), self.last_completed_timestamp())
     }
+
+    pub fn buffered_commands(
+        &self,
+    ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {
+        self.command_buffer.iter()
+    }
 }
 
 impl<WorldType: World> Stepper for WorldSimulation<WorldType> {
