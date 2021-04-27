@@ -109,7 +109,7 @@ impl Config {
             lag_compensation_latency: 0.3,
             interpolation_latency: 0.2,
             timestep_seconds: 1.0 / 60.0,
-            clock_sync_needed_sample_count: 32,
+            clock_sync_needed_sample_count: 8,
             clock_sync_request_period: 0.2,
             clock_sync_assumed_outlier_rate: 0.2,
             max_tolerable_clock_deviation: 0.1,
