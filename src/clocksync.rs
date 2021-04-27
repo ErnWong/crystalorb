@@ -101,6 +101,14 @@ impl ClockSyncer {
         self.server_seconds_offset.is_some() && self.client_id.is_some()
     }
 
+    pub fn sample_count(&self) -> usize {
+        self.server_seconds_offset_samples.len()
+    }
+
+    pub fn samples_needed(&self) -> usize {
+        self.config.clock_sync_samples_needed_to_store()
+    }
+
     /// An identifier issued by the server for us to identify ourselves from other clients. Used,
     /// for example, for issuing our player's commands to the server.
     ///

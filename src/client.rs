@@ -79,6 +79,16 @@ pub enum ClientState<WorldType: World> {
 
 pub struct SyncingClockClient(ClockSyncer);
 
+impl SyncingClockClient {
+    pub fn sample_count(&self) -> usize {
+        self.0.sample_count()
+    }
+
+    pub fn samples_needed(&self) -> usize {
+        self.0.samples_needed()
+    }
+}
+
 pub struct SyncingInitialStateClient<WorldType: World>(ActiveClient<WorldType>);
 
 impl<WorldType: World> SyncingInitialStateClient<WorldType> {
