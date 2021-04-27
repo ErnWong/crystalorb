@@ -90,7 +90,7 @@ impl From<Timestamp> for i16 {
 
 impl Display for Timestamp {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "T={:+05}", self.0 .0)
+        write!(f, "T={:+06}", self.0 .0)
     }
 }
 
