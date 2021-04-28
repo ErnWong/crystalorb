@@ -213,6 +213,12 @@ impl MyNetwork {
         }
     }
 
+    pub fn disconnect(&mut self) {
+        for connection in self.connections.values_mut() {
+            connection.is_connected.set(false);
+        }
+    }
+
     pub fn tick(&mut self) {
         for connection in self.connections.values_mut() {
             connection.tick();
