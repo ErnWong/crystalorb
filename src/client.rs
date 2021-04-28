@@ -147,6 +147,26 @@ impl<WorldType: World> ReadyClient<WorldType> {
             .as_ref()
             .expect("Client should be initialised")
     }
+
+    /// The timestamp used to test whether the next snapshot to be received is newer or older, and
+    /// therefore should be discarded or queued.
+    /// None if no snapshots have been received yet.
+    pub fn last_queued_snapshot_timestamp(&self) -> &Option<Timestamp> {
+        &self
+            .0
+            .timekeeping_simulations
+            .last_queued_snapshot_timestamp
+    }
+
+    /// The timestamp of the most recently received snapshot, regardless of whether it got queued
+    /// or discarded.
+    /// None if no spashots have been received yet.
+    pub fn last_received_snapshot_timestamp(&self) -> &Option<Timestamp> {
+        &self
+            .0
+            .timekeeping_simulations
+            .last_received_snapshot_timestamp
+    }
 }
 
 pub struct ActiveClient<WorldType: World> {
@@ -237,6 +257,11 @@ pub struct ClientWorldSimulations<WorldType: World> {
     /// snapshot has been cleared after it has been applied to the world.
     last_queued_snapshot_timestamp: Option<Timestamp>,
 
+    /// The timestamp of the last received snapshot from the server, regardless of whether it
+    /// was discarded or accepted (since we only keep the latest snapshot). This is primarily
+    /// for diagnostic purposes.
+    last_received_snapshot_timestamp: Option<Timestamp>,
+
     /// The command buffer that is used to initialize the new world simulation's command
     /// buffers whenever a queued snapshot is applied to it. Contains older commands that the
     /// individual world simulation's internal command buffers would have already dropped, but
@@ -276,6 +301,7 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
         let mut client_world_simulations = Self {
             queued_snapshot: None,
             last_queued_snapshot_timestamp: None,
+            last_received_snapshot_timestamp: None,
             base_command_buffer: Default::default(),
             world_simulations: OldNew::new(),
             old_new_interpolation_t: 1.0,
@@ -302,6 +328,8 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
             "Received snapshot: {:?} frames behind",
             self.last_completed_timestamp() - snapshot.timestamp()
         );
+
+        self.last_received_snapshot_timestamp = Some(snapshot.timestamp());
         match &self.last_queued_snapshot_timestamp {
             None => self.queued_snapshot = Some(snapshot),
             Some(last_timestamp) => {
@@ -311,6 +339,7 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
                 }
             }
         }
+
         if let Some(queued_snapshot) = &self.queued_snapshot {
             self.last_queued_snapshot_timestamp = Some(queued_snapshot.timestamp());
         }
