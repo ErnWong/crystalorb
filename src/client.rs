@@ -150,6 +150,12 @@ impl<WorldType: World> ReadyClient<WorldType> {
 
     /// The timestamp used to test whether the next snapshot to be received is newer or older, and
     /// therefore should be discarded or queued.
+    ///
+    /// This value gets updated if it gets too old, even if there hasn't been any newer snapshot
+    /// received. This is because we need to compare newly-received snapshots with this value, but
+    /// we can't compare Timestamps if they are outside the
+    /// [comparable range](Timestamp::comparable_range_with_midpoint).
+    ///
     /// None if no snapshots have been received yet.
     pub fn last_queued_snapshot_timestamp(&self) -> &Option<Timestamp> {
         &self
@@ -160,6 +166,11 @@ impl<WorldType: World> ReadyClient<WorldType> {
 
     /// The timestamp of the most recently received snapshot, regardless of whether it got queued
     /// or discarded.
+    ///
+    /// Unlike [ReadyClient::last_queued_snapshot_timestamp], this does not get updated when it
+    /// becomes too old to be compared with the current timestamp. This is primarily used for
+    /// diagnostic purposes.
+    ///
     /// None if no spashots have been received yet.
     pub fn last_received_snapshot_timestamp(&self) -> &Option<Timestamp> {
         &self
@@ -330,12 +341,19 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
         );
 
         self.last_received_snapshot_timestamp = Some(snapshot.timestamp());
+
+        if snapshot.timestamp() > self.last_completed_timestamp() {
+            warn!("Received snapshot from the future! Ignoring snapshot.");
+            return;
+        }
         match &self.last_queued_snapshot_timestamp {
             None => self.queued_snapshot = Some(snapshot),
             Some(last_timestamp) => {
                 // Ignore stale snapshots.
                 if snapshot.timestamp() > *last_timestamp {
                     self.queued_snapshot = Some(snapshot);
+                } else {
+                    warn!("Received stale snapshot - ignoring.");
                 }
             }
         }
@@ -527,5 +545,20 @@ impl<WorldType: World> FixedTimestepper for ClientWorldSimulations<WorldType> {
         trace!("Update the base command buffer's timestamp and accept-window");
         self.base_command_buffer
             .update_timestamp(self.last_completed_timestamp());
+
+        trace!("Reset last completed timestamp if outside comparable range");
+        if let Some(last_timestamp) = self.last_queued_snapshot_timestamp.as_ref().copied() {
+            let comparable_range =
+                Timestamp::comparable_range_with_midpoint(self.last_completed_timestamp());
+            if !comparable_range.contains(&last_timestamp)
+                || last_timestamp > self.last_completed_timestamp()
+            {
+                warn!("Last queued snapshot timestamp too old to compare. Resetting timestamp book-keeping");
+                // This is done to prevent new snapshots from being discarded due
+                // to a very old snapshot that was last applied. This can happen
+                // after a very long pause (e.g. browser tab sleeping).
+                self.last_queued_snapshot_timestamp = Some(comparable_range.start);
+            }
+        }
     }
 }
