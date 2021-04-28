@@ -1,0 +1,844 @@
+<html>
+  <head>
+    <meta content="text/html;charset=utf-8" http-equip="Content-Type" />
+    <meta charset="UTF-8" />
+    <style>
+      :root {
+        --bg-color: orange;
+        --bg-color: white;
+        --bg-color: rgb(13,17,23);
+      }
+      html {
+        background: linear-gradient(to right, rgb(13,17,23) 50%, white 50%);
+        background: var(--bg-color);
+      }
+      body {
+        display: flex;
+      }
+      .demo {
+        display: flex;
+        align-items: center;
+        font-family: sans-serif;
+        font-size: 12px;
+        text-align: center;
+        text-transform: uppercase;
+        padding-top: 80px;
+        padding-bottom: 100px;
+        margin: auto;
+      }
+      .machine {
+        flex-shrink: 0;
+        width: 180px;
+        margin: 0;
+        color: #fff;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+        position: relative;
+        border-radius: 3px;
+      }
+      .machine > h2 {
+        border-radius: 3px 3px 0 0;
+      }
+      .machine > h2, .machine > .timestamp {
+        margin: 0;
+        padding: 4px;
+        font-size: 1em;
+        position: relative; /* so shadows don't get clipped by element below */
+        letter-spacing: 2px;
+        background-color: #3fb79b;
+      }
+      .ready, .loading {
+        width: 100%;
+        height: 100px;
+        background-color: rgba(63,183,155,0.7);
+        position: relative;
+      }
+      .ready svg, .loading svg {
+        transition: opacity 0.8s;
+      }
+      .ready svg {
+        width: 100%;
+        height: 100px;
+        opacity: 1;
+      }
+      .loading svg {
+        opacity: 0;
+      }
+      .loading::before, .ready::before {
+        content: 'Loading...';
+        display: flex;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        letter-spacing: 2px;
+        transition: opacity 0.8s;
+        font-style: italic;
+      }
+      .loading::before {
+        opacity: 1;
+      }
+      .ready::before {
+        opacity: 0;
+      }
+      .command-buffer {
+        height: 100px;
+        overflow-y: scroll;
+        margin: 0;
+        padding: 10px;
+        list-style: none;
+        text-align: left;
+        background-color: #3fb79b;
+        opacity: 0.7;
+        font-family: monospace;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0);
+        border-radius: 0 0 3px 3px;
+      }
+      .command-buffer::-webkit-scrollbar {
+        width: 6px;
+      }
+      .command-buffer::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.5);
+      }
+      .connection {
+        width: 100px;
+        display: flex;
+        flex-direction: column;
+        color: #888;
+        position: relative;
+      }
+      .connection > * {
+        margin: 10px;
+      }
+      .connection > svg {
+        stroke: #888;
+        fill: transparent;
+        margin: 10px auto 0;
+        opacity: 0.5;
+      }
+      .connection > svg + label + svg {
+        margin: 0 auto 10px;
+      }
+      .connected > button, .disconnected > button {
+        padding: 6px 10px;
+        font-size: 10px;
+        width: 108px;
+        --shadow: rgba(31, 100, 89, 1.0);
+        --mid-tone: rgba(47, 142, 122, 1.0);
+        --hover: rgba(63, 183, 155, 1.0);
+      }
+      .connected, .disconnected {
+        font-weight: bold;
+        letter-spacing: 2px;
+        font-size: 10px;
+        position: absolute;
+        top: -80px;
+        left: 50%;
+        width: 200px;
+        margin-left: -100px;
+      }
+      .connected::before, .disconnected::before,
+      .connected::after, .disconnected::after {
+        content: '';
+        display: block;
+        position: absolute;
+        width: 30px;
+        top: 23%;
+        color: rgba(63, 183, 155, 0.5);
+        border-top: solid currentColor 1px;
+        height: 35px;
+      }
+      .connected::before, .disconnected::before {
+        border-left: solid currentColor 1px;
+        left: 0;
+      }
+      .connected::after, .disconnected::after {
+        border-right: solid currentColor 1px;
+        right: 0;
+      }
+      .connected span, .disconnected span {
+        position: relative;
+        display: block;
+        margin: 10px;
+      }
+      .connected span {
+        color: rgba(63, 183, 155, 1.0);
+      }
+      .disconnected span {
+        color: rgba(255, 0, 118, 0.5);
+        animation: blink 1s linear infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 1;
+        }
+        60% {
+          opacity: 0;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+      .signal {
+        user-select: none;
+        height: 14px;
+        width: 80px;
+        position: relative;
+      }
+      /* Hack to hide pixel precision issues when zooming a fractional amount */
+      .signal::after {
+        content: '';
+        width: calc(100% + 2px);
+        height: calc(100% + 2px);
+        position: absolute;
+        top: -1px;
+        left: -1px;
+        display: block;
+        border: 2px solid var(--bg-color);
+        box-sizing: border-box;
+        z-index: 4;
+      }
+      .signal * {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .signal-mask {
+        color: white;
+        background-color: black;
+        z-index: 1;
+      }
+      .signal-fg {
+        background-color: rgba(128, 128, 128, 0.3);
+        background-color: rgba(63, 183, 155, 0.3);
+        background-color: var(--bg-color);
+        mix-blend-mode: multiply;
+        filter: invert(1);
+        z-index: 2;
+      }
+      .signal.rtl .signal-fg {
+        transform: scaleX(-1);
+      }
+      .signal-bg {
+        color: white;
+        background-color: var(--bg-color);
+        mix-blend-mode: difference;
+        z-index: 3;
+      }
+      .latency {
+        background-color: rgba(137,137,137,0);
+        cursor: text;
+        transition: background-color 0.1s;
+        border-radius: 3px;
+      }
+      .latency > input {
+        color: inherit;
+        width: 35px;
+        border: none;
+        text-align: center;
+        background-color: transparent;
+        -moz-appearance: textfield;
+      }
+      .latency > input:focus {
+        outline: none;
+      }
+      .latency > input::-webkit-outer-spin-button,
+      .latency > input::-webkit-inner-spin-button {
+        display: none;
+      }
+      .latency:hover, .latency:focus-within {
+        background-color: rgba(137,137,137,0.3);
+      }
+      .timestamp {
+        font-family: monospace;
+      }
+      .highlight {
+        stroke: var(--highlight);
+        fill: none;
+      }
+      .mid-tone {
+        fill: var(--mid-tone);
+      }
+      .shadow {
+        fill: var(--shadow);
+      }
+      .reflected-highlight {
+        stroke: var(--reflected-highlight);
+      }
+      .billiard-blue {
+        --mid-tone: #3366cc;
+        --shadow: #003399;
+        --highlight: white;
+        --reflected-highlight: #3366cc;
+      }
+      .billiard-black {
+        --mid-tone: #404040;
+        --shadow: black;
+        --highlight: white;
+        --reflected-highlight: #808080;
+      }
+      .billiard-red {
+        --mid-tone: #ff6600;
+        --shadow: #cc0000;
+        --highlight: white;
+        --reflected-highlight: #ff6600;
+      }
+      .billiard-text {
+        font-size: 8px;
+        font-weight: bold;
+        text-anchor: middle;
+        dominant-baseline: middle;
+      }
+      .keyboard-controls {
+        position: absolute;
+        bottom: 10px;
+      }
+      #client-left .keyboard-controls {
+        left: 0;
+        --hover: #ff9900;
+        --mid-tone: #ff6600;
+        --shadow: #cc0000;
+      }
+      #client-right .keyboard-controls {
+        right: 100px;
+        --hover: #33aadd;
+        --mid-tone: #3366cc;
+        --shadow: #003399;
+      }
+      button {
+        background-color: var(--mid-tone);
+        transition: background-color 0.1s;
+        box-shadow: 0 4px 0 var(--shadow),
+          0 7px 10px rgba(0, 0, 0, 0.5);
+        border-radius: 2px;
+        font-weight: bold;
+        user-select: none;
+        border: none;
+        color: white;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 4px;
+      }
+      button:hover, button:focus {
+        background-color: var(--hover);
+        box-shadow: 0 4px 0 var(--mid-tone),
+          0 7px 10px rgba(0, 0, 0, 0.5);
+        outline: none;
+      }
+      button.pressed:hover, button:hover:active,
+      button.pressed:focus, button:focus:active {
+        box-shadow: 0 0 0 var(--mid-tone),
+          0 3px 10px rgba(0, 0, 0, 0.5);
+      }
+      button.pressed, button:active {
+        margin-top: 4px;
+        margin-bottom: 0px;
+        box-shadow: 0 0 0 var(--shadow),
+          0 3px 10px rgba(0, 0, 0, 0.5);
+      }
+      .keyboard-controls * {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+        position: absolute;
+      }
+      .keyboard-controls .up {
+        top: 0;
+        left: 35px;
+      }
+      .keyboard-controls .left {
+        top: 39px;
+        left: 0;
+      }
+      .keyboard-controls .down {
+        top: 39px;
+        left: 35px;
+      }
+      .keyboard-controls .right {
+        top: 39px;
+        left: 70px;
+      }
+    </style>
+  </head>
+  <body>
+    <svg style="display: none">
+      <defs>
+        <g id="billiard">
+          <path class="shadow" d="M 0,-10 A 10,10 0 0,0 0,10 L 0,-10" fill="#003399" transform="rotate(225)" />
+          <path class="mid-tone" d="M 0,-10 A 10,10 0 0,0 0,10 A 5,10 0 0,0 0,-10" fill="#3366cc" transform="rotate(45)" />
+          <path class="highlight" d="M -5.8,-5.2 A 8,8 0 0,1 -2.0,-7.8" fill="transparent" stroke="white" stroke-linecap="round" stroke-width="1.5px" />
+          <path class="highlight" d="M -7.4,-2.88 A 8,8 0 0,1 -7,-3.9" fill="transparent" stroke="white" stroke-linecap="round" stroke-width="1.5px" />
+          <path class="reflected-highlight" d="M -5.8,-5.2 A 8,8 0 0,1 -2.0,-7.8" fill="transparent" stroke="#3366cc" stroke-linecap="round" transform="scale(-1)" stroke-width="1.5px" />
+          <path class="reflected-highlight" d="M -7.4,-2.88 A 8,8 0 0,1 -7,-3.9" fill="transparent" stroke="#3366cc" stroke-linecap="round" transform="scale(-1)" stroke-width="1.5px" />
+          <circle cx="0" cy="0" r="5" fill="white" />
+        </g>
+      </defs>
+    </svg>
+    <div class="demo">
+      <div class="machine" id="client-left">
+        <h2>Client</h2>
+        <div id="client-left-screen" class="loading">
+          <svg>
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-red" id="client-left-body-left" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-blue" id="client-left-body-right" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-black" id="client-left-body-none" />
+            <text x="0" y="0" class="billiard-text" id="client-left-body-left-rotate" style="tranform: translateY(-100px)">5</text>
+            <text x="0" y="0" class="billiard-text" id="client-left-body-right-rotate" style="transform: translateY(-100px)">3</text>
+            <text x="0" y="0" class="billiard-text" id="client-left-body-none-rotate" style="transform: translateY(-100px)">8</text>
+          </svg>
+        </div>
+        <div class="timestamp" id="timestamp-left">T=1234</div>
+        <ul class="command-buffer" id="commands-left">
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+        </ul>
+        <div class="keyboard-controls">
+          <button class="up" id="key-w">W</button>
+          <button class="left" id="key-a">A</button>
+          <button class="down" id="key-s">S</button>
+          <button class="right" id="key-d">D</button>
+        </div>
+      </div>
+      <div class="connection" id="connection-left">
+        <div id="connection-left-status" class="disconnected">
+          <button id="connect-left" class="connect">Connect</button>
+          <span>Disconnected</span>
+        </div>
+        <div class="signal ltr">
+          <div class="signal-mask">clocksync</div>
+          <canvas class="signal-fg" id="signal-left-server-clocksync"></canvas>
+          <div class="signal-bg">clocksync</div>
+        </div>
+        <div class="signal ltr">
+          <div class="signal-mask">command</div>
+          <canvas class="signal-fg" id="signal-left-server-command"></canvas>
+          <div class="signal-bg">command</div>
+        </div>
+        <svg width="80" height="10">
+          <path d="M 0 10 L 80 10 L 70 0" />
+        </svg>
+        <label class="latency"><input type="number" value="100" min="0" max="9999" maxlength="4" id="delay-left"> ms</label>
+        <svg width="80" height="10">
+          <path d="M 80 0 L 0 0 L 10 10" />
+        </svg>
+        <div class="signal rtl">
+          <div class="signal-mask">command</div>
+          <canvas class="signal-fg" id="signal-left-client-command"></canvas>
+          <div class="signal-bg">command</div>
+        </div>
+        <div class="signal rtl">
+          <div class="signal-mask">clocksync</div>
+          <canvas class="signal-fg" id="signal-left-client-clocksync"></canvas>
+          <div class="signal-bg">clocksync</div>
+        </div>
+        <div class="signal rtl">
+          <div class="signal-mask">snapshot</div>
+          <canvas class="signal-fg" id="signal-left-client-snapshot"></canvas>
+          <div class="signal-bg">snapshot</div>
+        </div>
+      </div>
+      <div class="machine" id="server">
+        <h2>Server</h2>
+        <div id="server-screen" class="ready">
+          <svg>
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-red" id="server-body-left" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-blue" id="server-body-right" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-black" id="server-body-none" />
+            <text x="0" y="0" class="billiard-text" id="server-body-left-rotate" style="transform: translateY(-100px)">5</text>
+            <text x="0" y="0" class="billiard-text" id="server-body-right-rotate" style="transform: translateY(-100px)">3</text>
+            <text x="0" y="0" class="billiard-text" id="server-body-none-rotate" style="transform: translateY(-100px)">8</text>
+          </svg>
+        </div>
+        <div class="timestamp" id="timestamp-server">T=1234</div>
+        <ul class="command-buffer" id="commands-server">
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+        </ul>
+      </div>
+      <div class="connection" id="connection-right">
+        <div id="connection-right-status" class="disconnected">
+          <button id="connect-right" class="connect">Connect</button>
+          <span>Disconnected</span>
+        </div>
+        <div class="signal rtl">
+          <div class="signal-mask">clocksync</div>
+          <canvas class="signal-fg" id="signal-right-server-clocksync"></canvas>
+          <div class="signal-bg">clocksync</div>
+        </div>
+        <div class="signal rtl">
+          <div class="signal-mask">command</div>
+          <canvas class="signal-fg" id="signal-right-server-command"></canvas>
+          <div class="signal-bg">command</div>
+        </div>
+        <svg width="80" height="10">
+          <path d="M 80 10 L 0 10 L 10 0" />
+        </svg>
+        <label class="latency"><input type="number" value="100" id="delay-right" min="0" max="9999" maxlength="4"> ms</label>
+        <svg width="80" height="10">
+          <path d="M 0 0 L 80 0 L 70 10" />
+        </svg>
+        <div class="signal ltr">
+          <div class="signal-mask">command</div>
+          <canvas class="signal-fg" id="signal-right-client-command"></canvas>
+          <div class="signal-bg">command</div>
+        </div>
+        <div class="signal ltr">
+          <div class="signal-mask">clocksync</div>
+          <canvas class="signal-fg" id="signal-right-client-clocksync"></canvas>
+          <div class="signal-bg">clocksync</div>
+        </div>
+        <div class="signal ltr">
+          <div class="signal-mask">snapshot</div>
+          <canvas class="signal-fg" id="signal-right-client-snapshot"></canvas>
+          <div class="signal-bg">snapshot</div>
+        </div>
+      </div>
+      <div class="machine" id="client-right">
+        <h2>Client</h2>
+        <div id="client-right-screen" class="loading">
+          <svg>
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-red" id="client-right-body-left" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-blue" id="client-right-body-right" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-black" id="client-right-body-none" />
+            <text x="0" y="0" class="billiard-text" id="client-right-body-left-rotate" style="transform: translateY(-100px)">5</text>
+            <text x="0" y="0" class="billiard-text" id="client-right-body-right-rotate" style="transform: translateY(-100px)">3</text>
+            <text x="0" y="0" class="billiard-text" id="client-right-body-none-rotate" style="transform: translateY(-100px)">8</text>
+          </svg>
+        </div>
+        <div class="timestamp" id="timestamp-right">T=1234</div>
+        <ul class="command-buffer" id="commands-right">
+          <li>
+            <span class="timestamp">T=1220</span>
+            <span class="command">jump</span>
+          </li>
+        </ul>
+        <div class="keyboard-controls">
+          <button class="up" id="key-up">▲</button>
+          <button class="left" id="key-left">◀</button>
+          <button class="down" id="key-down">▼</button>
+          <button class="right" id="key-right">▶</button>
+        </div>
+      </div>
+    </div>
+    <script type="module">
+      import init, { Demo, DemoCommand, PlayerSide, PlayerCommand, CommsChannel } from './pkg/demo.js';
+      async function run() {
+        await init();
+        const demo = new Demo();
+
+        const latencies = new Map();
+
+        const signals = (() => {
+          const Signal = (canvas, side, comms_channel) => ({ canvas, side, comms_channel, activity: [] });
+          return [
+            Signal(document.getElementById('signal-left-server-command'),    PlayerSide.Left,  CommsChannel.ToServerCommand),
+            Signal(document.getElementById('signal-left-server-clocksync'),  PlayerSide.Left,  CommsChannel.ToServerClocksync),
+            Signal(document.getElementById('signal-left-client-command'),    PlayerSide.Left,  CommsChannel.ToClientCommand),
+            Signal(document.getElementById('signal-left-client-clocksync'),  PlayerSide.Left,  CommsChannel.ToClientClocksync),
+            Signal(document.getElementById('signal-left-client-snapshot'),   PlayerSide.Left,  CommsChannel.ToClientSnapshot),
+            Signal(document.getElementById('signal-right-server-command'),   PlayerSide.Right, CommsChannel.ToServerCommand),
+            Signal(document.getElementById('signal-right-server-clocksync'), PlayerSide.Right, CommsChannel.ToServerClocksync),
+            Signal(document.getElementById('signal-right-client-command'),   PlayerSide.Right, CommsChannel.ToClientCommand),
+            Signal(document.getElementById('signal-right-client-clocksync'), PlayerSide.Right, CommsChannel.ToClientClocksync),
+            Signal(document.getElementById('signal-right-client-snapshot'),  PlayerSide.Right, CommsChannel.ToClientSnapshot),
+          ];
+        })();
+
+        function update_network_delays() {
+        const latency_left = document.getElementById('delay-left').value / 1000;
+        const latency_right = document.getElementById('delay-right').value / 1000;
+          demo.set_network_delay(PlayerSide.Left, latency_left);
+          demo.set_network_delay(PlayerSide.Right, latency_right);
+          latencies.set(PlayerSide.Left, latency_left);
+          latencies.set(PlayerSide.Right, latency_right);
+        }
+
+        update_network_delays();
+        document.getElementById('delay-left').addEventListener('change', update_network_delays);
+        document.getElementById('delay-right').addEventListener('change', update_network_delays);
+        function enter_to_blur(event) {
+          if (event.code == "Enter") {
+            event.target.blur();
+          }
+        }
+        function select_on_focus(event) {
+          event.target.select();
+        }
+        document.getElementById('delay-left').addEventListener('change', update_network_delays);
+        document.getElementById('delay-right').addEventListener('change', update_network_delays);
+        document.getElementById('delay-left').addEventListener('keydown', enter_to_blur);
+        document.getElementById('delay-right').addEventListener('keydown', enter_to_blur);
+        document.getElementById('delay-left').addEventListener('focus', select_on_focus);
+        document.getElementById('delay-right').addEventListener('focus', select_on_focus);
+
+        const timestamp_left = document.getElementById('timestamp-left');
+        const timestamp_right = document.getElementById('timestamp-right');
+        const timestamp_server = document.getElementById('timestamp-server');
+
+        function get_display_state_elements(machine) {
+          return {
+            body_left: document.getElementById(`${machine}-body-left`),
+            body_right: document.getElementById(`${machine}-body-right`),
+            body_doodad: document.getElementById(`${machine}-body-none`),
+            rotate_left: document.getElementById(`${machine}-body-left-rotate`),
+            rotate_right: document.getElementById(`${machine}-body-right-rotate`),
+            rotate_doodad: document.getElementById(`${machine}-body-none-rotate`),
+            screen: document.getElementById(`${machine}-screen`),
+          };
+        }
+        const display_left = get_display_state_elements('client-left');
+        const display_right = get_display_state_elements('client-right');
+        const display_server = get_display_state_elements('server');
+
+        const commands_left = document.getElementById('commands-left');
+        const commands_right = document.getElementById('commands-right');
+        const commands_server = document.getElementById('commands-server');
+
+        const INPUT_MAP = new Map([
+          ["KeyW", {side: PlayerSide.Left, command: PlayerCommand.Jump, element: document.getElementById('key-w')}],
+          ["KeyA", {side: PlayerSide.Left, command: PlayerCommand.Left, element: document.getElementById('key-a')}],
+          ["KeyS", {side: PlayerSide.Left, command: null, element: document.getElementById('key-s')}],
+          ["KeyD", {side: PlayerSide.Left, command: PlayerCommand.Right, element: document.getElementById('key-d')}],
+          ["ArrowUp", {side: PlayerSide.Right, command: PlayerCommand.Jump, element: document.getElementById('key-up')}],
+          ["ArrowLeft", {side: PlayerSide.Right, command: PlayerCommand.Left, element: document.getElementById('key-left')}],
+          ["ArrowDown", {side: PlayerSide.Right, command: null, element: document.getElementById('key-down')}],
+          ["ArrowRight", {side: PlayerSide.Right, command: PlayerCommand.Right, element: document.getElementById('key-right')}],
+        ])
+
+        function on_keydown(code) {
+          const input = INPUT_MAP.get(code);
+          if (input) {
+            if (input.command !== null) {
+              demo.issue_command(new DemoCommand(input.side, input.command, true));
+            }
+            input.element.classList.add('pressed');
+          }
+        }
+        function on_keyup(code) {
+          const input = INPUT_MAP.get(code);
+          if (input) {
+            if (input.command !== null) {
+              demo.issue_command(new DemoCommand(input.side, input.command, false));
+            }
+            input.element.classList.remove('pressed');
+          }
+        }
+        document.addEventListener('keydown', event => {
+          if (!event.repeat) on_keydown(event.code);
+        });
+        document.addEventListener('keyup', event => {
+          if (!event.repeat) on_keyup(event.code);
+        });
+        for (const [code, input] of INPUT_MAP.entries()) {
+          input.element.addEventListener('mousedown', () => on_keydown(code));
+          input.element.addEventListener('mouseup', () => on_keyup(code));
+          input.element.addEventListener('mouseout', () => on_keyup(code));
+          input.element.addEventListener('keydown', event => {
+            if (!event.repeat && event.code == 'Space') {
+              on_keydown(code);
+            }
+          });
+          input.element.addEventListener('keyup', event => {
+            if (!event.repeat && event.code == 'Space') {
+              on_keyup(code);
+            }
+          });
+        }
+
+        document.getElementById('connect-left').addEventListener('click', event => {
+          switch (event.target.className) {
+            case "connect": {
+              demo.connect(PlayerSide.Left);
+              document.getElementById('connection-left-status').getElementsByTagName('span')[0].textContent = "Connected";
+              document.getElementById('connection-left-status').className = "connected";
+              event.target.textContent = "Disconnect";
+              event.target.className = "disconnect";
+              break;
+            }
+            case "disconnect": {
+              demo.disconnect(PlayerSide.Left);
+              document.getElementById('connection-left-status').getElementsByTagName('span')[0].textContent = "Disconnected";
+              document.getElementById('connection-left-status').className = "disconnected";
+              event.target.textContent = "Connect";
+              event.target.className = "connect";
+              break;
+            }
+          }
+        });
+
+        document.getElementById('connect-right').addEventListener('click', event => {
+          switch (event.target.className) {
+            case "connect": {
+              demo.connect(PlayerSide.Right);
+              document.getElementById('connection-right-status').getElementsByTagName('span')[0].textContent = "Connected";
+              document.getElementById('connection-right-status').className = "connected";
+              event.target.textContent = "Disconnect";
+              event.target.className = "disconnect";
+              break;
+            }
+            case "disconnect": {
+              demo.disconnect(PlayerSide.Right);
+              document.getElementById('connection-right-status').getElementsByTagName('span')[0].textContent = "Disconnected";
+              document.getElementById('connection-right-status').className = "disconnected";
+              event.target.textContent = "Connect";
+              event.target.className = "connect";
+              break;
+            }
+          }
+        });
+
+        function update_display_state_elements(elements, display_state) {
+          if (display_state) {
+            const left_x = display_state.player_left_translation_x();
+            const left_y = 100 - display_state.player_left_translation_y();
+            const right_x = display_state.player_right_translation_x();
+            const right_y = 100 - display_state.player_right_translation_y();
+            const doodad_x = display_state.doodad_translation_x();
+            const doodad_y = 100 - display_state.doodad_translation_y();
+            elements.body_left.setAttribute("x", left_x);
+            elements.body_left.setAttribute("y", left_y);
+            elements.rotate_left.style.transform = `translate(${left_x}px, ${left_y}px) rotate(${-display_state.player_left_angle()}rad)`;
+            elements.body_right.setAttribute("x", right_x);
+            elements.body_right.setAttribute("y", right_y);
+            elements.rotate_right.style.transform = `translate(${right_x}px, ${right_y}px) rotate(${-display_state.player_right_angle()}rad)`;
+            elements.body_doodad.setAttribute("x", doodad_x);
+            elements.body_doodad.setAttribute("y", doodad_y);
+            elements.rotate_doodad.style.transform = `translate(${doodad_x}px, ${doodad_y}px) rotate(${-display_state.doodad_angle()}rad)`;
+            elements.screen.className = "ready";
+          } else {
+            elements.screen.className = "loading";
+          }
+        }
+
+        const PULSE_DURATION = 0.3;
+
+        function kernel(x) {
+          // Shape:
+          // +1       .
+          //         /|
+          // +0_____/ |______
+          //   -x -1  0    +x
+
+          if (x > 0) return 0;
+          return Math.max(0, x + 1.0);
+        }
+
+        const SLOW_DOWN = 1;
+
+        const start_time = Date.now() / 1000 / SLOW_DOWN;
+        let prev_time = 0.0;
+        function next_frame() {
+          const now = Date.now() / 1000 / SLOW_DOWN - start_time;
+          const delta_seconds = now - prev_time;
+          requestAnimationFrame(next_frame);
+          if (delta_seconds < 1 / 60) return;
+          prev_time = now;
+          demo.update(delta_seconds, now);
+
+          timestamp_left.innerText = demo.client_timestamp(PlayerSide.Left);
+          timestamp_right.innerText = demo.client_timestamp(PlayerSide.Right);
+          timestamp_server.innerText = demo.server_timestamp();
+
+          update_display_state_elements(display_left, demo.client_display_state(PlayerSide.Left));
+          update_display_state_elements(display_right, demo.client_display_state(PlayerSide.Right));
+          update_display_state_elements(display_server, demo.server_display_state());
+
+          commands_left.innerHTML = demo
+            .get_client_commands(PlayerSide.Left)
+            .map(command => `<li>${command}</li>`)
+            .join('');
+          commands_right.innerHTML = demo
+            .get_client_commands(PlayerSide.Right)
+            .map(command => `<li>${command}</li>`)
+            .join('');
+          commands_server.innerHTML = demo
+            .get_server_commands()
+            .map(command => `<li>${command}</li>`)
+            .join('');
+
+          for (const signal of signals) {
+            const { canvas, side, comms_channel } = signal;
+            const latency = latencies.get(side);
+            const context = canvas.getContext('2d');
+            for (let i = 0; i < demo.new_comms_activity_count(side, comms_channel); i++) {
+              signal.activity.push(now);
+            }
+            signal.activity = signal.activity
+              .filter(pulse_start => now - pulse_start < PULSE_DURATION + latency);
+
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            for (let x = 0; x < canvas.width; x++) {
+              //context.fillStyle = `rgba(63, 183, 155, ${Math.sin(x / signal.width * 10 * Math.PI - now * 20)})`;
+              //context.fillStyle = `rgba(0, 161, 255, ${Math.sin(x / signal.width * 2 * Math.PI - now * 50) / 2 + 0.5})`;
+              //context.fillStyle = `rgba(128, 128, 128, ${Math.sin(x / signal.width * 2 * Math.PI - now * 10)})`;
+              //const strength = Math.max(Math.sin(x / signal.width / 2 * Math.PI - now * 25), 0.0)**8 + 0.3;
+
+              const strength = signal.activity.reduce((strength, pulse_start) => {
+                const pulse_age = now - pulse_start;
+                return strength + kernel((x / canvas.width * latency - pulse_age) / PULSE_DURATION);
+              }, 0);
+              const opacity = 0.7 * strength + 0.3;
+              context.fillStyle = `rgba(63, 183, 155, ${opacity})`;
+              context.fillRect(x, 0, 1, canvas.height);
+            }
+          }
+        }
+        next_frame();
+      }
+      run();
+    </script>
+  </body>
+</html>

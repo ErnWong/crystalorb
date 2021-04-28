@@ -25,3 +25,11 @@ pretty_assertions = "0.7.1"
 itertools = "0.10.0"
 float-cmp = "0.8.0"
 test-env-log = {version = "0.2.7", default-features = false, features = ["trace"]}
+
+[workspace]
+members = [
+  "examples/demo"
+]
+
+[profile.release.package.demo]
+debug = true
