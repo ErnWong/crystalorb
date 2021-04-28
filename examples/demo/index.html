@@ -676,24 +676,56 @@
             input.element.classList.remove('pressed');
           }
         }
-        document.addEventListener('keydown', event => {
-          if (!event.repeat) on_keydown(event.code);
-        });
-        document.addEventListener('keyup', event => {
-          if (!event.repeat) on_keyup(event.code);
-        });
         for (const [code, input] of INPUT_MAP.entries()) {
-          input.element.addEventListener('mousedown', () => on_keydown(code));
-          input.element.addEventListener('mouseup', () => on_keyup(code));
-          input.element.addEventListener('mouseout', () => on_keyup(code));
+          let is_keydown = false;
+          let is_spacedown = false;
+          let is_mousedown_on_button = false;
+          function try_keydown() {
+            if (is_keydown || is_spacedown || is_mousedown_on_button) {
+              // Don't double trigger.
+              return;
+            }
+            on_keydown(code);
+          }
+          function try_keyup() {
+            if (is_keydown || is_spacedown || is_mousedown_on_button) {
+              // Don't early trigger when something is still pressed.
+              return;
+            }
+            on_keyup(code);
+          }
+          input.element.addEventListener('mousedown', () => {
+            try_keydown(code);
+            is_mousedown_on_button = true;
+          });
+          window.addEventListener('mouseup', event => {
+            if (is_mousedown_on_button) {
+              is_mousedown_on_button = false;
+              try_keyup(code);
+            }
+          });
+          window.addEventListener('keydown', event => {
+            if (!event.repeat && event.code == code) {
+              try_keydown(code);
+              is_keydown = true;
+            }
+          });
+          window.addEventListener('keyup', event => {
+            if (!event.repeat && event.code == code) {
+              is_keydown = false;
+              try_keyup(code);
+            }
+          });
           input.element.addEventListener('keydown', event => {
             if (!event.repeat && event.code == 'Space') {
-              on_keydown(code);
+              try_keydown(code);
+              is_spacedown = true;
             }
           });
           input.element.addEventListener('keyup', event => {
             if (!event.repeat && event.code == 'Space') {
-              on_keyup(code);
+              is_spacedown = false;
+              try_keyup(code);
             }
           });
         }
