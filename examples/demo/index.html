@@ -2,13 +2,18 @@
   <head>
     <meta content="text/html;charset=utf-8" http-equip="Content-Type" />
     <meta charset="UTF-8" />
+    <meta name="color-scheme" content="dark light" />
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Girassol&family=Roboto+Condensed:ital,wght@0,400;0,700;1,700&display=swap">
     <style>
       :root {
-        --bg-color: orange;
+        color-scheme: light dark;
         --bg-color: white;
-        --bg-color: rgb(13,17,23);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-color: rgb(13,17,23);
+        }
       }
       html {
         background: linear-gradient(to right, rgb(13,17,23) 50%, white 50%);
