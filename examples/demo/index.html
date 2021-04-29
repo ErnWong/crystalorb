@@ -8,7 +8,46 @@
     <style>
       :root {
         color-scheme: light dark;
+
+        --bg-color: rgb(13,17,23);
         --bg-color: white;
+
+        --main-color: rgba(63, 183, 155, 1.0);
+        --main-color: rgba(56, 163, 138, 1.0);
+        --main-color-fg: rgba(255, 255, 255, 1.0);
+        --main-color-less-contrast: rgba(63, 183, 155, 0.7);
+        --main-color-less-contrast-fg: rgba(255, 255, 255, 0.7);
+        --main-color-darker: rgba(31, 100, 89, 1.0);
+        --main-color-darker-less-contrast: rgba(31, 100, 89, 0.7);
+        --main-color-mid: rgba(47, 142, 122, 1.0);
+        --main-color-mid: rgba(43, 131, 112, 1.0);
+        --main-color-mid-less-contrast: rgba(43, 131, 112, 0.7);
+
+        --heading-shadow: rgb(160, 0, 0);
+
+        --latency-fg: #757575;
+        --latency-bg: rgba(137, 137, 137, 0);
+        --latency-highlighted-bg: rgba(137, 137, 137, 0.2);
+        --latency-highlighted-fg: var(--latency-fg);
+
+        --connected-color: var(--main-color);
+        --disconnected-color: rgba(230, 0, 106, 1.0);
+
+        --blue-mid: #3366cc;
+        --blue-dark: #003399;
+        --blue-light: #33aadd;
+
+        --black-mid: #404040;
+        --black-dark: black;
+        --black-light: #808080;
+
+        --red-mid: #ff6600;
+        --red-dark: #cc0000;
+        --red-light: #ff9900;
+
+        --red-fg: #3d180d;
+
+        --soft-shadow: rgba(0, 0, 0, 0.5);
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -28,7 +67,6 @@
         min-height: 100%;
       }
       header {
-        color: #3fb79b;
         width: 500px;
         text-align: center;
         margin: 10px auto;
@@ -40,14 +78,19 @@
       h1 {
         font-family: "Girassol", serif;
         font-size: 50px;
-        text-shadow: 0 3px rgba(31, 100, 89, 1.0);
+        text-shadow: 0 3px var(--heading-shadow);
         margin: 0;
+        color: var(--main-color);
       }
       body > header p {
         text-transform: uppercase;
+        color: var(--main-color-mid);
         font-style: italic;
         font-weight: bold;
         line-height: 1.5;
+      }
+      abbr {
+        text-decoration-color: var(--main-color-mid-less-contrast);
       }
       .demo {
         display: flex;
@@ -65,8 +108,8 @@
         flex-shrink: 0;
         width: 180px;
         margin: 0;
-        color: #fff;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+        color: var(--main-color-fg);
+        box-shadow: 0 3px 10px var(--soft-shadow);
         position: relative;
         border-radius: 3px;
       }
@@ -85,12 +128,12 @@
         font-size: 1em;
         position: relative; /* so shadows don't get clipped by element below */
         letter-spacing: 2px;
-        background-color: #3fb79b;
+        background-color: var(--main-color-darker);
       }
       .ready, .loading {
         width: 100%;
         height: 100px;
-        background-color: rgba(63,183,155,0.7);
+        background-color: var(--main-color-darker-less-contrast);
         position: relative;
       }
       .ready svg, .loading svg {
@@ -130,8 +173,8 @@
         padding: 10px;
         list-style: none;
         text-align: left;
-        background-color: #3fb79b;
-        opacity: 0.7;
+        background-color: var(--main-color-darker-less-contrast);
+        color: var(--main-color-less-contrast-fg);
         scrollbar-width: thin;
         scrollbar-color: rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0);
         border-radius: 0 0 3px 3px;
@@ -146,14 +189,13 @@
         width: 100px;
         display: flex;
         flex-direction: column;
-        color: #888;
         position: relative;
       }
       .connection > * {
         margin: 10px;
       }
       .connection > svg {
-        stroke: #888;
+        stroke: var(--latency-fg);
         fill: transparent;
         margin: 10px auto 0;
         opacity: 0.5;
@@ -165,9 +207,10 @@
         padding: 6px 10px;
         font-size: 10px;
         width: 108px;
-        --shadow: rgba(31, 100, 89, 1.0);
-        --mid-tone: rgba(47, 142, 122, 1.0);
-        --hover: rgba(63, 183, 155, 1.0);
+        color: white;
+        --shadow: var(--main-color-darker);
+        --mid-tone: var(--main-color-mid);
+        --hover: var(--main-color);
       }
       .connected, .disconnected {
         font-weight: bold;
@@ -186,7 +229,7 @@
         position: absolute;
         width: 30px;
         top: 23%;
-        color: rgba(63, 183, 155, 0.5);
+        color: var(--main-color-less-contrast);
         border-top: solid currentColor 1px;
         height: 35px;
       }
@@ -206,10 +249,10 @@
         margin: 10px;
       }
       .connected span {
-        color: rgba(63, 183, 155, 1.0);
+        color: var(--connected-color);
       }
       .disconnected span {
-        color: rgba(255, 0, 118, 0.5);
+        color: var(--disconnected-color);
         animation: blink 1s linear infinite;
       }
       @keyframes blink {
@@ -255,8 +298,6 @@
         z-index: 1;
       }
       .signal-fg {
-        background-color: rgba(128, 128, 128, 0.3);
-        background-color: rgba(63, 183, 155, 0.3);
         background-color: var(--bg-color);
         mix-blend-mode: multiply;
         filter: invert(1);
@@ -272,7 +313,8 @@
         z-index: 3;
       }
       .latency {
-        background-color: rgba(137,137,137,0);
+        color: var(--latency-fg);
+        background-color: var(--latency-bg);
         cursor: text;
         transition: background-color 0.1s;
         border-radius: 3px;
@@ -293,7 +335,8 @@
         display: none;
       }
       .latency:hover, .latency:focus-within {
-        background-color: rgba(137,137,137,0.3);
+        color: var(--latency-highlighted-fg);
+        background-color: var(--latency-highlighted-bg);
       }
       .highlight {
         stroke: var(--highlight);
@@ -309,22 +352,22 @@
         stroke: var(--reflected-highlight);
       }
       .billiard-blue {
-        --mid-tone: #3366cc;
-        --shadow: #003399;
+        --mid-tone: var(--blue-mid);
+        --shadow: var(--blue-dark);
         --highlight: white;
-        --reflected-highlight: #3366cc;
+        --reflected-highlight: var(--blue-mid);
       }
       .billiard-black {
-        --mid-tone: #404040;
-        --shadow: black;
+        --mid-tone: var(--black-mid);
+        --shadow: var(--black-dark);
         --highlight: white;
-        --reflected-highlight: #808080;
+        --reflected-highlight: var(--black-light);
       }
       .billiard-red {
-        --mid-tone: #ff6600;
-        --shadow: #cc0000;
+        --mid-tone: var(--red-mid);
+        --shadow: var(--red-dark);
         --highlight: white;
-        --reflected-highlight: #ff6600;
+        --reflected-highlight: var(--red-mid);
       }
       .billiard-text {
         font-size: 8px;
@@ -338,15 +381,17 @@
       }
       #client-left .keyboard-controls {
         left: 0;
-        --hover: #ff9900;
-        --mid-tone: #ff6600;
-        --shadow: #cc0000;
+        color: var(--red-fg);
+        --hover: var(--red-light);
+        --mid-tone: var(--red-mid);
+        --shadow: var(--red-dark);
       }
       #client-right .keyboard-controls {
         right: 100px;
-        --hover: #33aadd;
-        --mid-tone: #3366cc;
-        --shadow: #003399;
+        color: white;
+        --hover: var(--blue-light);
+        --mid-tone: var(--blue-mid);
+        --shadow: var(--blue-dark);
       }
       button {
         background-color: var(--mid-tone);
@@ -358,7 +403,6 @@
         font-weight: bold;
         user-select: none;
         border: none;
-        color: white;
         text-transform: uppercase;
         letter-spacing: 2px;
         padding: 1px 6px 1px 8px; /* Note: compensate letter-spacing */
@@ -367,19 +411,19 @@
       button:hover, button:focus {
         background-color: var(--hover);
         box-shadow: 0 4px 0 var(--mid-tone),
-          0 7px 10px rgba(0, 0, 0, 0.5);
+          0 7px 10px var(--soft-shadow);
         outline: none;
       }
       button.pressed:hover, button:hover:active,
       button.pressed:focus, button:focus:active {
         box-shadow: 0 0 0 var(--mid-tone),
-          0 3px 10px rgba(0, 0, 0, 0.5);
+          0 3px 10px var(--soft-shadow);
       }
       button.pressed, button:active {
         margin-top: 4px;
         margin-bottom: 0px;
         box-shadow: 0 0 0 var(--shadow),
-          0 3px 10px rgba(0, 0, 0, 0.5);
+          0 3px 10px var(--soft-shadow);
       }
       .keyboard-controls * {
         display: inline-block;
@@ -387,6 +431,7 @@
         height: 30px;
         line-height: 30px;
         position: absolute;
+        color: inherit;
       }
       .keyboard-controls .up {
         top: 0;
@@ -855,8 +900,8 @@
                 const pulse_age = now - pulse_start;
                 return strength + kernel((x / canvas.width * latency - pulse_age) / PULSE_DURATION);
               }, 0);
-              const opacity = 0.7 * strength + 0.3;
-              context.fillStyle = `rgba(63, 183, 155, ${opacity})`;
+              const opacity = 0.8 * strength + 0.2;
+              context.fillStyle = `rgba(31, 100, 89, ${opacity})`;
               context.fillRect(x, 0, 1, canvas.height);
             }
           }
