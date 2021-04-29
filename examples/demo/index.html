@@ -19,12 +19,18 @@
         flex-direction: column;
         font-family: "Roboto Condensed", sans-serif;
         font-size: 12px;
+        margin: 0;
+        min-height: 100%;
       }
       header {
         color: #3fb79b;
         width: 500px;
         text-align: center;
         margin: 10px auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        flex-grow: 1;
       }
       h1 {
         font-family: "Girassol", serif;
@@ -40,12 +46,15 @@
       }
       .demo {
         display: flex;
-        align-items: center;
+        align-items: start;
         text-align: center;
         text-transform: uppercase;
-        padding-top: 80px;
-        padding-bottom: 100px;
+        padding: 80px 0;
         margin: auto;
+        width: 100%;
+        overflow-x: auto;
+        box-sizing: border-box;
+        flex-grow: 1;
       }
       .machine {
         flex-shrink: 0;
@@ -55,6 +64,12 @@
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
         position: relative;
         border-radius: 3px;
+      }
+      #client-left {
+        margin-left: auto;
+      }
+      #client-right {
+        margin-right: auto;
       }
       .machine > h2 {
         border-radius: 3px 3px 0 0;
@@ -74,11 +89,11 @@
         position: relative;
       }
       .ready svg, .loading svg {
+        width: 100%;
+        height: 100px;
         transition: opacity 0.8s;
       }
       .ready svg {
-        width: 100%;
-        height: 100px;
         opacity: 1;
       }
       .loading svg {
