@@ -1,0 +1,40 @@
+name: cd
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/toolchain@v1
+      - uses: jetli/wasm-pack-action@v0.3.0
+      - run: wasm-pack build --target web --release
+        working-directory: ./examples/demo
+      - uses: actions/upload-artifact@v1
+        with:
+          name: demo
+          path: |
+            examples/demo/index.html
+            examples/demo/pkg/demo.js
+            examples/demo/pkg/demo_bg.wasm
+  deploy-gh-pages:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    needs: [build-demo]
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: demo
+          path: demo
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
