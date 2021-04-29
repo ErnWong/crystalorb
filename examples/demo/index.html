@@ -383,6 +383,30 @@
         text-anchor: middle;
         dominant-baseline: middle;
       }
+      #timeskip-controls {
+        position: absolute;
+        bottom: -60px;
+        width: 400px;
+        left: calc(50% - 200px);
+        color: var(--main-color-darker);
+        vertical-align: middle;
+      }
+      #timeskip-controls span {
+        display: inline-block;
+        width: 55px;
+        vertical-align: middle;
+        font-weight: bold;
+        letter-spacing: 2px;
+      }
+      #timeskip-controls button {
+        font-size: 12px;
+        vertical-align: middle;
+        color: white;
+        height: 30px;
+        --shadow: var(--main-color-darker);
+        --mid-tone: var(--main-color-mid);
+        --hover: var(--main-color);
+      }
       .keyboard-controls {
         position: absolute;
         bottom: 10px;
@@ -558,6 +582,11 @@
         </div>
         <div class="timestamp" id="timestamp-server">Syncing</div>
         <ul class="command-buffer" id="commands-server"></ul>
+        <div id="timeskip-controls">
+          <button id="timeskip-backwards">−1 min</button>
+          <span>Time Skip</span>
+          <button id="timeskip-forwards">+1 min</button>
+        </div>
       </div>
       <div class="connection" id="connection-right">
         <div id="connection-right-status" class="disconnected">
@@ -856,13 +885,22 @@
 
         const SLOW_DOWN = 1;
 
-        const start_time = Date.now() / 1000 / SLOW_DOWN;
+        let start_time = Date.now() / 1000 / SLOW_DOWN;
         let prev_time = 0.0;
+
+        document.getElementById("timeskip-backwards").addEventListener("click", () => {
+          start_time += 60;
+        });
+
+        document.getElementById("timeskip-forwards").addEventListener("click", () => {
+          start_time -= 60;
+        });
+
         function next_frame() {
           const now = Date.now() / 1000 / SLOW_DOWN - start_time;
           const delta_seconds = now - prev_time;
           requestAnimationFrame(next_frame);
-          if (delta_seconds < 1 / 60) return;
+          if (Math.abs(delta_seconds) < 1 / 60) return;
           prev_time = now;
           demo.update(delta_seconds, now);
 
