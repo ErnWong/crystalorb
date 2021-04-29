@@ -294,8 +294,15 @@
         height: 100%;
       }
       .signal-mask {
-        color: white;
-        background-color: black;
+        /*
+         * We want white text with black background, but this causes some weird subpixel
+         * anti-aliasing artifacts/glitches when blended together in Firefox 88.0 for
+         * Ubuntu 20.04.2 LTS.
+         * Inverting seems to do the trick.
+         */
+        color: black;
+        background-color: white;
+        filter: invert(1);
         z-index: 1;
       }
       .signal-fg {
