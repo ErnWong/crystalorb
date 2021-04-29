@@ -653,7 +653,9 @@ impl<T> DelayedQueue<T> {
         }
 
         for (_, age) in &mut self.incoming {
-            *age += delta_seconds;
+            // Note: Never decrement age. The network is immune to timeskips for our
+            // demo.
+            *age += delta_seconds.max(0.0);
         }
     }
 

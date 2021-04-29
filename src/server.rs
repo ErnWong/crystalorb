@@ -6,7 +6,7 @@ use crate::{
     world::{World, WorldSimulation},
     Config,
 };
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 pub struct Server<WorldType: World> {
     timekeeping_simulation:
@@ -130,6 +130,13 @@ impl<WorldType: World> Server<WorldType> {
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
     ) {
+        let positive_delta_seconds = delta_seconds.max(0.0);
+        if delta_seconds != positive_delta_seconds {
+            warn!(
+                "Attempted to update client with a negative delta_seconds of {}. Clamping it to zero.",
+                delta_seconds
+            );
+        }
         let mut new_commands = Vec::new();
         let mut clock_syncs = Vec::new();
         for (handle, mut connection) in net.connections() {
@@ -151,9 +158,9 @@ impl<WorldType: World> Server<WorldType> {
         }
 
         self.timekeeping_simulation
-            .update(delta_seconds, seconds_since_startup);
+            .update(positive_delta_seconds, seconds_since_startup);
 
-        self.seconds_since_last_snapshot += delta_seconds;
+        self.seconds_since_last_snapshot += positive_delta_seconds;
         if self.seconds_since_last_snapshot > self.config.snapshot_send_period {
             trace!(
                 "Broadcasting snapshot at timestamp: {:?} (note: drift error: {})",

@@ -31,17 +31,24 @@ impl<WorldType: World> Client<WorldType> {
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
     ) {
+        let positive_delta_seconds = delta_seconds.max(0.0);
+        if delta_seconds != positive_delta_seconds {
+            warn!(
+                "Attempted to update client with a negative delta_seconds {}. Clamping it to zero.",
+                delta_seconds
+            );
+        }
         let should_transition = match &mut self.state.as_mut().unwrap() {
             ClientState::SyncingClock(SyncingClockClient(clocksyncer)) => {
-                clocksyncer.update(delta_seconds, seconds_since_startup, net);
+                clocksyncer.update(positive_delta_seconds, seconds_since_startup, net);
                 clocksyncer.is_ready()
             }
             ClientState::SyncingInitialState(SyncingInitialStateClient(client)) => {
-                client.update(delta_seconds, seconds_since_startup, net);
+                client.update(positive_delta_seconds, seconds_since_startup, net);
                 client.is_ready()
             }
             ClientState::Ready(ReadyClient(client)) => {
-                client.update(delta_seconds, seconds_since_startup, net);
+                client.update(positive_delta_seconds, seconds_since_startup, net);
                 false
             }
         };
