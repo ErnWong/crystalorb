@@ -2,6 +2,8 @@
   <head>
     <meta content="text/html;charset=utf-8" http-equip="Content-Type" />
     <meta charset="UTF-8" />
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Girassol&family=Roboto+Condensed:ital,wght@0,400;0,700;1,700&display=swap">
     <style>
       :root {
         --bg-color: orange;
@@ -14,12 +16,12 @@
       }
       body {
         display: flex;
+        font-family: "Roboto Condensed", sans-serif;
+        font-size: 12px;
       }
       .demo {
         display: flex;
         align-items: center;
-        font-family: sans-serif;
-        font-size: 12px;
         text-align: center;
         text-transform: uppercase;
         padding-top: 80px;
@@ -91,7 +93,6 @@
         text-align: left;
         background-color: #3fb79b;
         opacity: 0.7;
-        font-family: monospace;
         scrollbar-width: thin;
         scrollbar-color: rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0);
         border-radius: 0 0 3px 3px;
@@ -253,9 +254,6 @@
       .latency:hover, .latency:focus-within {
         background-color: rgba(137,137,137,0.3);
       }
-      .timestamp {
-        font-family: monospace;
-      }
       .highlight {
         stroke: var(--highlight);
         fill: none;
@@ -315,6 +313,7 @@
         box-shadow: 0 4px 0 var(--shadow),
           0 7px 10px rgba(0, 0, 0, 0.5);
         border-radius: 2px;
+        font-family: "Roboto Condensed", sans-serif;
         font-weight: bold;
         user-select: none;
         border: none;
