@@ -557,7 +557,12 @@ impl<WorldType: World> FixedTimestepper for ClientWorldSimulations<WorldType> {
                 // This is done to prevent new snapshots from being discarded due
                 // to a very old snapshot that was last applied. This can happen
                 // after a very long pause (e.g. browser tab sleeping).
-                self.last_queued_snapshot_timestamp = Some(comparable_range.start);
+                // We don't jump to `comparable_range.start` since it will be invalid immediately
+                // in the next iteration.
+                self.last_queued_snapshot_timestamp = Some(
+                    self.last_completed_timestamp()
+                        - (self.config.lag_compensation_frame_count() * 2),
+                );
             }
         }
     }
