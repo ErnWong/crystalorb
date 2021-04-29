@@ -16,8 +16,27 @@
       }
       body {
         display: flex;
+        flex-direction: column;
         font-family: "Roboto Condensed", sans-serif;
         font-size: 12px;
+      }
+      header {
+        color: #3fb79b;
+        width: 500px;
+        text-align: center;
+        margin: 10px auto;
+      }
+      h1 {
+        font-family: "Girassol", serif;
+        font-size: 50px;
+        text-shadow: 0 3px rgba(31, 100, 89, 1.0);
+        margin: 0;
+      }
+      body > header p {
+        text-transform: uppercase;
+        font-style: italic;
+        font-weight: bold;
+        line-height: 1.5;
       }
       .demo {
         display: flex;
@@ -379,6 +398,17 @@
         </g>
       </defs>
     </svg>
+    <header>
+      <h1>CrystalOrb</h1>
+      <p>
+        <abbr title="This means that CrystalOrb doesn't care what underlying transport layer you use. You'll need to bring your own transport layer.">Network-agnostic</abbr>,
+        <abbr title="This means that CrystalOrb is focused only on solving the state synchronization problem. You'll need to bring your own physics engine.">high-level</abbr>
+        game networking library<br/>
+        for
+        <abbr title="Clients don't need to wait for the server's confirmation before reacting to the player's input">client-side prediction</abbr>
+        and
+        <abbr title="Clients will tweak their predictions based on the server's authoritative updates">server reconciliation</abbr></p>
+    </header>
     <div class="demo">
       <div class="machine" id="client-left">
         <h2>Client</h2>
