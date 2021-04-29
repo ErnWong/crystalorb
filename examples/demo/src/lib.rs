@@ -396,9 +396,7 @@ impl Stepper for DemoWorld {
                 true,
             );
             if player.input.jump {
-                if body.position().translation.vector[1] < 12.0 {
-                    body.apply_impulse(Vector2::new(0.0, 4000.0), true);
-                }
+                body.apply_impulse(Vector2::new(0.0, 4000.0), true);
                 player.input.jump = false;
             }
         }
