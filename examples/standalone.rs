@@ -128,29 +128,16 @@ impl DisplayState for MyDisplayState {
 
 impl NetworkResource for MyNetwork {
     type ConnectionType<'a> = MyConnectionRef<'a>;
-    fn broadcast_message<MessageType>(&mut self, message: MessageType)
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        for connection in self.connections.values_mut() {
-            connection.get_mut::<MessageType>().send(message.clone());
-        }
-    }
-    fn send_message<MessageType>(
-        &mut self,
+
+    fn get_connection<'a>(
+        &'a mut self,
         handle: ConnectionHandleType,
-        message: MessageType,
-    ) -> Result<Option<MessageType>, Box<dyn Error + Send>>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        Ok(self
-            .connections
+    ) -> Option<Self::ConnectionType<'a>> {
+        self.connections
             .get_mut(&handle)
-            .unwrap()
-            .get_mut::<MessageType>()
-            .send(message))
+            .map(|connection| MyConnectionRef(connection))
     }
+
     fn connections<'a>(
         &'a mut self,
     ) -> Box<dyn Iterator<Item = (ConnectionHandleType, Self::ConnectionType<'a>)> + 'a> {

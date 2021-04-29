@@ -678,28 +678,17 @@ pub struct DemoConnectionRef<'a>(&'a mut DemoConnection);
 
 impl NetworkResource for DemoNetwork {
     type ConnectionType<'a> = DemoConnectionRef<'a>;
-    fn broadcast_message<MessageType>(&mut self, message: MessageType)
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        for connection in self.connections.values_mut() {
-            if connection.is_connected.get() {
-                connection.get_mut::<MessageType>().send(message.clone());
-            }
-        }
-    }
-    fn send_message<MessageType>(
-        &mut self,
+
+    fn get_connection<'a>(
+        &'a mut self,
         handle: ConnectionHandleType,
-        message: MessageType,
-    ) -> Result<Option<MessageType>, Box<dyn Error + Send>>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        let connection = self.connections.get_mut(&handle).unwrap();
-        assert!(connection.is_connected.get());
-        Ok(connection.get_mut::<MessageType>().send(message))
+    ) -> Option<Self::ConnectionType<'a>> {
+        self.connections
+            .get_mut(&handle)
+            .filter(|connection| connection.is_connected.get())
+            .map(|connection| DemoConnectionRef(connection))
     }
+
     fn connections<'a>(
         &'a mut self,
     ) -> Box<dyn Iterator<Item = (ConnectionHandleType, Self::ConnectionType<'a>)> + 'a> {

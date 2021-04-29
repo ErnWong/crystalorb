@@ -100,16 +100,17 @@ impl DisplayState for MockWorld {
 
 impl NetworkResource for MyNetwork {
     type ConnectionType<'a> = MockConnectionRef<'a>;
-    fn broadcast_message<MessageType>(&mut self, message: MessageType)
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        for connection in self.connections.values_mut() {
-            if connection.is_connected.get() {
-                connection.get_mut::<MessageType>().send(message.clone());
-            }
-        }
+
+    fn get_connection<'a>(
+        &'a mut self,
+        handle: ConnectionHandleType,
+    ) -> Option<Self::ConnectionType<'a>> {
+        self.connections
+            .get_mut(&handle)
+            .filter(|connection| connection.is_connected.get())
+            .map(|connection| MockConnectionRef(connection))
     }
+
     fn send_message<MessageType>(
         &mut self,
         handle: ConnectionHandleType,
@@ -122,6 +123,7 @@ impl NetworkResource for MyNetwork {
         assert!(connection.is_connected.get());
         Ok(connection.get_mut::<MessageType>().send(message))
     }
+
     fn connections<'a>(
         &'a mut self,
     ) -> Box<dyn Iterator<Item = (ConnectionHandleType, Self::ConnectionType<'a>)> + 'a> {
