@@ -18,7 +18,7 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.3.0
       - run: wasm-pack build --target web --release
         working-directory: ./examples/demo
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v2
         with:
           name: demo
           path: |
