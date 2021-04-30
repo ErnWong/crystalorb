@@ -184,7 +184,7 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
     }
 
     /// Get the current display state of the world. Returns `None` if the world has not been
-    /// initialized with a snapshot yet, and [`INITIALIZATION_TYPE`] is
+    /// initialized with a snapshot yet, and [`INITIALIZATION_TYPE`](WorldSimulation) is
     /// [`InitializationType::NeedsInitialization`].
     pub fn display_state(&self) -> Option<Timestamped<WorldType::DisplayStateType>> {
         if self.has_initialized {
