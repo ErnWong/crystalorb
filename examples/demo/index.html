@@ -175,7 +175,7 @@
         opacity: 0;
       }
       .command-buffer {
-        height: 100px;
+        height: 60px;
         overflow-y: scroll;
         margin: 0;
         padding: 10px;
@@ -191,10 +191,6 @@
       }
       .command-buffer::-webkit-scrollbar-thumb {
         background-color: rgba(0, 0, 0, 0.5);
-      }
-      #client-left .command-buffer,
-      #client-right .command-buffer {
-        height: 60px;
       }
       .connection {
         width: 100px;
@@ -393,6 +389,42 @@
         text-anchor: middle;
         dominant-baseline: middle;
       }
+      #slowdown-controls {
+        position: absolute;
+        bottom: -115px;
+        width: 322px;
+        left: calc(50% - 161px);
+        display: flex;
+        justify-content: center;
+        filter: drop-shadow(0 3px 5px var(--soft-shadow));
+      }
+      #slowdown-controls input {
+        display: none;
+      }
+      #slowdown-controls input + label {
+        display: inline-block;
+        font-size: 12px;
+        vertical-align: middle;
+        color: white;
+        height: 30px;
+        width: 46px;
+        box-sizing: border-box;
+        line-height: 30px;
+        --shadow: var(--main-color-darker);
+        --mid-tone: var(--main-color-mid);
+        --hover: var(--main-color);
+        --soft-shadow: transparent;
+        border-right: 1px solid var(--main-color-darker);
+        border-left: 1px solid var(--main-color);
+      }
+      #slowdown-controls label:first-of-type {
+        border-radius: 4px 0 0 4px;
+        border-left: none;
+      }
+      #slowdown-controls label:last-of-type {
+        border-radius: 0 4px 4px 0;
+        border-right: none;
+      }
       #timeskip-controls {
         position: absolute;
         bottom: -60px;
@@ -435,32 +467,44 @@
         --shadow: var(--blue-dark);
       }
       button {
+        --soft-shadow: rgba(0, 0, 0, 0.5);
+        border-radius: 2px;
+        border: none;
+      }
+      button,
+      #slowdown-controls input + label {
         background-color: var(--mid-tone);
         transition: background-color 0.1s;
         box-shadow: 0 4px 0 var(--shadow),
-          0 7px 10px rgba(0, 0, 0, 0.5);
-        border-radius: 2px;
+          0 7px 10px var(--soft-shadow);
         font-family: "Roboto Condensed", sans-serif;
         font-weight: bold;
         user-select: none;
-        border: none;
         text-transform: uppercase;
         letter-spacing: 2px;
         padding: 1px 6px 1px 8px; /* Note: compensate letter-spacing */
         margin-bottom: 4px;
       }
-      button:hover, button:focus {
+      button:hover, button:focus,
+      #slowdown-controls input + label:hover,
+      #slowdown-controls input + label:focus {
         background-color: var(--hover);
         box-shadow: 0 4px 0 var(--mid-tone),
           0 7px 10px var(--soft-shadow);
         outline: none;
       }
       button.pressed:hover, button:hover:active,
-      button.pressed:focus, button:focus:active {
+      button.pressed:focus, button:focus:active,
+      #slowdown-controls input:checked + label:hover,
+      #slowdown-controls input:checked + label:focus,
+      #slowdown-controls input + label:hover:active,
+      #slowdown-controls input + label:focus:active {
         box-shadow: 0 0 0 var(--mid-tone),
           0 3px 10px var(--soft-shadow);
       }
-      button.pressed, button:active {
+      button.pressed, button:active,
+      #slowdown-controls input:checked + label,
+      #slowdown-controls input + label:active {
         margin-top: 4px;
         margin-bottom: 0px;
         box-shadow: 0 0 0 var(--shadow),
@@ -595,6 +639,22 @@
           <button id="timeskip-backwards">−1 min</button>
           <span>Time Skip</span>
           <button id="timeskip-forwards">+1 min</button>
+        </div>
+        <div id="slowdown-controls">
+          <input type="radio" name="slowdown-radio" value="pause" id="slowdown-pause" />
+          <label for="slowdown-pause">⏸</label>
+          <input type="radio" name="slowdown-radio" value="32" id="slowdown-32" />
+          <label for="slowdown-32">1/32</label>
+          <input type="radio" name="slowdown-radio" value="16" id="slowdown-16" />
+          <label for="slowdown-16">1/16</label>
+          <input type="radio" name="slowdown-radio" value="4" id="slowdown-4" />
+          <label for="slowdown-4">1/4</label>
+          <input type="radio" name="slowdown-radio" value="8" id="slowdown-8" />
+          <label for="slowdown-8">1/8</label>
+          <input type="radio" name="slowdown-radio" value="2" id="slowdown-2" />
+          <label for="slowdown-2">1/2</label>
+          <input type="radio" name="slowdown-radio" value="1" id="slowdown-1" checked />
+          <label for="slowdown-1">▶</label>
         </div>
         <ul class="command-buffer" id="commands-server"></ul>
       </div>
@@ -860,6 +920,14 @@
           }
         });
 
+        for (const i of [1, 2, 4, 8, 16, 32, "pause"]) {
+          document.getElementById(`slowdown-${i}`).addEventListener('change', event => {
+            if (event.target.checked) {
+              slowdown_amount = i === "pause" ? Number.POSITIVE_INFINITY : i;
+            }
+          });
+        }
+
         function update_display_state_elements(elements, display_state) {
           if (display_state) {
             const left_x = display_state.player_left_translation_x();
@@ -896,26 +964,33 @@
           return Math.max(0, x + 1.0);
         }
 
-        const SLOW_DOWN = 1;
-
-        let start_time = Date.now() / 1000 / SLOW_DOWN;
+        let start_time = Date.now() / 1000;
         let prev_time = 0.0;
 
         document.getElementById("timeskip-backwards").addEventListener("click", () => {
-          start_time += 60;
+          start_time += 60 * slowdown_amount;
         });
 
         document.getElementById("timeskip-forwards").addEventListener("click", () => {
-          start_time -= 60;
+          start_time -= 60 * slowdown_amount;
         });
 
+        let slowdown_counter = 0;
+        let slowdown_amount = 1;
+        let simulation_now = 0;
+
         function next_frame() {
-          const now = Date.now() / 1000 / SLOW_DOWN - start_time;
+          const now = Date.now() / 1000 - start_time;
           const delta_seconds = now - prev_time;
           requestAnimationFrame(next_frame);
-          if (Math.abs(delta_seconds) < 1 / 60) return;
-          prev_time = now;
-          demo.update(delta_seconds, now);
+          slowdown_counter++;
+          if (slowdown_counter > slowdown_amount) {
+            slowdown_counter = 0;
+            prev_time = now;
+            const simulation_delta_seconds = delta_seconds / slowdown_amount;
+            simulation_now += simulation_delta_seconds;
+            demo.update(simulation_delta_seconds, simulation_now);
+          }
 
           timestamp_left.innerText = demo.client_timestamp(PlayerSide.Left);
           timestamp_right.innerText = demo.client_timestamp(PlayerSide.Right);
@@ -943,7 +1018,7 @@
 
           for (const signal of signals) {
             const { canvas, side, comms_channel } = signal;
-            const latency = latencies.get(side);
+            const latency = latencies.get(side) * slowdown_amount;
             const context = canvas.getContext('2d');
             for (let i = 0; i < demo.new_comms_activity_count(side, comms_channel); i++) {
               signal.activity.push(now);
