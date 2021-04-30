@@ -8,6 +8,7 @@ use crate::{
     world::{DisplayState, InitializationType, Tweened, World, WorldSimulation},
     Config,
 };
+use std::fmt::{Display, Formatter};
 use tracing::{debug, info, trace, warn};
 
 pub struct Client<WorldType: World> {
@@ -186,6 +187,14 @@ impl<WorldType: World> ReadyClient<WorldType> {
             .timekeeping_simulations
             .last_received_snapshot_timestamp
     }
+
+    /// Useful diagnostic to see what stage of the server reconciliation process that the
+    /// client is currently at. For more information, refer to [`ReconciliationStatus`].
+    pub fn reconciliation_status(&self) -> ReconciliationStatus {
+        self.0
+            .timekeeping_simulations
+            .infer_current_reconciliation_status()
+    }
 }
 
 pub struct ActiveClient<WorldType: World> {
@@ -311,6 +320,28 @@ pub enum FastforwardingHealth {
     /// current new world timestamp that we are trying to fastforward may end up *ahead* of the
     /// current timestamp.
     Overshot,
+}
+
+impl Display for ReconciliationStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReconciliationStatus::AwaitingSnapshot => write!(f, "Awaiting Snapshot"),
+            ReconciliationStatus::Fastforwarding(health) => {
+                write!(f, "Fastforwarding {}", health)
+            }
+            ReconciliationStatus::Blending(t) => write!(f, "Blending @ {}%", (t * 100.0) as i32),
+        }
+    }
+}
+
+impl Display for FastforwardingHealth {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FastforwardingHealth::Healthy => write!(f, ""),
+            FastforwardingHealth::Obsolete => write!(f, "Obsolete"),
+            FastforwardingHealth::Overshot => write!(f, "Overshot"),
+        }
+    }
 }
 
 pub struct ClientWorldSimulations<WorldType: World> {
