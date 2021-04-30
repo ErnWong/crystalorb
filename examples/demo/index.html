@@ -120,8 +120,11 @@
       #client-right {
         margin-right: auto;
       }
-      .machine > h2 {
+      .machine > *:first-child {
         border-radius: 3px 3px 0 0;
+      }
+      .machine > *:last-child {
+        border-radius: 0 0 3px 3px;
       }
       .machine > h2, .machine > .timestamp {
         margin: 0;
@@ -129,6 +132,10 @@
         font-size: 1em;
         position: relative; /* so shadows don't get clipped by element below */
         letter-spacing: 2px;
+        background-color: var(--main-color-darker);
+      }
+      .machine > .status {
+        padding: 4px;
         background-color: var(--main-color-darker);
       }
       .ready, .loading {
@@ -178,13 +185,16 @@
         color: var(--main-color-less-contrast-fg);
         scrollbar-width: thin;
         scrollbar-color: rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0);
-        border-radius: 0 0 3px 3px;
       }
       .command-buffer::-webkit-scrollbar {
         width: 6px;
       }
       .command-buffer::-webkit-scrollbar-thumb {
         background-color: rgba(0, 0, 0, 0.5);
+      }
+      #client-left .command-buffer,
+      #client-right .command-buffer {
+        height: 60px;
       }
       .connection {
         width: 100px;
@@ -409,17 +419,16 @@
       }
       .keyboard-controls {
         position: absolute;
-        bottom: 10px;
+        bottom: -20px;
+        left: calc(50% - 50px);
       }
       #client-left .keyboard-controls {
-        left: 0;
         color: var(--red-fg);
         --hover: var(--red-light);
         --mid-tone: var(--red-mid);
         --shadow: var(--red-dark);
       }
       #client-right .keyboard-controls {
-        right: 100px;
         color: white;
         --hover: var(--blue-light);
         --mid-tone: var(--blue-mid);
@@ -529,6 +538,7 @@
           <button class="down" id="key-s">S</button>
           <button class="right" id="key-d">D</button>
         </div>
+        <div class="status" id="status-left">Loading</div>
       </div>
       <div class="connection" id="connection-left">
         <div id="connection-left-status" class="disconnected">
@@ -581,12 +591,12 @@
           </svg>
         </div>
         <div class="timestamp" id="timestamp-server">Syncing</div>
-        <ul class="command-buffer" id="commands-server"></ul>
         <div id="timeskip-controls">
           <button id="timeskip-backwards">−1 min</button>
           <span>Time Skip</span>
           <button id="timeskip-forwards">+1 min</button>
         </div>
+        <ul class="command-buffer" id="commands-server"></ul>
       </div>
       <div class="connection" id="connection-right">
         <div id="connection-right-status" class="disconnected">
@@ -646,6 +656,7 @@
           <button class="down" id="key-down">▼</button>
           <button class="right" id="key-right">▶</button>
         </div>
+        <div class="status" id="status-right">Loading</div>
       </div>
     </div>
     <script type="module">
@@ -702,6 +713,8 @@
         const timestamp_left = document.getElementById('timestamp-left');
         const timestamp_right = document.getElementById('timestamp-right');
         const timestamp_server = document.getElementById('timestamp-server');
+        const status_left = document.getElementById('status-left');
+        const status_right = document.getElementById('status-right');
 
         function get_display_state_elements(machine) {
           return {
@@ -907,6 +920,9 @@
           timestamp_left.innerText = demo.client_timestamp(PlayerSide.Left);
           timestamp_right.innerText = demo.client_timestamp(PlayerSide.Right);
           timestamp_server.innerText = demo.server_timestamp();
+
+          status_left.innerText = demo.client_reconciliation_status(PlayerSide.Left);
+          status_right.innerText = demo.client_reconciliation_status(PlayerSide.Right);
 
           update_display_state_elements(display_left, demo.client_display_state(PlayerSide.Left));
           update_display_state_elements(display_right, demo.client_display_state(PlayerSide.Right));

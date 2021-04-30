@@ -905,6 +905,13 @@ impl Demo {
         }
     }
 
+    pub fn client_reconciliation_status(&self, side: PlayerSide) -> String {
+        match self.client(side).client.state() {
+            ClientState::Ready(client) => format!("{}", client.reconciliation_status()),
+            _ => String::from("Inactive"),
+        }
+    }
+
     pub fn server_timestamp(&self) -> String {
         format!("{}", self.server.server.last_completed_timestamp())
     }
