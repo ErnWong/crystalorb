@@ -3,14 +3,16 @@ use crate::{
     fixed_timestepper::{FixedTimestepper, TerminationCondition, TimeKeeper},
     network_resource::{Connection, ConnectionHandleType, NetworkResource},
     timestamp::{Timestamp, Timestamped},
-    world::{World, WorldSimulation},
+    world::{InitializationType, World, WorldSimulation},
     Config,
 };
 use tracing::{debug, error, info, trace, warn};
 
 pub struct Server<WorldType: World> {
-    timekeeping_simulation:
-        TimeKeeper<WorldSimulation<WorldType>, { TerminationCondition::LastUndershoot }>,
+    timekeeping_simulation: TimeKeeper<
+        WorldSimulation<WorldType, { InitializationType::PreInitialized }>,
+        { TerminationCondition::LastUndershoot },
+    >,
     seconds_since_last_snapshot: f64,
     config: Config,
 }
@@ -121,7 +123,9 @@ impl<WorldType: World> Server<WorldType> {
     }
 
     pub fn display_state(&self) -> Timestamped<WorldType::DisplayStateType> {
-        self.timekeeping_simulation.display_state()
+        self.timekeeping_simulation
+            .display_state()
+            .expect("Server simulation does not need initialization")
     }
 
     pub fn update<NetworkResourceType: NetworkResource>(

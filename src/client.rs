@@ -5,7 +5,7 @@ use crate::{
     network_resource::{Connection, NetworkResource},
     old_new::{OldNew, OldNewResult},
     timestamp::{Timestamp, Timestamped},
-    world::{DisplayState, Tweened, World, WorldSimulation},
+    world::{DisplayState, InitializationType, Tweened, World, WorldSimulation},
     Config,
 };
 use tracing::{debug, info, trace, warn};
@@ -266,6 +266,53 @@ impl<WorldType: World> ActiveClient<WorldType> {
     }
 }
 
+/// The client needs to perform different behaviours at different times. For example, the client
+/// cannot reconcile with the server before receing a snapshot from the server. The client cannot
+/// blend the snapshot into the current world state until the snapshot state has been fastforwarded
+/// to the correct timestamp (since server snapshots are always behind the client's state).
+#[derive(Debug)]
+pub enum ReconciliationStatus {
+    /// This is the status when the previous snapshot has been fully blended in, and the client is
+    /// now waiting for the next snapshot to be applied.
+    AwaitingSnapshot,
+
+    /// This is the status when a snapshot is taken from the snapshot queue and the client is now
+    /// in the process of bringing that snapshot state on par with the client's existing timestamp.
+    Fastforwarding(FastforwardingHealth),
+
+    /// This is the status when the snapshot timestamp now matches the client's timestamp, and the
+    /// client is now in the process of blending the snapshot into the client's display state.
+    /// The `f64` value describes the current interpolation parameter used for blending the old and
+    /// new display states together, ranging from `0.0` (meaning use the old state) to `1.0`
+    /// (meaning use the new state).
+    Blending(f64),
+}
+
+/// Fastforwarding the server's snapshot to the current timestamp can take multiple update cycles.
+/// During this time, different external situations can cause the fastfowarding process to abort in
+/// an unexpected way. This enum describes these possible situations.
+#[derive(Debug)]
+pub enum FastforwardingHealth {
+    /// Exactly as the name implies. Fastforwarding continues as normal.
+    Healthy,
+
+    /// If a new server snapshot arrives before the current server snapshot has finished
+    /// fastfowarding, and for some reason this server snapshot has a timestamp newer than the
+    /// current fastforwarded snapshot timestamp, then we mark the current fastforwarded snapshot
+    /// as obsolete as it is even further behind than the latest snapshot. This newer snapshot then
+    /// replaces the current new-world state, and the fast-forwarding continues.
+    ///
+    /// Essentially, this is like taking a shortcut, and is important whenever the client performs
+    /// a timeskip. The new world timestamp could suddenly become very far behind, and we don't
+    /// want the client to become stuck trying to fastforward this very "old" server snapshot.
+    Obsolete,
+
+    /// When the client perform timeskips, weird things can happen to existing timestamps and the
+    /// current new world timestamp that we are trying to fastforward may end up *ahead* of the
+    /// current timestamp.
+    Overshot,
+}
+
 pub struct ClientWorldSimulations<WorldType: World> {
     /// The next server snapshot that needs applying after the current latest snapshot has been
     /// fully interpolated into.
@@ -292,7 +339,8 @@ pub struct ClientWorldSimulations<WorldType: World> {
     /// `world_simulation.get().new` has the latest server snapshot applied.
     /// `world_simulation.get().old` does not have the latest server snapshot applied.
     /// Old and new gets swapped every time a new queued server snapshot is applied.
-    world_simulations: OldNew<WorldSimulation<WorldType>>,
+    world_simulations:
+        OldNew<WorldSimulation<WorldType, { InitializationType::NeedsInitialization }>>,
 
     /// The interpolation paramater to blend the `old_world` and `new_world` together into a
     /// single world state. The parameter is in the range `[0,1]` where 0 represents using only
@@ -334,6 +382,52 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
         client_world_simulations
     }
 
+    pub fn infer_current_reconciliation_phase(&self) -> ReconciliationStatus {
+        let OldNewResult {
+            old: old_world_simulation,
+            new: new_world_simulation,
+        } = self.world_simulations.get();
+
+        if new_world_simulation.last_completed_timestamp()
+            != old_world_simulation.last_completed_timestamp()
+        {
+            assert!(
+                self.old_new_interpolation_t <= 0.0,
+                "Interpolation t advances only if timestamps are equal, and once they are equal, they remain equal even in timeskips."
+            );
+
+            let is_snapshot_newer = self.queued_snapshot.as_ref().map_or(false, |snapshot| {
+                snapshot.timestamp() > new_world_simulation.last_completed_timestamp()
+            });
+
+            let fastforward_status = if new_world_simulation.last_completed_timestamp()
+                > old_world_simulation.last_completed_timestamp()
+            {
+                FastforwardingHealth::Overshot
+            } else if is_snapshot_newer {
+                FastforwardingHealth::Obsolete
+            } else {
+                assert!(
+                    new_world_simulation.last_completed_timestamp()
+                        < old_world_simulation.last_completed_timestamp()
+                );
+                FastforwardingHealth::Healthy
+            };
+            ReconciliationStatus::Fastforwarding(fastforward_status)
+        } else {
+            assert_eq!(
+                new_world_simulation.last_completed_timestamp(),
+                old_world_simulation.last_completed_timestamp()
+            );
+            if self.old_new_interpolation_t < 1.0 {
+                ReconciliationStatus::Blending(self.old_new_interpolation_t)
+            } else {
+                assert!(self.old_new_interpolation_t >= 1.0);
+                ReconciliationStatus::AwaitingSnapshot
+            }
+        }
+    }
+
     fn receive_command(&mut self, command: Timestamped<WorldType::CommandType>) {
         debug!("Received command {:?}", command);
         let OldNewResult { old, new } = self.world_simulations.get_mut();
@@ -370,97 +464,47 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
             self.last_queued_snapshot_timestamp = Some(queued_snapshot.timestamp());
         }
     }
-}
 
-impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
-    fn step(&mut self) {
-        trace!("Step...");
+    fn load_snapshot(&mut self, snapshot: Timestamped<WorldType::SnapshotType>) {
+        trace!("Loading new snapshot from server");
 
-        // Figure out what state we are in.
-        // TODO: This logic needs tidying up and untangling.
-        let has_finished_interpolating_to_new_world = self.old_new_interpolation_t >= 1.0;
-        let (is_fastforwarding_and_snapshot_is_newer, is_interpolating) = {
-            let OldNewResult {
-                old: old_world_simulation,
-                new: new_world_simulation,
-            } = self.world_simulations.get();
-            let is_fastforwarding = new_world_simulation.last_completed_timestamp()
-                < old_world_simulation.last_completed_timestamp();
-            trace!(
-                "Old New Interpolation t: {:?}",
-                self.old_new_interpolation_t
-            );
-            trace!(
-                "Old world current simulating timestamp: {:?}",
-                old_world_simulation.simulating_timestamp()
-            );
-            trace!(
-                "New world current simulating timestamp: {:?}",
-                new_world_simulation.simulating_timestamp()
-            );
-            let snapshot_is_newer = self.queued_snapshot.as_ref().map_or(false, |snapshot| {
-                trace!("Snapshot timestamp:  {:?}", snapshot.timestamp());
-                snapshot.timestamp() > new_world_simulation.last_completed_timestamp()
-            });
-            let is_interpolating = new_world_simulation.last_completed_timestamp()
-                == old_world_simulation.last_completed_timestamp();
-            (is_fastforwarding && snapshot_is_newer, is_interpolating)
-        };
+        let OldNewResult {
+            old: old_world_simulation,
+            new: new_world_simulation,
+        } = self.world_simulations.get_mut();
 
-        // Note: Don't progress with interpolation if new world is still fast forwarding or is
-        // ahead of old world.
-        if is_interpolating && !has_finished_interpolating_to_new_world {
-            self.old_new_interpolation_t += self.config.interpolation_progress_per_frame();
-            self.old_new_interpolation_t = self.old_new_interpolation_t.clamp(0.0, 1.0);
-        } else if is_fastforwarding_and_snapshot_is_newer || has_finished_interpolating_to_new_world
+        // We can now safely discard commands from the buffer that are older than this
+        // server snapshot.
+        //
+        // Off-by-one check:
+        //
+        // snapshot has completed the frame at t=snapshot.timestamp(), and therefore
+        // has already applied commands that are scheduled for t=snapshot.timestamp().
+        self.base_command_buffer.drain_up_to(snapshot.timestamp());
+
+        new_world_simulation.apply_completed_snapshot(snapshot, self.base_command_buffer.clone());
+
+        if new_world_simulation.last_completed_timestamp()
+            > old_world_simulation.last_completed_timestamp()
         {
-            if let Some(snapshot) = self.queued_snapshot.take() {
-                trace!("Applying new snapshot from server");
-
-                if has_finished_interpolating_to_new_world {
-                    self.world_simulations.swap();
-                } else {
-                    warn!("Abandoning previous snapshot for newer shapshot! Couldn't fastforward the previous snapshot in time,");
-                }
-
-                let OldNewResult {
-                    old: old_world_simulation,
-                    new: new_world_simulation,
-                } = self.world_simulations.get_mut();
-
-                // We can now safely discard commands from the buffer that are older than
-                // this server snapshot.
-                // Off-by-one check:
-                // snapshot has completed the frame at t=snapshot.timestamp(), and therefore has
-                // already applied commands that are scheduled for t=snapshot.timestamp().
-                self.base_command_buffer.drain_up_to(snapshot.timestamp());
-
-                new_world_simulation
-                    .apply_completed_snapshot(snapshot, self.base_command_buffer.clone());
-
-                if new_world_simulation.last_completed_timestamp()
-                    > old_world_simulation.last_completed_timestamp()
-                {
-                    // The server should always be behind the client, even excluding the network
-                    // latency. The client may momentarily fall behind due to, e.g., browser tab
-                    // sleeping, but once the browser tab wakes up, the client should automatically
-                    // compensate, and if necessary, time skip to the correct timestamp to be ahead
-                    // of the server. If even then the server continues to be ahead, then it might
-                    // suggest that the client and the server's clocks are running at different
-                    // rates, and some additional time syncing mechanism is needed.
-                    warn!("Server's snapshot is newer than client!");
-                }
-
-                // We reset the old/new interpolation factor and begin slowly blending in from the
-                // old world to the new world once the new world has caught up (aka
-                // "fast-forwarded") to the old world's timestamp.
-                self.old_new_interpolation_t = 0.0;
-            }
+            // The server should always be behind the client, even excluding the
+            // network latency. The client may momentarily fall behind due to, e.g.,
+            // browser tab sleeping, but once the browser tab wakes up, the client
+            // should automatically compensate, and if necessary, time skip to the
+            // correct timestamp to be ahead of the server. If even then the server
+            // continues to be ahead, then it might suggest that the client and the
+            // server's clocks are running at different rates, and some additional time
+            // syncing mechanism is needed.
+            warn!("Server's snapshot is newer than client!");
         }
 
-        assert!(is_interpolating || self.old_new_interpolation_t == 0.0,
-            "Interpolation parameter t should be reset and not advanced if the new world has not caught up to the new world yet");
+        // We reset the old/new interpolation factor and begin slowly blending in from
+        // the old world to the new world once the new world has caught up (aka
+        // "fast-forwarded") to the old world's timestamp.
+        self.old_new_interpolation_t = 0.0;
+    }
 
+    fn simulate_next_frame(&mut self) {
         trace!("Stepping old world by one frame");
         let OldNewResult {
             old: old_world_simulation,
@@ -477,33 +521,168 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
             &old_world_simulation.last_completed_timestamp(),
             self.config.fastforward_max_per_step,
         );
+    }
 
-        let is_first_initialised_frame = self.last_queued_snapshot_timestamp.is_some()
-            && self.states.get().new.is_none()
-            && new_world_simulation.last_completed_timestamp()
-                == old_world_simulation.last_completed_timestamp();
-        let had_already_initialised = self.states.get().new.is_some();
+    fn publish_old_state(&mut self) {
+        self.states.swap();
+        self.states
+            .set_new(self.world_simulations.get().old.display_state());
+    }
 
-        if is_first_initialised_frame {
-            // The old world simulation contains the uninitialised state while the new
-            // world simulation is based on the first snapshot from the server.
-            // Therefore, we can skip the interpolation and jump straight to the new
-            // world state.
-            self.old_new_interpolation_t = 1.0;
-        }
+    fn publish_blended_state(&mut self) {
+        let OldNewResult {
+            old: old_world_simulation,
+            new: new_world_simulation,
+        } = self.world_simulations.get_mut();
 
-        if is_first_initialised_frame || had_already_initialised {
-            // TODO: Optimizable - the states only need to be updated at the last step of the
-            // current advance.
-            trace!("Blending the old and new world states");
-            self.states.swap();
-            self.states.set_new(Some(
+        assert_eq!(
+            old_world_simulation.last_completed_timestamp(),
+            new_world_simulation.last_completed_timestamp()
+        );
+
+        trace!("Blending the old and new world states");
+        let state_to_publish = match (
+            old_world_simulation.display_state(),
+            new_world_simulation.display_state(),
+        ) {
+            (Some(old), Some(new)) => Some(
                 Timestamped::<WorldType::DisplayStateType>::from_interpolation(
-                    &old_world_simulation.display_state(),
-                    &new_world_simulation.display_state(),
+                    &old,
+                    &new,
                     self.old_new_interpolation_t,
                 ),
-            ));
+            ),
+            (None, Some(new)) => Some(new),
+            (Some(_), None) => {
+                unreachable!("New world is always initialized before old world does")
+            }
+            (None, None) => None,
+        };
+
+        self.states.swap();
+        self.states.set_new(state_to_publish);
+    }
+}
+
+impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
+    fn step(&mut self) {
+        trace!("Step...");
+
+        match self.infer_current_reconciliation_phase() {
+            ReconciliationStatus::Blending(_) => {
+                self.old_new_interpolation_t += self.config.interpolation_progress_per_frame();
+                self.old_new_interpolation_t = self.old_new_interpolation_t.clamp(0.0, 1.0);
+                self.simulate_next_frame();
+                self.publish_blended_state();
+
+                assert!(
+                    matches!(
+                        self.infer_current_reconciliation_phase(),
+                        ReconciliationStatus::Blending(_) | ReconciliationStatus::AwaitingSnapshot,
+                    ),
+                    "Unexpected state change into: {:?}",
+                    self.infer_current_reconciliation_phase()
+                );
+            }
+
+            ReconciliationStatus::AwaitingSnapshot => {
+                if let Some(snapshot) = self.queued_snapshot.take() {
+                    self.world_simulations.swap();
+                    self.load_snapshot(snapshot);
+                    self.simulate_next_frame();
+                    self.publish_old_state();
+
+                    assert!(
+                        matches!(
+                            self.infer_current_reconciliation_phase(),
+                            ReconciliationStatus::Fastforwarding(FastforwardingHealth::Healthy)
+                                | ReconciliationStatus::Fastforwarding(
+                                    FastforwardingHealth::Overshot
+                                )
+                        ) || matches!(
+                            self.infer_current_reconciliation_phase(),
+                            ReconciliationStatus::Blending(t) if t == 0.0
+                        ),
+                        "Unexpected state change into: {:?}",
+                        self.infer_current_reconciliation_phase()
+                    );
+                } else {
+                    self.simulate_next_frame();
+                    self.publish_blended_state();
+
+                    assert!(
+                        matches!(
+                            self.infer_current_reconciliation_phase(),
+                            ReconciliationStatus::AwaitingSnapshot
+                        ),
+                        "Unexpected state change into: {:?}",
+                        self.infer_current_reconciliation_phase()
+                    );
+                }
+            }
+
+            ReconciliationStatus::Fastforwarding(FastforwardingHealth::Obsolete) => {
+                let snapshot = self
+                    .queued_snapshot
+                    .take()
+                    .expect("New world can only be obsolete if there exists a newer snapshot");
+
+                warn!("Abandoning previous snapshot for newer shapshot! Couldn't fastforward the previous snapshot in time.");
+
+                self.load_snapshot(snapshot);
+                self.simulate_next_frame();
+                self.publish_old_state();
+
+                assert!(
+                    matches!(
+                        self.infer_current_reconciliation_phase(),
+                        ReconciliationStatus::Fastforwarding(FastforwardingHealth::Healthy)
+                    ),
+                    "Unexpected state change into: {:?}",
+                    self.infer_current_reconciliation_phase()
+                );
+            }
+
+            ReconciliationStatus::Fastforwarding(FastforwardingHealth::Healthy) => {
+                self.simulate_next_frame();
+                self.publish_old_state();
+
+                assert!(
+                    matches!(
+                        self.infer_current_reconciliation_phase(),
+                        ReconciliationStatus::Fastforwarding(FastforwardingHealth::Healthy)
+                    ) || matches!(
+                        self.infer_current_reconciliation_phase(),
+                        ReconciliationStatus::Blending(t) if t == 0.0
+                    ),
+                    "Unexpected state change into: {:?}",
+                    self.infer_current_reconciliation_phase()
+                );
+            }
+
+            ReconciliationStatus::Fastforwarding(FastforwardingHealth::Overshot) => {
+                warn!("New world fastforwarded beyond old world - This should only happen when the client had timeskipped.");
+
+                let OldNewResult {
+                    old: old_world_simulation,
+                    new: new_world_simulation,
+                } = self.world_simulations.get_mut();
+
+                new_world_simulation.reset_last_completed_timestamp(
+                    old_world_simulation.last_completed_timestamp(),
+                );
+                self.simulate_next_frame();
+                self.publish_blended_state();
+
+                assert!(
+                    matches!(
+                        self.infer_current_reconciliation_phase(),
+                        ReconciliationStatus::Blending(t) if t == 0.0
+                    ),
+                    "Unexpected state change into: {:?}",
+                    self.infer_current_reconciliation_phase()
+                );
+            }
         }
     }
 }

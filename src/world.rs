@@ -86,21 +86,44 @@ pub trait World: Stepper + Default + Send + Sync + 'static {
     fn display_state(&self) -> Self::DisplayStateType;
 }
 
-pub struct WorldSimulation<WorldType: World> {
-    world: WorldType,
-    command_buffer: CommandBuffer<WorldType::CommandType>,
+/// Whether the [`WorldSimulation`] needs to wait for a snapshot to be applied before its display
+/// state can be considered usable.
+#[derive(PartialEq, Eq)]
+pub enum InitializationType {
+    /// Implies that the world can be used as is without first being initialized with any snapshot.
+    /// A good example would be the server's world simulations.
+    PreInitialized,
+
+    /// Implies that the world starts off in an "invalid" state, and needs to be initialized with a
+    /// snapshot before its resulting display state is "valid" and usable. A good example would be
+    /// the clients' world simulations.
+    NeedsInitialization,
 }
 
-impl<WorldType: World> Default for WorldSimulation<WorldType> {
+pub struct WorldSimulation<WorldType: World, const INITIALIZATION_TYPE: InitializationType> {
+    world: WorldType,
+    command_buffer: CommandBuffer<WorldType::CommandType>,
+    has_initialized: bool,
+}
+
+impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType> Default
+    for WorldSimulation<WorldType, INITIALIZATION_TYPE>
+{
     fn default() -> Self {
         Self {
             world: Default::default(),
             command_buffer: Default::default(),
+            has_initialized: match INITIALIZATION_TYPE {
+                InitializationType::NeedsInitialization => false,
+                InitializationType::PreInitialized => true,
+            },
         }
     }
 }
 
-impl<WorldType: World> WorldSimulation<WorldType> {
+impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
+    WorldSimulation<WorldType, INITIALIZATION_TYPE>
+{
     pub fn new() -> Self {
         Self::default()
     }
@@ -151,6 +174,7 @@ impl<WorldType: World> WorldSimulation<WorldType> {
         self.command_buffer = rewound_command_buffer;
         self.command_buffer
             .update_timestamp(completed_snapshot.timestamp());
+        self.has_initialized = true;
     }
 
     /// Generates a timestamped snapshot of the world for the latest frame that has completed
@@ -159,8 +183,18 @@ impl<WorldType: World> WorldSimulation<WorldType> {
         Timestamped::new(self.world.snapshot(), self.last_completed_timestamp())
     }
 
-    pub fn display_state(&self) -> Timestamped<WorldType::DisplayStateType> {
-        Timestamped::new(self.world.display_state(), self.last_completed_timestamp())
+    /// Get the current display state of the world. Returns `None` if the world has not been
+    /// initialized with a snapshot yet, and [`INITIALIZATION_TYPE`] is
+    /// [`InitializationType::NeedsInitialization`].
+    pub fn display_state(&self) -> Option<Timestamped<WorldType::DisplayStateType>> {
+        if self.has_initialized {
+            Some(Timestamped::new(
+                self.world.display_state(),
+                self.last_completed_timestamp(),
+            ))
+        } else {
+            None
+        }
     }
 
     pub fn buffered_commands(
@@ -170,7 +204,9 @@ impl<WorldType: World> WorldSimulation<WorldType> {
     }
 }
 
-impl<WorldType: World> Stepper for WorldSimulation<WorldType> {
+impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType> Stepper
+    for WorldSimulation<WorldType, INITIALIZATION_TYPE>
+{
     fn step(&mut self) {
         trace!(
             "World simulation step (simulation timestamp: {:?})",
@@ -195,7 +231,9 @@ impl<WorldType: World> Stepper for WorldSimulation<WorldType> {
     }
 }
 
-impl<WorldType: World> FixedTimestepper for WorldSimulation<WorldType> {
+impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType> FixedTimestepper
+    for WorldSimulation<WorldType, INITIALIZATION_TYPE>
+{
     /// The timestamp for the frame that has completed simulation, and whose resulting state is
     /// now available.
     fn last_completed_timestamp(&self) -> Timestamp {
