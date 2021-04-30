@@ -32,6 +32,7 @@ impl<WorldType: World> Client<WorldType> {
         net: &mut NetworkResourceType,
     ) {
         let positive_delta_seconds = delta_seconds.max(0.0);
+        #[allow(clippy::float_cmp)]
         if delta_seconds != positive_delta_seconds {
             warn!(
                 "Attempted to update client with a negative delta_seconds {}. Clamping it to zero.",
