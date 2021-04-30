@@ -133,20 +133,15 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
         mock_client_server
             .server
             .issue_command(MockCommand(1234), &mut mock_client_server.server_net);
-        if !*should_disconnect {
-            mock_client_server.client_1_net.connect();
-        }
-        mock_client_server.update(1.0); // Note: > lag_compensation_latency.
+        let timestamp_for_new_command = mock_client_server
+            .server
+            .estimated_client_simulating_timestamp();
+        mock_client_server.client_1_net.connect();
 
         // WHEN that client finally hears back from the server.
-        if *should_disconnect {
-            mock_client_server.client_1_net.connect();
-        }
         let mut last_received_snapshot_timestamp_after_disconnect =
             last_received_snapshot_timestamp_before_disconnect;
-        while last_received_snapshot_timestamp_after_disconnect
-            == last_received_snapshot_timestamp_before_disconnect
-        {
+        while last_received_snapshot_timestamp_after_disconnect != Some(timestamp_for_new_command) {
             mock_client_server.update(TIMESTEP_SECONDS);
             last_received_snapshot_timestamp_after_disconnect =
                 match mock_client_server.client_1.state() {
