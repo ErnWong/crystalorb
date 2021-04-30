@@ -107,6 +107,12 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
             .collect()
     }
 
+    pub fn drain_all(&mut self) -> Vec<CommandType> {
+        let commands = self.map.values().rev().flatten().cloned().collect();
+        self.map.clear();
+        commands
+    }
+
     pub fn commands_at(&self, timestamp: Timestamp) -> Option<impl Iterator<Item = &CommandType>> {
         self.map
             .get(&Reverse(timestamp))

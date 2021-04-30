@@ -698,6 +698,8 @@ impl<WorldType: World> FixedTimestepper for ClientWorldSimulations<WorldType> {
             new: new_world_simulation,
         } = self.world_simulations.get_mut();
 
+        let old_timestamp = old_world_simulation.last_completed_timestamp();
+
         if new_world_simulation.last_completed_timestamp()
             == old_world_simulation.last_completed_timestamp()
         {
@@ -705,6 +707,13 @@ impl<WorldType: World> FixedTimestepper for ClientWorldSimulations<WorldType> {
         }
 
         old_world_simulation.reset_last_completed_timestamp(corrected_timestamp);
+
+        // Note: If timeskip was so large that timestamp has wrapped around to the past,
+        // then we need to clear all the commands in the base command buffer so that any
+        // pending commands to get replayed unexpectedly in the future at the wrong time.
+        if corrected_timestamp < old_timestamp {
+            self.base_command_buffer.drain_all();
+        }
     }
 
     fn post_update(&mut self, timestep_overshoot_seconds: f64) {

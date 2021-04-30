@@ -247,7 +247,19 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType> FixedTimes
     /// frame, unless they are too stale that the must be dropped to maintain the transitivity
     /// laws.
     fn reset_last_completed_timestamp(&mut self, timestamp: Timestamp) {
+        let old_timestamp = self.last_completed_timestamp();
         self.command_buffer.update_timestamp(timestamp);
+
+        // Note: If timeskip was so large that timestamp has wrapped around to the past, then we
+        // need to apply all the commands in the command buffer so that any pending commands to get
+        // replayed unexpectedly in the future at the wrong time.
+        if timestamp < old_timestamp {
+            let commands = self.command_buffer.drain_all();
+            for command in commands {
+                trace!("Applying stale command after large timeskip {:?}", &command);
+                self.world.apply_command(&command);
+            }
+        }
     }
 }
 
