@@ -681,10 +681,7 @@ pub struct DemoConnectionRef<'a>(&'a mut DemoConnection);
 impl NetworkResource for DemoNetwork {
     type ConnectionType<'a> = DemoConnectionRef<'a>;
 
-    fn get_connection<'a>(
-        &'a mut self,
-        handle: ConnectionHandleType,
-    ) -> Option<Self::ConnectionType<'a>> {
+    fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
         self.connections
             .get_mut(&handle)
             .filter(|connection| connection.is_connected.get())

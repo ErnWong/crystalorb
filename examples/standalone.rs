@@ -129,10 +129,7 @@ impl DisplayState for MyDisplayState {
 impl NetworkResource for MyNetwork {
     type ConnectionType<'a> = MyConnectionRef<'a>;
 
-    fn get_connection<'a>(
-        &'a mut self,
-        handle: ConnectionHandleType,
-    ) -> Option<Self::ConnectionType<'a>> {
+    fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
         self.connections
             .get_mut(&handle)
             .map(|connection| MyConnectionRef(connection))

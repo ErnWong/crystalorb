@@ -37,10 +37,7 @@ pub trait NetworkResource {
     ) -> Box<dyn Iterator<Item = (ConnectionHandleType, Self::ConnectionType<'a>)> + 'a>;
 
     /// Get a specific connection given its connection handle.
-    fn get_connection<'a>(
-        &'a mut self,
-        handle: ConnectionHandleType,
-    ) -> Option<Self::ConnectionType<'a>>;
+    fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>>;
 
     /// Optional: Send the given message to all active connections. A default implementation is
     /// already given that uses [`NetworkResource::connections`] and [`Connection::send`].
