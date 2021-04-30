@@ -1,6 +1,7 @@
 #![feature(generic_associated_types)]
 
 use crystalorb::{client::ClientState, Config, TweeningMethod};
+use itertools::iproduct;
 use pretty_assertions::assert_eq;
 use test_env_log::test;
 
@@ -77,12 +78,16 @@ fn when_client_becomes_ready_state_should_already_be_initialised() {
 fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_accepted() {
     const TIMESTEP_SECONDS: f64 = 1.0 / 60.0;
 
-    for long_delay_seconds in &[
-        TIMESTEP_SECONDS * 14.0f64.exp2(),
-        TIMESTEP_SECONDS * 14.5f64.exp2(),
-        TIMESTEP_SECONDS * 15.0f64.exp2(),
-        TIMESTEP_SECONDS * 15.5f64.exp2(),
-    ] {
+    for (long_delay_seconds, should_disconnect) in iproduct!(
+        &[
+            -60.0,
+            TIMESTEP_SECONDS * 14.0f64.exp2(),
+            TIMESTEP_SECONDS * 14.5f64.exp2(),
+            TIMESTEP_SECONDS * 15.0f64.exp2(),
+            TIMESTEP_SECONDS * 15.5f64.exp2(),
+        ],
+        &[false, true]
+    ) {
         // GIVEN a server and multiple clients in a perfect network.
         const FRAMES_TO_LAG_BEHIND: i32 = 10;
         let mut mock_client_server = MockClientServer::new(Config {
@@ -93,7 +98,7 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
             clock_sync_request_period: 0.0,
             clock_sync_assumed_outlier_rate: 0.2,
             max_tolerable_clock_deviation: 0.1,
-            snapshot_send_period: 0.1,
+            snapshot_send_period: 0.0,
             update_delta_seconds_max: 0.25,
             timestamp_skip_threshold_seconds: 1.0,
             fastforward_max_per_step: 10,
@@ -106,7 +111,9 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
         mock_client_server.update_until_clients_ready(TIMESTEP_SECONDS);
 
         // GIVEN that a client does not hear from the server for a long time.
-        mock_client_server.client_1_net.disconnect();
+        if *should_disconnect {
+            mock_client_server.client_1_net.disconnect();
+        }
         let last_accepted_snapshot_timestamp_before_disconnect =
             match mock_client_server.client_1.state() {
                 ClientState::Ready(client) => client.last_queued_snapshot_timestamp().clone(),
@@ -119,14 +126,22 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
             };
         mock_client_server.update(*long_delay_seconds);
 
-        // GIVEN that the server has some new state changes
+        // GIVEN that the server has some new state changes that the client doesn't know.
+        if !*should_disconnect {
+            mock_client_server.client_1_net.disconnect();
+        }
         mock_client_server
             .server
             .issue_command(MockCommand(1234), &mut mock_client_server.server_net);
+        if !*should_disconnect {
+            mock_client_server.client_1_net.connect();
+        }
         mock_client_server.update(1.0); // Note: > lag_compensation_latency.
 
         // WHEN that client finally hears back from the server.
-        mock_client_server.client_1_net.connect();
+        if *should_disconnect {
+            mock_client_server.client_1_net.connect();
+        }
         let mut last_received_snapshot_timestamp_after_disconnect =
             last_received_snapshot_timestamp_before_disconnect;
         while last_received_snapshot_timestamp_after_disconnect
@@ -149,13 +164,13 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
         assert_eq!(
             last_accepted_snapshot_timestamp_after_disconnect,
             last_received_snapshot_timestamp_after_disconnect,
-            "Condition: Snapshot not rejected after {} delay",
+            "Condition: Snapshot should not be rejected after {} delay",
             long_delay_seconds
         );
         assert_ne!(
             last_accepted_snapshot_timestamp_before_disconnect,
             last_accepted_snapshot_timestamp_after_disconnect,
-            "Condition: Snapshot renewed after {} delay",
+            "Condition: Snapshot should be renewed after {} delay",
             long_delay_seconds
         );
 
@@ -163,13 +178,13 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
         for _ in 0..100 {
             mock_client_server.update(TIMESTEP_SECONDS)
         }
-        let dx = match mock_client_server.client_1.state() {
-            ClientState::Ready(client) => client.display_state().dx,
+        let display_state = match mock_client_server.client_1.state() {
+            ClientState::Ready(client) => client.display_state(),
             _ => unreachable!(),
         };
         assert_eq!(
-            dx, 1234,
-            "Condition: State change reflected after {} delay",
+            display_state.dx, 1234,
+            "Condition: State change should be reflected after {} delay",
             long_delay_seconds
         );
     }
