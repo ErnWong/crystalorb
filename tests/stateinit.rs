@@ -119,6 +119,12 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
             };
         mock_client_server.update(*long_delay_seconds);
 
+        // GIVEN that the server has some new state changes
+        mock_client_server
+            .server
+            .issue_command(MockCommand(1234), &mut mock_client_server.server_net);
+        mock_client_server.update(1.0); // Note: > lag_compensation_latency.
+
         // WHEN that client finally hears back from the server.
         mock_client_server.client_1_net.connect();
         let mut last_received_snapshot_timestamp_after_disconnect =
@@ -150,6 +156,20 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
             last_accepted_snapshot_timestamp_before_disconnect,
             last_accepted_snapshot_timestamp_after_disconnect,
             "Condition: Snapshot renewed after {} delay",
+            long_delay_seconds
+        );
+
+        // THEN that client state should eventually reflect the server state change.
+        for _ in 0..100 {
+            mock_client_server.update(TIMESTEP_SECONDS)
+        }
+        let dx = match mock_client_server.client_1.state() {
+            ClientState::Ready(client) => client.display_state().dx,
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            dx, 1234,
+            "Condition: State change reflected after {} delay",
             long_delay_seconds
         );
     }
