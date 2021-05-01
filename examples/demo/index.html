@@ -925,7 +925,8 @@
         }
 
         let start_time = Date.now() / 1000;
-        let prev_time = 0.0;
+        let prev_update_time = 0.0;
+        let prev_frame_time = 0.0;
 
         document.getElementById("timeskip-backwards").addEventListener("click", () => {
           start_time += 60 * slowdown_amount;
@@ -941,13 +942,15 @@
 
         function next_frame() {
           const now = Date.now() / 1000 - start_time;
-          const delta_seconds = now - prev_time;
+          const delta_seconds_for_frame = now - prev_frame_time;
+          prev_frame_time = now;
           requestAnimationFrame(next_frame);
           slowdown_counter++;
           if (slowdown_counter > slowdown_amount) {
+            const delta_seconds_for_update = now - prev_update_time;
             slowdown_counter = 0;
-            prev_time = now;
-            const simulation_delta_seconds = delta_seconds / slowdown_amount;
+            prev_update_time = now;
+            const simulation_delta_seconds = delta_seconds_for_update / slowdown_amount;
             simulation_now += simulation_delta_seconds;
             demo.update(simulation_delta_seconds, simulation_now);
           }
@@ -976,21 +979,23 @@
             .map(command => `<li>${command}</li>`)
             .join('');
 
+          const simulation_pulse_duration = PULSE_DURATION / slowdown_amount;
+
           for (const signal of signals) {
             const { canvas, side, comms_channel } = signal;
-            const latency = latencies.get(side) * slowdown_amount;
+            const latency = latencies.get(side);
             const context = canvas.getContext('2d');
             for (let i = 0; i < demo.new_comms_activity_count(side, comms_channel); i++) {
-              signal.activity.push(now);
+              signal.activity.push(0);
             }
             signal.activity = signal.activity
-              .filter(pulse_start => now - pulse_start < PULSE_DURATION + latency);
+              .filter(pulse_age => pulse_age < simulation_pulse_duration + latency)
+              .map(pulse_age => pulse_age + delta_seconds_for_frame / slowdown_amount);
 
             context.clearRect(0, 0, canvas.width, canvas.height);
             for (let x = 0; x < canvas.width; x++) {
-              const strength = signal.activity.reduce((strength, pulse_start) => {
-                const pulse_age = now - pulse_start;
-                return strength + kernel((x / canvas.width * latency - pulse_age) / PULSE_DURATION);
+              const strength = signal.activity.reduce((strength, pulse_age) => {
+                return strength + kernel((x / canvas.width * latency - pulse_age) / simulation_pulse_duration);
               }, 0);
               const opacity = 0.8 * strength + 0.2;
               context.fillStyle = `rgba(31, 100, 89, ${opacity})`;
