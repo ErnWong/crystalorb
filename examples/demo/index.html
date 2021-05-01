@@ -23,6 +23,11 @@
         --main-color-mid: rgba(43, 131, 112, 1.0);
         --main-color-mid-less-contrast: rgba(43, 131, 112, 0.7);
 
+        --grey-color: rgba(110, 110, 110, 1.0);
+        --grey-color-mid: rgba(87, 87, 87, 1.0);
+        --grey-color-darker: rgba(66, 66, 66, 1.0);
+        --grey-color-less-contrast: rgba(122, 122, 122, 0.7);
+
         --heading-shadow: rgb(160, 0, 0);
 
         --latency-fg: #757575;
@@ -215,9 +220,9 @@
         font-size: 10px;
         width: 108px;
         color: white;
-        --shadow: var(--main-color-darker);
-        --mid-tone: var(--main-color-mid);
-        --hover: var(--main-color);
+        --shadow: var(--grey-color-darker);
+        --mid-tone: var(--grey-color-mid);
+        --hover: var(--grey-color);
       }
       .connected, .disconnected {
         font-weight: bold;
@@ -236,7 +241,7 @@
         position: absolute;
         width: 30px;
         top: 23%;
-        color: var(--main-color-less-contrast);
+        color: var(--grey-color-less-contrast);
         border-top: solid currentColor 1px;
         height: 35px;
       }
@@ -359,7 +364,9 @@
         filter: drop-shadow(0 3px 5px var(--soft-shadow));
       }
       #slowdown-controls input {
-        display: none;
+        width: 0;
+        height: 0;
+        margin: 0;
       }
       #slowdown-controls input + label {
         display: inline-block;
@@ -370,19 +377,19 @@
         width: 46px;
         box-sizing: border-box;
         line-height: 30px;
-        --shadow: var(--main-color-darker);
-        --mid-tone: var(--main-color-mid);
-        --hover: var(--main-color);
+        --shadow: var(--grey-color-darker);
+        --mid-tone: var(--grey-color-mid);
+        --hover: var(--grey-color);
         --soft-shadow: transparent;
-        border-right: 1px solid var(--main-color-darker);
-        border-left: 1px solid var(--main-color);
+        border-right: 1px solid var(--grey-color-darker);
+        border-left: 1px solid var(--grey-color);
       }
       #slowdown-controls label:first-of-type {
-        border-radius: 4px 0 0 4px;
+        border-radius: 3px 0 0 3px;
         border-left: none;
       }
       #slowdown-controls label:last-of-type {
-        border-radius: 0 4px 4px 0;
+        border-radius: 0 3px 3px 0;
         border-right: none;
       }
       #timeskip-controls {
@@ -390,7 +397,7 @@
         bottom: -60px;
         width: 400px;
         left: calc(50% - 200px);
-        color: var(--main-color-darker);
+        color: var(--grey-color-darker);
         vertical-align: middle;
       }
       #timeskip-controls span {
@@ -405,9 +412,9 @@
         vertical-align: middle;
         color: white;
         height: 30px;
-        --shadow: var(--main-color-darker);
-        --mid-tone: var(--main-color-mid);
-        --hover: var(--main-color);
+        --shadow: var(--grey-color-darker);
+        --mid-tone: var(--grey-color-mid);
+        --hover: var(--grey-color);
       }
       .keyboard-controls {
         position: absolute;
@@ -447,7 +454,7 @@
       }
       button:hover, button:focus,
       #slowdown-controls input + label:hover,
-      #slowdown-controls input + label:focus {
+      #slowdown-controls input:focus + label {
         background-color: var(--hover);
         box-shadow: 0 4px 0 var(--mid-tone),
           0 7px 10px var(--soft-shadow);
@@ -457,8 +464,8 @@
       button.pressed:focus, button:focus:active,
       #slowdown-controls input:checked + label:hover,
       #slowdown-controls input:checked + label:focus,
-      #slowdown-controls input + label:hover:active,
-      #slowdown-controls input + label:focus:active {
+      #slowdown-controls input:active + label:hover,
+      #slowdown-controls input:focus + label {
         box-shadow: 0 0 0 var(--mid-tone),
           0 3px 10px var(--soft-shadow);
       }
