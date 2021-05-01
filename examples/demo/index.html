@@ -9,17 +9,14 @@
       :root {
         color-scheme: light dark;
 
-        --bg-color: rgb(13,17,23);
         --bg-color: white;
 
-        --main-color: rgba(63, 183, 155, 1.0);
         --main-color: rgba(56, 163, 138, 1.0);
         --main-color-fg: rgba(255, 255, 255, 1.0);
         --main-color-less-contrast: rgba(63, 183, 155, 0.7);
         --main-color-less-contrast-fg: rgba(255, 255, 255, 0.7);
         --main-color-darker: rgba(31, 100, 89, 1.0);
         --main-color-darker-less-contrast: rgba(31, 100, 89, 0.7);
-        --main-color-mid: rgba(47, 142, 122, 1.0);
         --main-color-mid: rgba(43, 131, 112, 1.0);
         --main-color-mid-less-contrast: rgba(43, 131, 112, 0.7);
 
@@ -983,11 +980,6 @@
 
             context.clearRect(0, 0, canvas.width, canvas.height);
             for (let x = 0; x < canvas.width; x++) {
-              //context.fillStyle = `rgba(63, 183, 155, ${Math.sin(x / signal.width * 10 * Math.PI - now * 20)})`;
-              //context.fillStyle = `rgba(0, 161, 255, ${Math.sin(x / signal.width * 2 * Math.PI - now * 50) / 2 + 0.5})`;
-              //context.fillStyle = `rgba(128, 128, 128, ${Math.sin(x / signal.width * 2 * Math.PI - now * 10)})`;
-              //const strength = Math.max(Math.sin(x / signal.width / 2 * Math.PI - now * 25), 0.0)**8 + 0.3;
-
               const strength = signal.activity.reduce((strength, pulse_start) => {
                 const pulse_age = now - pulse_start;
                 return strength + kernel((x / canvas.width * latency - pulse_age) / PULSE_DURATION);
