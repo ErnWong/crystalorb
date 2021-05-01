@@ -401,6 +401,13 @@
         color: var(--grey-color-darker);
         vertical-align: middle;
       }
+      #time-controls {
+        opacity: 0.3;
+        transition: opacity 0.3s;
+      }
+      #time-controls:hover {
+        opacity: 1.0;
+      }
       #timeskip-controls span {
         display: inline-block;
         width: 55px;
@@ -597,26 +604,28 @@
           </svg>
         </div>
         <div class="timestamp" id="timestamp-server">Syncing</div>
-        <div id="timeskip-controls">
-          <button id="timeskip-backwards">−1 min</button>
-          <span>Time Skip</span>
-          <button id="timeskip-forwards">+1 min</button>
-        </div>
-        <div id="slowdown-controls">
-          <input type="radio" name="slowdown-radio" value="pause" id="slowdown-pause" />
-          <label for="slowdown-pause"><span class="material-icons">&#xE034;</span></label>
-          <input type="radio" name="slowdown-radio" value="32" id="slowdown-32" />
-          <label for="slowdown-32">1/32</label>
-          <input type="radio" name="slowdown-radio" value="16" id="slowdown-16" />
-          <label for="slowdown-16">1/16</label>
-          <input type="radio" name="slowdown-radio" value="8" id="slowdown-8" />
-          <label for="slowdown-8">1/8</label>
-          <input type="radio" name="slowdown-radio" value="4" id="slowdown-4" />
-          <label for="slowdown-4">1/4</label>
-          <input type="radio" name="slowdown-radio" value="2" id="slowdown-2" />
-          <label for="slowdown-2">1/2</label>
-          <input type="radio" name="slowdown-radio" value="1" id="slowdown-1" checked />
-          <label for="slowdown-1"><span class="material-icons">&#xE037;</span></label>
+        <div id="time-controls">
+          <div id="timeskip-controls">
+            <button id="timeskip-backwards">−1 min</button>
+            <span>Time Skip</span>
+            <button id="timeskip-forwards">+1 min</button>
+          </div>
+          <div id="slowdown-controls">
+            <input type="radio" name="slowdown-radio" value="pause" id="slowdown-pause" />
+            <label for="slowdown-pause"><span class="material-icons">&#xE034;</span></label>
+            <input type="radio" name="slowdown-radio" value="32" id="slowdown-32" />
+            <label for="slowdown-32">1/32</label>
+            <input type="radio" name="slowdown-radio" value="16" id="slowdown-16" />
+            <label for="slowdown-16">1/16</label>
+            <input type="radio" name="slowdown-radio" value="8" id="slowdown-8" />
+            <label for="slowdown-8">1/8</label>
+            <input type="radio" name="slowdown-radio" value="4" id="slowdown-4" />
+            <label for="slowdown-4">1/4</label>
+            <input type="radio" name="slowdown-radio" value="2" id="slowdown-2" />
+            <label for="slowdown-2">1/2</label>
+            <input type="radio" name="slowdown-radio" value="1" id="slowdown-1" checked />
+            <label for="slowdown-1"><span class="material-icons">&#xE037;</span></label>
+          </div>
         </div>
         <ul class="command-buffer" id="commands-server"></ul>
       </div>
