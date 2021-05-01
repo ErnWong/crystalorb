@@ -988,7 +988,7 @@
             .map(command => `<li>${command}</li>`)
             .join('');
 
-          const simulation_pulse_duration = PULSE_DURATION / slowdown_amount;
+          const simulation_pulse_duration = Math.max(0.02, PULSE_DURATION / slowdown_amount);
 
           for (const signal of signals) {
             const { canvas, side, comms_channel } = signal;
