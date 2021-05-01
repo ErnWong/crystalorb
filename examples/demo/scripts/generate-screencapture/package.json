@@ -1,0 +1,15 @@
+{
+  "name": "crystalorb-demo-generate-screencapture",
+  "version": "0.1.0",
+  "main": "index.js",
+  "author": "Ernest Wong <sudo@ernestwong.nz>",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@pdf-lib/upng": "^1.0.1",
+    "puppeteer": "^9.0.0"
+  },
+  "scripts": {
+    "start": "node index.js"
+  }
+}

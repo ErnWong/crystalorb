@@ -62,6 +62,9 @@
         background: var(--bg-color);
         height: 100%;
       }
+      html.screencapture {
+        background: transparent;
+      }
       body {
         display: flex;
         flex-direction: column;
@@ -78,6 +81,9 @@
         flex-direction: column;
         justify-content: flex-end;
         flex-grow: 1;
+      }
+      .screencapture header {
+        display: none;
       }
       h1 {
         font-family: "Girassol", serif;
@@ -264,6 +270,9 @@
       .disconnected span {
         color: var(--disconnected-color);
         animation: blink 1s linear infinite;
+      }
+      .screencapture .disconnected span {
+        animation: none;
       }
       @keyframes blink {
         50% {
@@ -682,6 +691,13 @@
     </div>
     <script type="module">
       import init, { Demo, DemoCommand, PlayerSide, PlayerCommand, CommsChannel } from './pkg/demo.js';
+
+      let IS_SCREEN_CAPTURE = false;
+      if (new URL(document.location).searchParams.has("screencapture")) {
+        document.documentElement.classList.add("screencapture");
+        IS_SCREEN_CAPTURE = true;
+      }
+
       async function run() {
         await init();
         const demo = new Demo();
@@ -949,11 +965,25 @@
         let slowdown_amount = 1;
         let simulation_now = 0;
 
-        function next_frame() {
+        function next_animation_frame() {
           const now = Date.now() / 1000 - start_time;
           const delta_seconds_for_frame = now - prev_frame_time;
           prev_frame_time = now;
-          requestAnimationFrame(next_frame);
+          update(delta_seconds_for_frame, now);
+          requestAnimationFrame(next_animation_frame);
+        }
+
+        (function() {
+          const SCREENSCAPTURE_FRAMERATE = 60;
+          let screenshot_time = 0;
+          window.next_screenshot_frame = function () {
+            const dt = 1 / SCREENSCAPTURE_FRAMERATE;
+            update(dt, screenshot_time);
+            screenshot_time += dt;
+          };
+        })();
+
+        function update(delta_seconds_for_frame, now) {
           slowdown_counter++;
           if (slowdown_counter > slowdown_amount) {
             const delta_seconds_for_update = now - prev_update_time;
@@ -1018,7 +1048,10 @@
             context.globalCompositeOperation = 'source-over';
           }
         }
-        next_frame();
+
+        if (!IS_SCREEN_CAPTURE) {
+          next_animation_frame();
+        }
       }
       run();
     </script>
