@@ -10,6 +10,9 @@
   <img src="examples/demo/scripts/generate-screencapture/screencapture.apng">
 </div>
 
+| WARNING: Currently depends on some of nightly rust unstable and incomplete features. |
+|---|
+
 Game networking is hard, because we usually want to give the illusion that the physics simulation is responsive, fair, and consistent between multiple game clients despite having significant network latency between the clients and the server. There are many different ways to solve the game networking problem. CrystalOrb tries implementing one of such ways.
 
 ***CrystalOrb*** is a young networking library that implements:
