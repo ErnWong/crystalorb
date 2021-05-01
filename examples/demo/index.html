@@ -279,52 +279,12 @@
         width: 80px;
         position: relative;
       }
-      /* Hack to hide pixel precision issues when zooming a fractional amount */
-      .signal::after {
-        content: '';
-        width: calc(100% + 2px);
-        height: calc(100% + 2px);
-        position: absolute;
-        top: -1px;
-        left: -1px;
-        display: block;
-        border: 2px solid var(--bg-color);
-        box-sizing: border-box;
-        z-index: 4;
-      }
-      .signal * {
+      .signal canvas {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-      }
-      .signal-mask {
-        /*
-         * We want white text with black background, but this causes some weird subpixel
-         * anti-aliasing artifacts/glitches when blended together in Firefox 88.0 for
-         * Ubuntu 20.04.2 LTS.
-         * Inverting seems to do the trick.
-         */
-        color: black;
-        background-color: white;
-        filter: invert(1);
-        z-index: 1;
-      }
-      .signal-fg {
-        background-color: var(--bg-color);
-        mix-blend-mode: multiply;
-        filter: invert(1);
-        z-index: 2;
-      }
-      .signal.rtl .signal-fg {
-        transform: scaleX(-1);
-      }
-      .signal-bg {
-        color: white;
-        background-color: var(--bg-color);
-        mix-blend-mode: difference;
-        z-index: 3;
       }
       .latency {
         color: var(--latency-fg);
@@ -589,15 +549,11 @@
           <button id="connect-left" class="connect">Connect</button>
           <span>Disconnected</span>
         </div>
-        <div class="signal ltr">
-          <div class="signal-mask">clocksync</div>
-          <canvas class="signal-fg" id="signal-left-server-clocksync"></canvas>
-          <div class="signal-bg">clocksync</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-server-clocksync"></canvas>
         </div>
-        <div class="signal ltr">
-          <div class="signal-mask">command</div>
-          <canvas class="signal-fg" id="signal-left-server-command"></canvas>
-          <div class="signal-bg">command</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-server-command"></canvas>
         </div>
         <svg width="80" height="10">
           <path d="M 0 10 L 80 10 L 70 0" />
@@ -606,20 +562,14 @@
         <svg width="80" height="10">
           <path d="M 80 0 L 0 0 L 10 10" />
         </svg>
-        <div class="signal rtl">
-          <div class="signal-mask">command</div>
-          <canvas class="signal-fg" id="signal-left-client-command"></canvas>
-          <div class="signal-bg">command</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-client-command"></canvas>
         </div>
-        <div class="signal rtl">
-          <div class="signal-mask">clocksync</div>
-          <canvas class="signal-fg" id="signal-left-client-clocksync"></canvas>
-          <div class="signal-bg">clocksync</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-client-clocksync"></canvas>
         </div>
-        <div class="signal rtl">
-          <div class="signal-mask">snapshot</div>
-          <canvas class="signal-fg" id="signal-left-client-snapshot"></canvas>
-          <div class="signal-bg">snapshot</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-client-snapshot"></canvas>
         </div>
       </div>
       <div class="machine" id="server">
@@ -663,15 +613,11 @@
           <button id="connect-right" class="connect">Connect</button>
           <span>Disconnected</span>
         </div>
-        <div class="signal rtl">
-          <div class="signal-mask">clocksync</div>
-          <canvas class="signal-fg" id="signal-right-server-clocksync"></canvas>
-          <div class="signal-bg">clocksync</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-server-clocksync"></canvas>
         </div>
-        <div class="signal rtl">
-          <div class="signal-mask">command</div>
-          <canvas class="signal-fg" id="signal-right-server-command"></canvas>
-          <div class="signal-bg">command</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-server-command"></canvas>
         </div>
         <svg width="80" height="10">
           <path d="M 80 10 L 0 10 L 10 0" />
@@ -680,20 +626,14 @@
         <svg width="80" height="10">
           <path d="M 0 0 L 80 0 L 70 10" />
         </svg>
-        <div class="signal ltr">
-          <div class="signal-mask">command</div>
-          <canvas class="signal-fg" id="signal-right-client-command"></canvas>
-          <div class="signal-bg">command</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-client-command"></canvas>
         </div>
-        <div class="signal ltr">
-          <div class="signal-mask">clocksync</div>
-          <canvas class="signal-fg" id="signal-right-client-clocksync"></canvas>
-          <div class="signal-bg">clocksync</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-client-clocksync"></canvas>
         </div>
-        <div class="signal ltr">
-          <div class="signal-mask">snapshot</div>
-          <canvas class="signal-fg" id="signal-right-client-snapshot"></canvas>
-          <div class="signal-bg">snapshot</div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-client-snapshot"></canvas>
         </div>
       </div>
       <div class="machine" id="client-right">
@@ -728,18 +668,26 @@
         const latencies = new Map();
 
         const signals = (() => {
-          const Signal = (canvas, side, comms_channel) => ({ canvas, side, comms_channel, activity: [] });
+          const Signal = (direction, message, reverse, side, comms_channel) => ({
+            canvas: document.getElementById(`signal-${direction}-${message}`),
+            direction,
+            message,
+            reverse,
+            side,
+            comms_channel,
+            activity: [],
+          });
           return [
-            Signal(document.getElementById('signal-left-server-command'),    PlayerSide.Left,  CommsChannel.ToServerCommand),
-            Signal(document.getElementById('signal-left-server-clocksync'),  PlayerSide.Left,  CommsChannel.ToServerClocksync),
-            Signal(document.getElementById('signal-left-client-command'),    PlayerSide.Left,  CommsChannel.ToClientCommand),
-            Signal(document.getElementById('signal-left-client-clocksync'),  PlayerSide.Left,  CommsChannel.ToClientClocksync),
-            Signal(document.getElementById('signal-left-client-snapshot'),   PlayerSide.Left,  CommsChannel.ToClientSnapshot),
-            Signal(document.getElementById('signal-right-server-command'),   PlayerSide.Right, CommsChannel.ToServerCommand),
-            Signal(document.getElementById('signal-right-server-clocksync'), PlayerSide.Right, CommsChannel.ToServerClocksync),
-            Signal(document.getElementById('signal-right-client-command'),   PlayerSide.Right, CommsChannel.ToClientCommand),
-            Signal(document.getElementById('signal-right-client-clocksync'), PlayerSide.Right, CommsChannel.ToClientClocksync),
-            Signal(document.getElementById('signal-right-client-snapshot'),  PlayerSide.Right, CommsChannel.ToClientSnapshot),
+            Signal('left-server',  'command',    false, PlayerSide.Left,  CommsChannel.ToServerCommand),
+            Signal('left-server',  'clocksync',  false, PlayerSide.Left,  CommsChannel.ToServerClocksync),
+            Signal('left-client',  'command',    true,  PlayerSide.Left,  CommsChannel.ToClientCommand),
+            Signal('left-client',  'clocksync',  true,  PlayerSide.Left,  CommsChannel.ToClientClocksync),
+            Signal('left-client',  'snapshot',   true,  PlayerSide.Left,  CommsChannel.ToClientSnapshot),
+            Signal('right-server', 'command',    true,  PlayerSide.Right, CommsChannel.ToServerCommand),
+            Signal('right-server', 'clocksync',  true,  PlayerSide.Right, CommsChannel.ToServerClocksync),
+            Signal('right-client', 'command',    false, PlayerSide.Right, CommsChannel.ToClientCommand),
+            Signal('right-client', 'clocksync',  false, PlayerSide.Right, CommsChannel.ToClientClocksync),
+            Signal('right-client', 'snapshot',   false, PlayerSide.Right, CommsChannel.ToClientSnapshot),
           ];
         })();
 
@@ -1039,8 +987,14 @@
               }, 0);
               const opacity = 0.8 * strength + 0.2;
               context.fillStyle = `rgba(31, 100, 89, ${opacity})`;
-              context.fillRect(x, 0, 1, canvas.height);
+              context.fillRect(signal.reverse ? canvas.width - x - 1 : x, 0, 1, canvas.height);
             }
+            context.globalCompositeOperation = 'destination-in';
+            context.font = '12px "Roboto Condensed", sans-serif';
+            context.textAlign = 'center';
+            context.fillStyle = 'black';
+            context.fillText(signal.message.toUpperCase(), canvas.width / 2, 12);
+            context.globalCompositeOperation = 'source-over';
           }
         }
         next_frame();
