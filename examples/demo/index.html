@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="color-scheme" content="dark light" />
     <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Girassol&family=Roboto+Condensed:ital,wght@0,400;0,700;1,700&display=swap">
     <style>
       :root {
@@ -381,6 +382,9 @@
         border-right: 1px solid var(--grey-color-darker);
         border-left: 1px solid var(--grey-color);
       }
+      #slowdown-controls input + label > .material-icons {
+        line-height: inherit;
+      }
       #slowdown-controls label:first-of-type {
         border-radius: 3px 0 0 3px;
         border-left: none;
@@ -474,7 +478,7 @@
         box-shadow: 0 0 0 var(--shadow),
           0 3px 10px var(--soft-shadow);
       }
-      .keyboard-controls * {
+      .keyboard-controls > * {
         display: inline-block;
         width: 30px;
         height: 30px;
@@ -497,6 +501,10 @@
       .keyboard-controls .right {
         top: 39px;
         left: 70px;
+      }
+      .keyboard-controls .material-icons {
+        line-height: inherit;
+        margin: 0 -6px 0 -8px;
       }
     </style>
   </head>
@@ -596,7 +604,7 @@
         </div>
         <div id="slowdown-controls">
           <input type="radio" name="slowdown-radio" value="pause" id="slowdown-pause" />
-          <label for="slowdown-pause">⏸</label>
+          <label for="slowdown-pause"><span class="material-icons">&#xE034;</span></label>
           <input type="radio" name="slowdown-radio" value="32" id="slowdown-32" />
           <label for="slowdown-32">1/32</label>
           <input type="radio" name="slowdown-radio" value="16" id="slowdown-16" />
@@ -608,7 +616,7 @@
           <input type="radio" name="slowdown-radio" value="2" id="slowdown-2" />
           <label for="slowdown-2">1/2</label>
           <input type="radio" name="slowdown-radio" value="1" id="slowdown-1" checked />
-          <label for="slowdown-1">▶</label>
+          <label for="slowdown-1"><span class="material-icons">&#xE037;</span></label>
         </div>
         <ul class="command-buffer" id="commands-server"></ul>
       </div>
@@ -655,10 +663,10 @@
         <div class="timestamp" id="timestamp-right">Syncing</div>
         <ul class="command-buffer" id="commands-right"></ul>
         <div class="keyboard-controls">
-          <button class="up" id="key-up">▲</button>
-          <button class="left" id="key-left">◀</button>
-          <button class="down" id="key-down">▼</button>
-          <button class="right" id="key-right">▶</button>
+          <button class="up" id="key-up"><span class="material-icons">&#xE316;</span></button>
+          <button class="left" id="key-left"><span class="material-icons">&#xE314;</span></button>
+          <button class="down" id="key-down"><span class="material-icons">&#xE313;</span></button>
+          <button class="right" id="key-right"><span class="material-icons">&#xE315;</span></button>
         </div>
         <div class="status" id="status-right">Loading</div>
       </div>
