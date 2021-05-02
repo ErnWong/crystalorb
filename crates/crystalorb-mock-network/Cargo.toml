@@ -1,0 +1,14 @@
+[package]
+name = "crystalorb-mock-network"
+version = "0.1.0"
+authors = ["Ernest Wong <sudo@ernestwong.nz>"]
+categories = ["games", "simulation"]
+edition = "2018"
+keywords = ["netcode"]
+license = "MIT"
+readme = "README.markdown"
+repository = "https://github.com/ErnWong/crystalorb"
+
+[dependencies]
+crystalorb = {version = "0.1.0", path="../../"}
+serde = {version = "1.0.118", features = ["derive"]}

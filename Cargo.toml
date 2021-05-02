@@ -25,10 +25,13 @@ pretty_assertions = "0.7.1"
 itertools = "0.10.0"
 float-cmp = "0.8.0"
 test-env-log = {version = "0.2.7", default-features = false, features = ["trace"]}
+crystalorb-mock-network = {version = "0.1.0", path = "./crates/crystalorb-mock-network"}
 
 [workspace]
 members = [
-  "examples/demo"
+  "examples/demo",
+  "crates/crystalorb-mock-network",
+  "crates/crystalorb-bevy-networking-turbulence"
 ]
 
 [profile.release.package.demo]

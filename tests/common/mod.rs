@@ -1,23 +1,14 @@
 use crystalorb::{
     client::{Client, ClientState},
-    clocksync::ClockSyncMessage,
     command::Command,
     fixed_timestepper::Stepper,
-    network_resource::{Connection, ConnectionHandleType, NetworkResource},
     server::Server,
-    timestamp::Timestamped,
     world::{DisplayState, World},
     Config,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    any::{type_name, Any, TypeId},
-    cell::{Cell, RefCell},
-    collections::{HashMap, VecDeque},
-    error::Error,
-    fmt::Debug,
-    rc::Rc,
-};
+use crystalorb_mock_network::MockNetwork;
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use tracing::info;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -98,261 +89,14 @@ impl DisplayState for MockWorld {
     }
 }
 
-impl NetworkResource for MyNetwork {
-    type ConnectionType<'a> = MockConnectionRef<'a>;
-
-    fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
-        self.connections
-            .get_mut(&handle)
-            .filter(|connection| connection.is_connected.get())
-            .map(|connection| MockConnectionRef(connection))
-    }
-
-    fn send_message<MessageType>(
-        &mut self,
-        handle: ConnectionHandleType,
-        message: MessageType,
-    ) -> Result<Option<MessageType>, Box<dyn Error + Send>>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        let connection = self.connections.get_mut(&handle).unwrap();
-        assert!(connection.is_connected.get());
-        Ok(connection.get_mut::<MessageType>().send(message))
-    }
-
-    fn connections<'a>(
-        &'a mut self,
-    ) -> Box<dyn Iterator<Item = (ConnectionHandleType, Self::ConnectionType<'a>)> + 'a> {
-        Box::new(
-            self.connections
-                .iter_mut()
-                .filter(|(_handle, connection)| connection.is_connected.get())
-                .map(|(handle, connection)| (*handle, MockConnectionRef(connection))),
-        )
-    }
-}
-
-impl<'a> Connection for MockConnectionRef<'a> {
-    fn recv<MessageType>(&mut self) -> Option<MessageType>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        assert!(self.0.is_connected.get());
-        self.0.get_mut::<MessageType>().recv()
-    }
-    fn send<MessageType>(&mut self, message: MessageType) -> Option<MessageType>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        assert!(self.0.is_connected.get());
-        self.0.get_mut::<MessageType>().send(message)
-    }
-    fn flush<MessageType>(&mut self)
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        assert!(self.0.is_connected.get());
-        // No-op in our mock network. You may want to forward this call to your network library.
-    }
-}
-
-#[derive(Default)]
-pub struct MyNetwork {
-    pub connections: HashMap<ConnectionHandleType, MockConnection>,
-}
-
-impl MyNetwork {
-    pub fn new_mock_network() -> (MyNetwork, (MyNetwork, MyNetwork)) {
-        let mut client_1_net = MyNetwork::default();
-        let mut client_2_net = MyNetwork::default();
-        let mut server_net = MyNetwork::default();
-
-        let (mut client_1_connection, mut server_1_connection) = MockConnection::new_pair();
-        let (mut client_2_connection, mut server_2_connection) = MockConnection::new_pair();
-
-        MockConnection::register_channel::<ClockSyncMessage>(
-            &mut client_1_connection,
-            &mut server_1_connection,
-        );
-        MockConnection::register_channel::<ClockSyncMessage>(
-            &mut client_2_connection,
-            &mut server_2_connection,
-        );
-
-        MockConnection::register_channel::<Timestamped<MockWorld>>(
-            &mut client_1_connection,
-            &mut server_1_connection,
-        );
-        MockConnection::register_channel::<Timestamped<MockWorld>>(
-            &mut client_2_connection,
-            &mut server_2_connection,
-        );
-
-        MockConnection::register_channel::<Timestamped<MockCommand>>(
-            &mut client_1_connection,
-            &mut server_1_connection,
-        );
-        MockConnection::register_channel::<Timestamped<MockCommand>>(
-            &mut client_2_connection,
-            &mut server_2_connection,
-        );
-
-        client_1_net.connections.insert(0, client_1_connection);
-        client_2_net.connections.insert(0, client_2_connection);
-        server_net.connections.insert(0, server_1_connection);
-        server_net.connections.insert(1, server_2_connection);
-
-        (server_net, (client_1_net, client_2_net))
-    }
-
-    pub fn connect(&mut self) {
-        for connection in self.connections.values_mut() {
-            connection.is_connected.set(true);
-        }
-    }
-
-    pub fn disconnect(&mut self) {
-        for connection in self.connections.values_mut() {
-            connection.is_connected.set(false);
-        }
-    }
-
-    pub fn tick(&mut self) {
-        for connection in self.connections.values_mut() {
-            connection.tick();
-        }
-    }
-}
-
-pub struct MockConnection {
-    pub channels: HashMap<TypeId, Box<dyn Tick>>,
-    pub is_connected: Rc<Cell<bool>>,
-}
-
-impl MockConnection {
-    pub fn new_pair() -> (MockConnection, MockConnection) {
-        let connection_1 = MockConnection {
-            channels: Default::default(),
-            is_connected: Rc::new(Cell::new(false)),
-        };
-        let connection_2 = MockConnection {
-            channels: Default::default(),
-            is_connected: connection_1.is_connected.clone(),
-        };
-        (connection_1, connection_2)
-    }
-
-    pub fn register_channel<T: 'static>(
-        connection_1: &mut MockConnection,
-        connection_2: &mut MockConnection,
-    ) {
-        let (channel_1, channel_2) = MockChannel::<T>::new_pair();
-        let key = TypeId::of::<T>();
-        connection_1.channels.insert(key, Box::new(channel_1));
-        connection_2.channels.insert(key, Box::new(channel_2));
-    }
-
-    pub fn get_mut<T: 'static>(&mut self) -> &mut MockChannel<T> {
-        let key = TypeId::of::<T>();
-        self.channels
-            .get_mut(&key)
-            .expect(&format!(
-                "Message of type {:?} should be registered",
-                type_name::<T>()
-            ))
-            .as_any()
-            .downcast_mut()
-            .expect("Channel is of the right type")
-    }
-
-    pub fn tick(&mut self) {
-        for channel in self.channels.values_mut() {
-            channel.tick();
-        }
-    }
-}
-
-pub struct MockChannel<T> {
-    pub inbox: Rc<RefCell<DelayedQueue<T>>>,
-    pub outbox: Rc<RefCell<DelayedQueue<T>>>,
-}
-
-pub trait Tick {
-    fn tick(&mut self);
-    fn as_any(&mut self) -> &mut dyn Any;
-}
-
-impl<T> MockChannel<T> {
-    pub fn new_pair() -> (MockChannel<T>, MockChannel<T>) {
-        let channel_1 = MockChannel {
-            inbox: Rc::new(RefCell::new(DelayedQueue::new())),
-            outbox: Rc::new(RefCell::new(DelayedQueue::new())),
-        };
-        let channel_2 = MockChannel {
-            inbox: channel_1.outbox.clone(),
-            outbox: channel_1.inbox.clone(),
-        };
-        (channel_1, channel_2)
-    }
-
-    pub fn send(&mut self, message: T) -> Option<T> {
-        self.outbox.borrow_mut().send(message)
-    }
-
-    pub fn recv(&mut self) -> Option<T> {
-        self.inbox.borrow_mut().recv()
-    }
-}
-
-impl<T: 'static> Tick for MockChannel<T> {
-    fn tick(&mut self) {
-        self.inbox.borrow_mut().tick();
-    }
-
-    fn as_any(&mut self) -> &mut dyn Any {
-        self
-    }
-}
-
-#[derive(Default)]
-pub struct DelayedQueue<T> {
-    incoming: VecDeque<T>,
-    outgoing: VecDeque<T>,
-}
-
-impl<T> DelayedQueue<T> {
-    pub fn new() -> Self {
-        Self {
-            incoming: VecDeque::new(),
-            outgoing: VecDeque::new(),
-        }
-    }
-
-    pub fn tick(&mut self) {
-        self.outgoing.append(&mut self.incoming);
-    }
-
-    pub fn send(&mut self, message: T) -> Option<T> {
-        self.incoming.push_back(message);
-        None
-    }
-
-    pub fn recv(&mut self) -> Option<T> {
-        self.outgoing.pop_front()
-    }
-}
-
-pub struct MockConnectionRef<'a>(&'a mut MockConnection);
-
 pub struct MockClientServer {
     pub config: Config,
     pub server: Server<MockWorld>,
     pub client_1: Client<MockWorld>,
     pub client_2: Client<MockWorld>,
-    pub server_net: MyNetwork,
-    pub client_1_net: MyNetwork,
-    pub client_2_net: MyNetwork,
+    pub server_net: MockNetwork,
+    pub client_1_net: MockNetwork,
+    pub client_2_net: MockNetwork,
     pub clock: f64,
     pub client_1_clock_offset: f64,
     pub client_2_clock_offset: f64,
@@ -360,7 +104,8 @@ pub struct MockClientServer {
 
 impl MockClientServer {
     pub fn new(config: Config) -> MockClientServer {
-        let (server_net, (client_1_net, client_2_net)) = MyNetwork::new_mock_network();
+        let (server_net, (client_1_net, client_2_net)) =
+            MockNetwork::new_mock_network::<MockWorld>();
         MockClientServer {
             config: config.clone(),
             client_1: Client::<MockWorld>::new(config.clone()),
@@ -422,8 +167,8 @@ impl MockClientServer {
             &mut self.client_2_net,
         );
 
-        self.client_1_net.tick();
-        self.client_2_net.tick();
-        self.server_net.tick();
+        self.client_1_net.tick(delta_seconds);
+        self.client_2_net.tick(delta_seconds);
+        self.server_net.tick(delta_seconds);
     }
 }

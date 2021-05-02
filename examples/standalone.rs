@@ -2,25 +2,15 @@
 
 use crystalorb::{
     client::{Client, ClientState},
-    clocksync::ClockSyncMessage,
     command::Command,
     fixed_timestepper::Stepper,
-    network_resource::{Connection, ConnectionHandleType, NetworkResource},
     server::Server,
-    timestamp::Timestamped,
     world::{DisplayState, World},
     Config, TweeningMethod,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    any::{type_name, Any, TypeId},
-    cell::RefCell,
-    collections::{HashMap, VecDeque},
-    error::Error,
-    fmt::Debug,
-    rc::Rc,
-    time::Instant,
-};
+use crystalorb_mock_network::MockNetwork;
+use serde::{Deserialize, Serialize};
+use std::{fmt::Debug, time::Instant};
 use tracing::Level;
 use tracing_subscriber;
 
@@ -126,51 +116,14 @@ impl DisplayState for MyDisplayState {
     }
 }
 
-impl NetworkResource for MyNetwork {
-    type ConnectionType<'a> = MyConnectionRef<'a>;
-
-    fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
-        self.connections
-            .get_mut(&handle)
-            .map(|connection| MyConnectionRef(connection))
-    }
-
-    fn connections<'a>(
-        &'a mut self,
-    ) -> Box<dyn Iterator<Item = (ConnectionHandleType, Self::ConnectionType<'a>)> + 'a> {
-        Box::new(
-            self.connections
-                .iter_mut()
-                .map(|(handle, connection)| (*handle, MyConnectionRef(connection))),
-        )
-    }
-}
-
-impl<'a> Connection for MyConnectionRef<'a> {
-    fn recv<MessageType>(&mut self) -> Option<MessageType>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        self.0.get_mut::<MessageType>().recv()
-    }
-    fn send<MessageType>(&mut self, message: MessageType) -> Option<MessageType>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        self.0.get_mut::<MessageType>().send(message)
-    }
-    fn flush<MessageType>(&mut self)
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        // No-op in our mock network. You may want to forward this call to your network library.
-    }
-}
-
 fn main() {
     tracing_subscriber::fmt().with_max_level(Level::WARN).init();
 
-    let (mut server_net, (mut client_1_net, mut client_2_net)) = MyNetwork::new_mock_network();
+    let (mut server_net, (mut client_1_net, mut client_2_net)) =
+        MockNetwork::new_mock_network::<MyWorld>();
+
+    client_1_net.connect();
+    client_2_net.connect();
 
     let config = Config {
         lag_compensation_latency: 0.3,
@@ -225,119 +178,10 @@ fn main() {
         client_2.update(delta_seconds, seconds_since_startup, &mut client_2_net);
         server.update(delta_seconds, seconds_since_startup, &mut server_net);
 
+        client_1_net.tick(delta_seconds);
+        client_2_net.tick(delta_seconds);
+        server_net.tick(delta_seconds);
+
         previous_time = current_time;
     }
 }
-
-// Dummy network backed by vecs.
-
-#[derive(Default)]
-pub struct MyNetwork {
-    pub connections: HashMap<ConnectionHandleType, MyConnection>,
-}
-
-impl MyNetwork {
-    pub fn new_mock_network() -> (MyNetwork, (MyNetwork, MyNetwork)) {
-        let mut client_1_net = MyNetwork::default();
-        let mut client_2_net = MyNetwork::default();
-        let mut server_net = MyNetwork::default();
-
-        let mut client_1_connection = MyConnection::default();
-        let mut client_2_connection = MyConnection::default();
-        let mut server_1_connection = MyConnection::default();
-        let mut server_2_connection = MyConnection::default();
-
-        MyConnection::register_channel::<ClockSyncMessage>(
-            &mut client_1_connection,
-            &mut server_1_connection,
-        );
-        MyConnection::register_channel::<ClockSyncMessage>(
-            &mut client_2_connection,
-            &mut server_2_connection,
-        );
-
-        MyConnection::register_channel::<Timestamped<MySnapshot>>(
-            &mut client_1_connection,
-            &mut server_1_connection,
-        );
-        MyConnection::register_channel::<Timestamped<MySnapshot>>(
-            &mut client_2_connection,
-            &mut server_2_connection,
-        );
-
-        MyConnection::register_channel::<Timestamped<MyCommand>>(
-            &mut client_1_connection,
-            &mut server_1_connection,
-        );
-        MyConnection::register_channel::<Timestamped<MyCommand>>(
-            &mut client_2_connection,
-            &mut server_2_connection,
-        );
-
-        client_1_net.connections.insert(0, client_1_connection);
-        client_2_net.connections.insert(0, client_2_connection);
-        server_net.connections.insert(0, server_1_connection);
-        server_net.connections.insert(1, server_2_connection);
-
-        (server_net, (client_1_net, client_2_net))
-    }
-}
-
-#[derive(Default)]
-pub struct MyConnection {
-    pub channels: HashMap<TypeId, Box<dyn Any>>,
-}
-
-impl MyConnection {
-    pub fn register_channel<T: 'static>(
-        connection_1: &mut MyConnection,
-        connection_2: &mut MyConnection,
-    ) {
-        let (channel_1, channel_2) = MyChannel::<T>::new_pair();
-        let key = TypeId::of::<T>();
-        connection_1.channels.insert(key, Box::new(channel_1));
-        connection_2.channels.insert(key, Box::new(channel_2));
-    }
-
-    pub fn get_mut<T: 'static>(&mut self) -> &mut MyChannel<T> {
-        let key = TypeId::of::<T>();
-        self.channels
-            .get_mut(&key)
-            .expect(&format!(
-                "Message of type {:?} should be registered",
-                type_name::<T>()
-            ))
-            .downcast_mut()
-            .expect("Channel is of the right type")
-    }
-}
-
-pub struct MyChannel<T> {
-    pub inbox: Rc<RefCell<VecDeque<T>>>,
-    pub outbox: Rc<RefCell<VecDeque<T>>>,
-}
-
-impl<T> MyChannel<T> {
-    pub fn new_pair() -> (MyChannel<T>, MyChannel<T>) {
-        let channel_1 = MyChannel {
-            inbox: Rc::new(RefCell::new(VecDeque::new())),
-            outbox: Rc::new(RefCell::new(VecDeque::new())),
-        };
-        let channel_2 = MyChannel {
-            inbox: channel_1.outbox.clone(),
-            outbox: channel_1.inbox.clone(),
-        };
-        (channel_1, channel_2)
-    }
-
-    pub fn send(&mut self, message: T) -> Option<T> {
-        self.outbox.borrow_mut().push_back(message);
-        None
-    }
-
-    pub fn recv(&mut self) -> Option<T> {
-        self.inbox.borrow_mut().pop_front()
-    }
-}
-
-pub struct MyConnectionRef<'a>(&'a mut MyConnection);

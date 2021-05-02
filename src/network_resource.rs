@@ -24,8 +24,8 @@ pub type ConnectionHandleType = usize;
 ///
 /// This interface is based off on the interface provided by the
 /// [bevy_networking_turbulence](https://github.com/smokku/bevy_networking_turbulence) plugin. See
-/// **TODO: Insert link once it is made available** for an example for integrating with
-/// bevy_networking_turbulence.
+/// [crystalorb-bevy-networking-turbulence](https://github.com/ErnWong/crystalorb/tree/crates/crystalorb-bevy-networking-turbulence)
+/// for an example for integrating with bevy_networking_turbulence.
 pub trait NetworkResource {
     type ConnectionType<'a>: Connection;
 
