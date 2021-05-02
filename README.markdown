@@ -1,17 +1,26 @@
+| WARNING: This crate currently depends on nightly rust unstable and incomplete features. |
+|---|
+
 <div align="center">
   <h1>crystalorb</h1>
-  <p><strong>Network-agnostic, high-level game networking library for client-side prediction and server reconciliation.</strong></p>
+  <p><strong>Network-agnostic, high-level game networking library<br>for client-side prediction and server reconciliation.</strong></p>
   <p>
+    <a href="https://crates.io/crates/crystalorb"><img alt="crates.io" src="https://meritbadge.herokuapp.com/crystalorb"></a>
+    <a href="https://docs.rs/crystalorb"><img alt="docs.rs" src="https://docs.rs/crystalorb/badge.svg"></a>
     <a href="https://github.com/ErnWong/crystalorb/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/ErnWong/crystalorb/actions/workflows/ci.yml/badge.svg"></a>
     <a href="https://github.com/ErnWong/crystalorb/actions/workflows/cd.yml"><img alt="cd" src="https://github.com/ErnWong/crystalorb/actions/workflows/cd.yml/badge.svg"></a>
-    <a href="https://crates.io/crates/crystalorb"><img alt="crates.io" src="https://meritbadge.herokuapp.com/crystalorb"></a>
-    <a href="https://codecov.io/github/ErnWong/crystalorb?branch=master"><img alt="Coverage" src="https://codecov.io/github/ErnWong/crystalorg/coverage.svg?branch=master"></a>
+    <a href="https://codecov.io/github/ErnWong/crystalorb?branch=master"><img alt="Coverage" src="https://codecov.io/github/ErnWong/crystalorb/coverage.svg?branch=master"></a>
   </p>
   <img src="examples/demo/scripts/generate-screencapture/screencapture.apng">
 </div>
 
-| WARNING: Currently depends on some of nightly rust unstable and incomplete features. |
-|---|
+## Quick start
+
+You may copy the [standalone](examples/standalone.rs) example to use as a starting template, and build off from there. You may also want to check out [crystalorb-mock-network](crates/crystalorb-mock-network) and [crystalorb-bevy-networking-turbulence](crates/crystalorb-bev-networking-turbulence), either to use directly in your projects, or as examples for you to integrate your own choice of networking layer.
+
+For more information about how to implement the required traits, refer to the [docs](https://docs.rs/crystalorb).
+
+## About
 
 Game networking is hard, because we usually want to give the illusion that the physics simulation is responsive, fair, and consistent between multiple game clients despite having significant network latency between the clients and the server. There are many different ways to solve the game networking problem. CrystalOrb tries implementing one of such ways.
 
@@ -50,9 +59,3 @@ CrystalOrb currently uses the following unstable features:
 #![feature(const_generics)]
 #![feature(generic_associated_types)]
 ```
-
-## Demo
-
-Using Bevy game engine + Rapier physics engine + Turbulence message channels + Naia sockets.
-
-TODO: insert jif
