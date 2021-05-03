@@ -142,7 +142,7 @@ fn main() {
 
     let mut client_1 = Client::<MyWorld>::new(config.clone());
     let mut client_2 = Client::<MyWorld>::new(config.clone());
-    let mut server = Server::<MyWorld>::new(config.clone());
+    let mut server = Server::<MyWorld>::new(config.clone(), 0.0);
 
     let startup_time = Instant::now();
     let mut previous_time = Instant::now();

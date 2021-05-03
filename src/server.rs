@@ -6,7 +6,7 @@ use crate::{
     world::{InitializationType, World, WorldSimulation},
     Config,
 };
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 pub struct Server<WorldType: World> {
     timekeeping_simulation: TimeKeeper<
@@ -18,12 +18,21 @@ pub struct Server<WorldType: World> {
 }
 
 impl<WorldType: World> Server<WorldType> {
-    pub fn new(config: Config) -> Self {
-        Self {
+    pub fn new(config: Config, seconds_since_startup: f64) -> Self {
+        let mut server = Self {
             timekeeping_simulation: TimeKeeper::new(Default::default(), config.clone()),
             seconds_since_last_snapshot: 0.0,
             config,
-        }
+        };
+
+        let initial_timestamp =
+            Timestamp::from_seconds(seconds_since_startup, server.config.timestep_seconds)
+                - server.config.lag_compensation_frame_count();
+        server
+            .timekeeping_simulation
+            .reset_last_completed_timestamp(initial_timestamp);
+
+        server
     }
 
     pub fn last_completed_timestamp(&self) -> Timestamp {
@@ -44,19 +53,6 @@ impl<WorldType: World> Server<WorldType> {
     /// be ahead of the server to compensate for the latency between the server and the clients).
     pub fn estimated_client_last_completed_timestamp(&self) -> Timestamp {
         self.last_completed_timestamp() + self.config.lag_compensation_frame_count()
-    }
-
-    pub fn update_timestamp(&mut self, seconds_since_startup: f64) {
-        let timestamp =
-            Timestamp::from_seconds(seconds_since_startup, self.config.timestep_seconds)
-                - self.config.lag_compensation_frame_count();
-        info!(
-            "Updating server world timestamp to {:?} (note: lag compensation frame count = {})",
-            timestamp,
-            self.config.lag_compensation_frame_count()
-        );
-        self.timekeeping_simulation
-            .reset_last_completed_timestamp(timestamp);
     }
 
     fn apply_validated_command<NetworkResourceType: NetworkResource>(

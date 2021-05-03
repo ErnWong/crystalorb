@@ -106,20 +106,22 @@ impl MockClientServer {
     pub fn new(config: Config) -> MockClientServer {
         let (server_net, (client_1_net, client_2_net)) =
             MockNetwork::new_mock_network::<MockWorld>();
+
+        // Start quarterway to avoid aliasing/precision issues.
+        // Note: not halfway, since that is the threshold for timestamp drift.
+        let clock_initial = config.timestep_seconds * 0.25;
+
         MockClientServer {
             config: config.clone(),
             client_1: Client::<MockWorld>::new(config.clone()),
             client_2: Client::<MockWorld>::new(config.clone()),
-            server: Server::<MockWorld>::new(config.clone()),
+            server: Server::<MockWorld>::new(config.clone(), clock_initial),
             server_net,
             client_1_net,
             client_2_net,
             client_1_clock_offset: 0.0,
             client_2_clock_offset: 0.0,
-
-            // Start quarterway to avoid aliasing/precision issues.
-            // Note: not halfway, since that is the threshold for timestamp drift.
-            clock: config.timestep_seconds * 0.25,
+            clock: clock_initial,
         }
     }
 

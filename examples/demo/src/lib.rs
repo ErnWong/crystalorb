@@ -456,7 +456,7 @@ pub enum CommsChannel {
 #[wasm_bindgen]
 impl Demo {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
+    pub fn new(seconds_since_startup: f64) -> Self {
         let config = Config {
             timestep_seconds: TIMESTEP,
             //snapshot_send_period: 0.3,
@@ -468,7 +468,7 @@ impl Demo {
             MockNetwork::new_mock_network::<DemoWorld>();
         Self {
             server: NetworkedServer {
-                server: Server::new(config.clone()),
+                server: Server::new(config.clone(), seconds_since_startup),
                 network: server_network,
             },
             client_left: NetworkedClient {
