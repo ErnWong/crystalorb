@@ -20,6 +20,7 @@ use tracing::{debug, error, trace, warn};
 /// This is the top-level structure of CrystalOrb for your game server, analogous to the
 /// [`Client`](crate::client::Client) for game clients. You create, store, and update this server
 /// instance to run your game on the server side.
+#[derive(Debug)]
 pub struct Server<WorldType: World> {
     timekeeping_simulation: TimeKeeper<
         WorldSimulation<WorldType, { InitializationType::PreInitialized }>,

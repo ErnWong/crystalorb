@@ -68,6 +68,7 @@ use tracing::{debug, info, trace, warn};
 /// This is the top-level structure of CrystalOrb for your game client, analogous to the
 /// [`Server`](crate::server::Server) for game servers. You create, store, and update this client
 /// instance to run your game on the client side.
+#[derive(Debug)]
 pub struct Client<WorldType: World> {
     config: Config,
     state: Option<ClientState<WorldType>>,
@@ -253,6 +254,7 @@ impl<WorldType: World> Client<WorldType> {
 /// depending on what stage the [`Client`] is at.
 ///
 /// TODO: This is probably best if renamed to "stage" to avoid confusion.
+#[derive(Debug)]
 pub enum ClientState<WorldType: World> {
     /// In this first stage, the [`Client`] tries to figure out the clock differences between the
     /// local machine and the server machine. The [`Client`] collects a handful of "clock offset"
@@ -278,6 +280,7 @@ pub enum ClientState<WorldType: World> {
 }
 
 /// The client interface while the client is in the initial clock syncing stage.
+#[derive(Debug)]
 pub struct SyncingClockClient(ClockSyncer);
 
 impl SyncingClockClient {
@@ -294,6 +297,7 @@ impl SyncingClockClient {
 }
 
 /// The client interface while the client is in the initial state syncing stage.
+#[derive(Debug)]
 pub struct SyncingInitialStateClient<WorldType: World>(ActiveClient<WorldType>);
 
 impl<WorldType: World> SyncingInitialStateClient<WorldType> {
@@ -311,6 +315,7 @@ impl<WorldType: World> SyncingInitialStateClient<WorldType> {
 }
 
 /// The client interface once the client is in the "ready" stage.
+#[derive(Debug)]
 pub struct ReadyClient<WorldType: World>(ActiveClient<WorldType>);
 
 impl<WorldType: World> ReadyClient<WorldType> {
@@ -411,6 +416,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
     }
 }
 
+#[derive(Debug)]
 struct ActiveClient<WorldType: World> {
     clocksyncer: ClockSyncer,
 
@@ -560,6 +566,7 @@ impl Display for FastforwardingHealth {
     }
 }
 
+#[derive(Debug)]
 struct ClientWorldSimulations<WorldType: World> {
     /// The next server snapshot that needs applying after the current latest snapshot has been
     /// fully interpolated into.

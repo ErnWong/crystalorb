@@ -17,7 +17,7 @@ use tracing::trace;
 /// [`World`]. There is nothing stopping you from making the [`DisplayState`] the same structure as
 /// the [`World`] if it makes more sense for your game, but most of the time, the [`World`]
 /// structure may contain things that are inefficient to copy around (e.g. an entire physics engine)
-pub trait DisplayState: Send + Sync + Clone {
+pub trait DisplayState: Send + Sync + Clone + Debug {
     /// CrystalOrb needs to mix different [`DisplayState`]s from different [`World`]s together, as
     /// well as mix [`DisplayState`] from two adjacent timestamps. The
     /// [`from_interpolation`](DisplayState::from_interpolation) method tells CrystalOrb how to
@@ -213,6 +213,7 @@ pub(crate) enum InitializationType {
 
 /// A "wrapper" for your [`World`] that is equipped with a `CommandBuffer`. This is responsible
 /// for applying the correct commands at the correct time while running your [`World`] simulation.
+#[derive(Debug)]
 pub(crate) struct WorldSimulation<WorldType: World, const INITIALIZATION_TYPE: InitializationType> {
     world: WorldType,
     command_buffer: CommandBuffer<WorldType::CommandType>,

@@ -5,6 +5,7 @@
 #![feature(generic_associated_types)]
 #![deny(missing_docs)]
 #![doc = include_str!("../README.markdown")]
+#![deny(missing_debug_implementations)]
 
 pub mod client;
 pub mod clocksync;
@@ -19,7 +20,7 @@ pub mod world;
 /// Represent how to calculate the current client display state based on the simulated undershot
 /// and overshot frames (since the two frames closest to the current time may not exactly line up
 /// with the current time).
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TweeningMethod {
     /// Use the undershot frame if the simulated frames don't exactly line up to the current time.
     /// This is equivalent to linearly interpolating between the undershot and overshot frame, but
@@ -62,7 +63,7 @@ impl TweeningMethod {
 ///
 /// let client = Client::<DemoWorld>::new(Config::new());
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
     /// Maximum amount of client lag in seconds that the server will compensate for.
     /// A higher number allows a client with a high ping to be able to perform actions

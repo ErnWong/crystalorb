@@ -1,4 +1,5 @@
 /// Like a circular buffer of size 2, aka a double buffer.
+#[derive(Debug)]
 pub struct OldNew<T>
 where
     T: Default,
@@ -8,11 +9,13 @@ where
     state: OldNewState,
 }
 
+#[derive(Debug)]
 pub enum OldNewState {
     LeftOldRightNew,
     LeftNewRightOld,
 }
 
+#[derive(Debug)]
 pub struct OldNewResult<T> {
     pub old: T,
     pub new: T,

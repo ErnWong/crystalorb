@@ -50,6 +50,7 @@ pub struct ClockSyncMessage {
 /// is calculated, and a rolling average (ignoring outliers) of these samples is used to update the
 /// effective clock offset that is used by the client once the effective clock offset deviates too
 /// far from the rolling average.
+#[derive(Debug)]
 pub(crate) struct ClockSyncer {
     /// The difference in seconds between client's seconds_since_startup and server's
     /// seconds_since_startup, where a positive value refers that an earlier client time value

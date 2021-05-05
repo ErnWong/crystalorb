@@ -29,7 +29,7 @@ pub(crate) trait FixedTimestepper: Stepper {
 
 /// The method for [TimeKeeper] to decide the last step to call as part of an
 /// [update](TimeKeeper::update) call.
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub(crate) enum TerminationCondition {
     /// [TimeKeeper::update] will stop on or just before the target time. As a result, the internal
     /// overshoot counter will always be zero or negative.
@@ -76,6 +76,7 @@ impl TerminationCondition {
 /// up with the external clock. You can call [TimeKeeper::update] at a framerate different to the
 /// internal stepper's fixed timestep, and the [TimeKeeper] will execute an appropriate number of
 /// steps on the stepper to meet the external framerate as close as possible.
+#[derive(Debug)]
 pub(crate) struct TimeKeeper<T: FixedTimestepper, const TERMINATION_CONDITION: TerminationCondition>
 {
     /// The stepper whose time is managed by this [TimeKeeper].

@@ -40,7 +40,7 @@ pub trait Command: Clone + Sync + Send + 'static + Serialize + DeserializeOwned 
 /// timestamps centered around the current timestamp, or else the command timestamps would be too
 /// far about and [wouldn't be
 /// comparable](crate::timestamp::Timestamp::comparable_range_with_midpoint).
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct CommandBuffer<CommandType: Command> {
     map: BTreeMap<Reverse<Timestamp>, Vec<CommandType>>,
     timestamp: Timestamp,
