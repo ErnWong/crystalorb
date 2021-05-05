@@ -1,3 +1,12 @@
+//! This module houses the structures that are specific to the management of a CrystalOrb game
+//! server.
+//!
+//! The [`Server`] structure is what you create, store, and update, analogous to the
+//! [`Client`](crate::client::Client) structure. Unlike the [`Client`](crate::client::Client), the
+//! [`Server`] does not need a "loading" stage, and can be used directly after creation.
+//!
+//! The interface shares some similarities with the [`ReadyClient`](crate::client::ReadyClient).
+
 use crate::{
     clocksync::ClockSyncMessage,
     fixed_timestepper::{FixedTimestepper, TerminationCondition, TimeKeeper},
@@ -8,6 +17,9 @@ use crate::{
 };
 use tracing::{debug, error, trace, warn};
 
+/// This is the top-level structure of CrystalOrb for your game server, analogous to the
+/// [`Client`](crate::client::Client) for game clients. You create, store, and update this server
+/// instance to run your game on the server side.
 pub struct Server<WorldType: World> {
     timekeeping_simulation: TimeKeeper<
         WorldSimulation<WorldType, { InitializationType::PreInitialized }>,
@@ -18,6 +30,8 @@ pub struct Server<WorldType: World> {
 }
 
 impl<WorldType: World> Server<WorldType> {
+    /// Constructs a new [`Server`]. This function requires a `seconds_since_startup` parameter to
+    /// initialize the server's simulation timestamp.
     pub fn new(config: Config, seconds_since_startup: f64) -> Self {
         let mut server = Self {
             timekeeping_simulation: TimeKeeper::new(Default::default(), config.clone()),
@@ -35,16 +49,23 @@ impl<WorldType: World> Server<WorldType> {
         server
     }
 
+    /// The timestamp of the most recent frame that has completed its simulation.
+    /// This is typically one less than [`Server::simulating_timestamp`].
     pub fn last_completed_timestamp(&self) -> Timestamp {
         self.timekeeping_simulation.last_completed_timestamp()
     }
 
+    /// The timestamp of the frame that is *in the process* of being simulated.
+    /// This is typically one more than [`Server::simulating_timestamp`].
     pub fn simulating_timestamp(&self) -> Timestamp {
         self.timekeeping_simulation.simulating_timestamp()
     }
 
     /// The timestamp that clients are supposed to be simulating at the moment (which should always
     /// be ahead of the server to compensate for the latency between the server and the clients).
+    ///
+    /// This is also the timestamp that gets attached to the command when you call
+    /// [`Server::issue_command`].
     pub fn estimated_client_simulating_timestamp(&self) -> Timestamp {
         self.simulating_timestamp() + self.config.lag_compensation_frame_count()
     }
@@ -112,18 +133,23 @@ impl<WorldType: World> Server<WorldType> {
         );
     }
 
+    /// Iterate through the commands that are being kept around. This is intended to be for
+    /// diagnostic purposes.
     pub fn buffered_commands(
         &self,
     ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {
         self.timekeeping_simulation.buffered_commands()
     }
 
+    /// Get the current display state of the server's world.
     pub fn display_state(&self) -> Timestamped<WorldType::DisplayStateType> {
         self.timekeeping_simulation
             .display_state()
             .expect("Server simulation does not need initialization")
     }
 
+    /// Perform the next update. You would typically call this in your game engine's update loop of
+    /// some kind.
     pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
         delta_seconds: f64,

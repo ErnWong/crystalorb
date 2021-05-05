@@ -1,14 +1,17 @@
+#![feature(extended_key_value_attributes)]
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(map_first_last)]
 #![feature(const_generics)]
 #![feature(generic_associated_types)]
+#![deny(missing_docs)]
+#![doc = include_str!("../README.markdown")]
 
 pub mod client;
 pub mod clocksync;
 pub mod command;
 pub mod fixed_timestepper;
 pub mod network_resource;
-pub mod old_new;
+pub(crate) mod old_new;
 pub mod server;
 pub mod timestamp;
 pub mod world;
@@ -46,6 +49,19 @@ impl TweeningMethod {
     }
 }
 
+/// Configuration parameters that tweak how CrystlOrb works.
+///
+/// For starters, you can just pass in the default values when you are creating the
+/// [`client::Client`] and [`server::Server`] instances.
+///
+/// # Example
+///
+/// ```
+/// use crystalorb::{Config, client::Client};
+/// use crystalorb_demo::DemoWorld;
+///
+/// let client = Client::<DemoWorld>::new(Config::new());
+/// ```
 #[derive(Clone)]
 pub struct Config {
     /// Maximum amount of client lag in seconds that the server will compensate for.
@@ -64,6 +80,13 @@ pub struct Config {
     /// worlds in `interpolation_latency` seconds.
     pub interpolation_latency: f64,
 
+    /// The number of seconds that gets simulated with every [`World`](world::World)
+    /// [`step`](fixed_timestepper::Stepper). This is the physics simulation "dt". This can be
+    /// different to the `delta_seconds` between each
+    /// [`Client::update`](client::Client::update)/[`Server::update`](server::Server::update) call.
+    /// For more accurate and predictable physics simulations, you may want to have a smaller
+    /// `timestep_seconds`. If your physics simulation is computationally intensive, you may want
+    /// to have a larger `timestep_seconds`.
     pub timestep_seconds: f64,
 
     /// The number of of clock sync responses from the server before the client averages them
@@ -81,19 +104,45 @@ pub struct Config {
     /// represented as the number of seconds before sending the next request.
     pub clock_sync_request_period: f64,
 
-    /// How big the difference needs to be between the following two before updating:
-    /// (1) the server clock offset value that the client is currently using for its
-    /// calculations, compared with
-    /// (2) the current rolling average server clock offset that was measured using clock_sync
-    /// messages,
+    /// How big the difference needs to be between the following two:
+    /// 1. the server clock offset value that the client is currently using for its
+    ///    calculations, compared with
+    /// 2. the current rolling average server clock offset that was measured using clock_sync
+    ///    messages,
+    /// before updating the clients.
     pub max_tolerable_clock_deviation: f64,
 
+    /// How many seconds to wait before the server sends another snapshot out to the clients. The
+    /// smaller this number, the higher the network traffic, but the sooner the client gets to
+    /// correctly apply other clients' commands at the correct timestmp. Regarding the latter
+    /// point, this is because commands take time to travel between clients, and by the time a
+    /// client receives another client's command, the command's intended timestamp would have
+    /// already been passed. The client can't rewind the world to reapply the command at the
+    /// intended timestamp, so the best thing it can do is to apply at the current timestamp, and
+    /// wait until the next server snapshot before finally applying the command at the intended
+    /// timestamp during the snapshot fastforwarding process.
     pub snapshot_send_period: f64,
 
+    /// This is the limit that CrystalOrb enforces to limit the number of times that the
+    /// [`World`](world::World)'s [`step`](crate::fixed_timestepper::Stepper::step) function gets
+    /// called per rendering frame (i.e. per [`Client::update`](crate::client::Client::update) or
+    /// [`Server::update`](crate::server::Server::update)). This is to prevent a catastrophic
+    /// situation where CrystalOrb could not keep up in one rendering frame, and making it worse in
+    /// the next frame, and subsequently "freezing" up in a positive feedback loop.
     pub update_delta_seconds_max: f64,
 
+    /// Due to floating-point rounding errors and due to the `update_delta_seconds_max` limit
+    /// that CrystalOrb enforces, the simulation [`Timestamp`](timestamp::Timestamp) might
+    /// slowly drift away from the intended value according to the system clock (which is a way
+    /// to make sure that different clients on different machines stay in sync in terms of time). When this time drift is small, CrystalOrb can compensate it in the next update by running extra simulation frames or some fewer frames than usual. However, if the timestamp drift becomes too large, it is not possible to correct all of this drift in one update using this method, and instead we need to perform a "time-skip" without running the corresponding simulation steps. The threshold for this drift before we start skipping some simulation frames is defined by this configuration parameter.
+    ///
+    /// Large timestamp drifts could happen when, for example, the game client has some system
+    /// lag. If the game client is hosted in the web browser, for exmple, then large timestamp
+    /// drifts can occur when the browser tab goes out of focus and sleeps. Large timestamp
+    /// drifts can also occur on the laptop when the computer enters sleep mode, etc.
     pub timestamp_skip_threshold_seconds: f64,
 
+    /// When the [`Client`](client::Client) receives a [`Snapshot`](world::World::SnapshotType) from the [`Server`](server::Server), the snapshot is going to have a timestamp older than the current client simulation timestamp. Before the snapshot can be blended into the client, it needs to fastforwarded to the current timestamp by running more simulation frmes on the snapshot than on the world that is currently displayed on the client. This configuration parameter specifies how much faster the snapshot can be simulated compared with the existing client world during the fastforwarding process. A value of `2`, for example, would represent that the received server snapshot could only run at most `2` simulation steps every time the existing client world runs one step. In this scenario, if the server snapshot is `10` frames behind the client, then it would take `10` client frames before the server snapshot ctches up with the client.
     pub fastforward_max_per_step: usize,
 
     /// In crystalorb, the physics simulation is assumed to be running at a fixed timestep that is
@@ -104,6 +153,51 @@ pub struct Config {
 }
 
 impl Config {
+    /// Returns a set of useable default configuration parameters.
+    ///
+    /// # Examples
+    ///
+    /// If you want to use the defaults:
+    ///
+    /// ```
+    /// use crystalorb::{Config, client::Client};
+    /// use crystalorb_demo::DemoWorld;
+    ///
+    /// let client = Client::<DemoWorld>::new(Config::new());
+    /// ```
+    ///
+    /// If you want to override the defaults:
+    ///
+    /// ```
+    /// use crystalorb::{Config, client::Client};
+    /// use crystalorb_demo::DemoWorld;
+    /// let client = Client::<DemoWorld>::new(Config {
+    ///     lag_compensation_latency: 0.5,
+    ///     ..Config::new()
+    /// });
+    /// ```
+    ///
+    /// You can use Default::defult() too:
+    ///
+    /// ```
+    /// use crystalorb::{Config, client::Client};
+    /// use crystalorb_demo::DemoWorld;
+    /// let client = Client::<DemoWorld>::new(Config {
+    ///     lag_compensation_latency: 0.5,
+    ///     ..Default::default()
+    /// });
+    /// ```
+    ///
+    /// Note that this is a constant function, so you can initialize your configuration as a
+    /// constant.
+    ///
+    /// ```
+    /// use crystalorb::Config;
+    /// const CONFIG: Config = Config {
+    ///     timestep_seconds: 1.0 / 24.0,
+    ///     ..Config::new()
+    /// };
+    /// ```
     pub const fn new() -> Self {
         Self {
             lag_compensation_latency: 0.3,
@@ -121,17 +215,22 @@ impl Config {
         }
     }
 
-    pub fn lag_compensation_frame_count(&self) -> i16 {
+    /// Re-expresses the amount of lag to compensate in terms of number of frames at the prescribed
+    /// timestep.
+    pub(crate) fn lag_compensation_frame_count(&self) -> i16 {
         (self.lag_compensation_latency / self.timestep_seconds).round() as i16
     }
 
-    pub fn interpolation_progress_per_frame(&self) -> f64 {
+    /// Re-expresses the speed of blending the server snapshot in terms of the amount that the
+    /// interpolation parameter `t` needs to be incremented on each step.
+    /// TODO: Rename to blending to avoid confusion
+    pub(crate) fn interpolation_progress_per_frame(&self) -> f64 {
         self.timestep_seconds / self.interpolation_latency
     }
 
     /// The number of samples N so that, before we calculate the rolling average, we skip the N
     /// lowest and N highest samples.
-    pub fn clock_sync_samples_to_discard_per_extreme(&self) -> usize {
+    pub(crate) fn clock_sync_samples_to_discard_per_extreme(&self) -> usize {
         (self.clock_sync_needed_sample_count as f64 * self.clock_sync_assumed_outlier_rate / 2.0)
             .max(1.0)
             .ceil() as usize
@@ -139,7 +238,7 @@ impl Config {
 
     /// The total number of samples that need to be kept in the ring buffer, so that, after
     /// discarding the outliers, there is enough samples to calculate the rolling average.
-    pub fn clock_sync_samples_needed_to_store(&self) -> usize {
+    pub(crate) fn clock_sync_samples_needed_to_store(&self) -> usize {
         self.clock_sync_needed_sample_count + self.clock_sync_samples_to_discard_per_extreme() * 2
     }
 }

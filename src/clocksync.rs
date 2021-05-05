@@ -1,3 +1,13 @@
+//! The `clocksync` module is responsible for managing the difference between the clocks on the
+//! local and remote machine (aka client and server clocks), and for the client to estimate the
+//! server's local time.
+//!
+//! The design of this module is currently suboptimal and could be improved:
+//! - Only the client-side clocksyncing logic is located here. The server-side logic is located in
+//!   the [`Server`](crate::server::Server) itself.
+//! - This clocksync module serves double duty for also informing the client which `client_id` has
+//!   been allocated to this client by the server.
+
 use crate::{
     network_resource::{Connection, NetworkResource},
     Config,
@@ -6,10 +16,30 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use tracing::{info, trace, warn};
 
+/// A message sent between client and server to measure the number of seconds difference between
+/// the clocks of the two machines.
+///
+/// 1. The client first sends this structure to the server, ignoring the
+///    `server_seconds_since_startup` and `client_id` fields. The
+///    `client_send_seconds_since_startup` records the client's local time that this message was
+///    prepared and sent.
+/// 2. The server sends back this structure to the client, preserving the same
+///    `client_send_seconds_since_startup` value as it received, but populating the remaining
+///    `client_id` and `server_seconds_since_startup` values. The `server_seconds_since_startup` is
+///    the server's local time at which it prepared and sent this message back to the client.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClockSyncMessage {
+    /// The time (in seconds) when the client side sends this `ClockSyncMessage` request to the
+    /// server.
     pub client_send_seconds_since_startup: f64,
+
+    /// The time (in seconds) when the server side sends this `ClockSyncMessage` back to the client
+    /// as a reply to the client's request.
     pub server_seconds_since_startup: f64,
+
+    /// The `client_id` that shouldn't really belong here, but is tagging along for the ride. This
+    /// is set by the server as part of the server's reply as well, and is set to the identifier
+    /// that the server has allocated for the client that has made the request.
     pub client_id: usize,
 }
 
@@ -20,7 +50,7 @@ pub struct ClockSyncMessage {
 /// is calculated, and a rolling average (ignoring outliers) of these samples is used to update the
 /// effective clock offset that is used by the client once the effective clock offset deviates too
 /// far from the rolling average.
-pub struct ClockSyncer {
+pub(crate) struct ClockSyncer {
     /// The difference in seconds between client's seconds_since_startup and server's
     /// seconds_since_startup, where a positive value refers that an earlier client time value
     /// corresponds to the same instant as a later server time value. Since servers start
@@ -42,6 +72,10 @@ pub struct ClockSyncer {
 }
 
 impl ClockSyncer {
+    /// Create a new [`ClockSyncer`] with the given configuration parameters. The [`ClockSyncer`]
+    /// will start off in a ["not ready" state](ClockSyncer::is_ready) until after multiple
+    /// [`update`](ClockSyncer::update) calls. During the time when the [`ClockSyncer`] is not
+    /// ready, some of the methods may return `None` as documented.
     pub fn new(config: Config) -> Self {
         Self {
             server_seconds_offset: None,
@@ -52,6 +86,8 @@ impl ClockSyncer {
         }
     }
 
+    /// Perform the next update, where the [`ClockSyncer`] tries to gather more information about
+    /// the client-server clock differences and makes adjustments when needed.
     pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
         delta_seconds: f64,
@@ -97,14 +133,23 @@ impl ClockSyncer {
         }
     }
 
+    /// Whether the [`ClockSyncer`] has enough information to make useful estimates.
+    ///
+    /// It is guaranteed that once the [`ClockSyncer`] becomes "ready", it stays "ready".
+    ///
+    /// TODO: Enforce this invariant.
     pub fn is_ready(&self) -> bool {
         self.server_seconds_offset.is_some() && self.client_id.is_some()
     }
 
+    /// How many measurement samples the [`ClockSyncer`] has collected and currently stored.
+    /// Previously collected samples that have since then been discarded are not counted. This
+    /// merely counts the number of samples in the current moving window.
     pub fn sample_count(&self) -> usize {
         self.server_seconds_offset_samples.len()
     }
 
+    /// How many samples are needed to start making useful estimates.
     pub fn samples_needed(&self) -> usize {
         self.config.clock_sync_samples_needed_to_store()
     }

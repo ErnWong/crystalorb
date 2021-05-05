@@ -27,7 +27,7 @@ use wasm_bindgen::prelude::*;
 const GRAVITY: Vector2<Real> = Vector2::new(0.0, -9.81 * 30.0);
 const TIMESTEP: f64 = 1.0 / 64.0;
 
-struct DemoWorld {
+pub struct DemoWorld {
     pipeline: PhysicsPipeline,
     broad_phase: BroadPhase,
     narrow_phase: NarrowPhase,
@@ -40,14 +40,14 @@ struct DemoWorld {
     doodad: Player,
 }
 
-struct Player {
+pub struct Player {
     body_handle: RigidBodyHandle,
     collider_handle: ColliderHandle,
     input: PlayerInput,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
-struct PlayerInput {
+pub struct PlayerInput {
     jump: bool,
     left: bool,
     right: bool,
@@ -111,14 +111,14 @@ pub enum PlayerCommand {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct DemoSnapshot {
+pub struct DemoSnapshot {
     player_left: PlayerSnapshot,
     player_right: PlayerSnapshot,
     doodad: PlayerSnapshot,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct PlayerSnapshot {
+pub struct PlayerSnapshot {
     position: Isometry<Real>,
     linvel: Vector2<Real>,
     angvel: Real,
@@ -126,7 +126,7 @@ struct PlayerSnapshot {
 }
 
 #[wasm_bindgen]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DemoDisplayState {
     player_left_position: Isometry<Real>,
     player_right_position: Isometry<Real>,

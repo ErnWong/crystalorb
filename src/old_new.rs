@@ -39,13 +39,6 @@ where
         }
     }
 
-    pub fn set_old(&mut self, value: T) {
-        match &self.state {
-            OldNewState::LeftNewRightOld => self.right = value,
-            OldNewState::LeftOldRightNew => self.left = value,
-        }
-    }
-
     pub fn set_new(&mut self, value: T) {
         match &self.state {
             OldNewState::LeftNewRightOld => self.left = value,

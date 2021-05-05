@@ -1,7 +1,13 @@
+//! The set of traits that need to be implemented to tell CrystalOrb how to use your external
+//! networking library to send and receive messages.
+
 use serde::{de::DeserializeOwned, Serialize};
 use std::{error::Error, fmt::Debug};
 
-/// Used for identifying each connection.
+/// Used for identifying each connection. Note that this is how the
+/// [`Server`](crate::server::Server) determines the
+/// [`client_id`](crate::client::ReadyClient::client_id) for each client, so they should be unique
+/// among all clients that is or has once connected during the server's uptime.
 pub type ConnectionHandleType = usize;
 
 /// CrystalOrb needs an external networking library before it can be used. Such networking library
@@ -27,6 +33,10 @@ pub type ConnectionHandleType = usize;
 /// [crystalorb-bevy-networking-turbulence](https://github.com/ErnWong/crystalorb/tree/crates/crystalorb-bevy-networking-turbulence)
 /// for an example for integrating with bevy_networking_turbulence.
 pub trait NetworkResource {
+    /// The [`Connection`] structure that CrystalOrb will use to send/receive messages from a
+    /// specific remote machine. This may probably be a wrapper to a mutable reference to some
+    /// connection type that is used by your external networking library of choice, in which
+    /// case a generic lifetime parameter is provided here that you can use.
     type ConnectionType<'a>: Connection;
 
     /// Iterate through the available connections. For servers, this would be the list of current

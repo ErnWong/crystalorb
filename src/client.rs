@@ -1,3 +1,57 @@
+//! This module houses the structures that are specific to the management of a CrystalOrb game
+//! client.
+//!
+//! The [`Client`] structure is what you create, store, and update, analogous to the
+//! [`Server`](crate::server::Server) structure. The other structures in this module are what you
+//! access indirectly through your [`Client`] to get additional functionality, depending on what
+//! loading stage the [`Client`] is at (via [`Client::state`] or [`Client::state_mut`]).
+//!
+//! For the majority of the time, you would probably want to access the [`ReadyClient`] in order
+//! to:
+//!
+//! - [issue commands](ReadyClient::issue_command)
+//!     ```
+//!     use crystalorb::{Config, client::{Client, ClientState}};
+//!     use crystalorb_demo::{DemoWorld, DemoCommand, PlayerSide, PlayerCommand};
+//!     use crystalorb_mock_network::MockNetwork;
+//!
+//!     // Using a mock network as an example...
+//!     let (_, (mut network, _)) =
+//!         MockNetwork::new_mock_network::<DemoWorld>();
+//!
+//!     let mut client = Client::<DemoWorld>::new(Config::new());
+//!
+//!     // ...later on in your update loop, in response to a player input...
+//!
+//!     if let ClientState::Ready(ready_client) = client.state_mut() {
+//!         let command = DemoCommand::new(PlayerSide::Left, PlayerCommand::Jump, true);
+//!         ready_client.issue_command(command, &mut network);
+//!     }
+//!     ```
+//! - and [get the display
+//! state](ReadyClient::display_state) to render on the screen.
+//!     ```
+//!     use crystalorb::{
+//!         Config,
+//!         client::{Client, ClientState},
+//!         world::DisplayState,
+//!     };
+//!     use crystalorb_demo::{DemoWorld, DemoDisplayState};
+//!
+//!     fn render(display_state: &DemoDisplayState) {
+//!         // [Your game rendering code]
+//!         println!("{:?}", display_state);
+//!     }
+//!
+//!     let client = Client::<DemoWorld>::new(Config::new());
+//!
+//!     // ...later on in your update loop...
+//!
+//!     if let ClientState::Ready(ready_client) = client.state() {
+//!         render(ready_client.display_state().display_state());
+//!     }
+//!     ```
+
 use crate::{
     clocksync::ClockSyncer,
     command::CommandBuffer,
@@ -11,12 +65,39 @@ use crate::{
 use std::fmt::{Display, Formatter};
 use tracing::{debug, info, trace, warn};
 
+/// This is the top-level structure of CrystalOrb for your game client, analogous to the
+/// [`Server`](crate::server::Server) for game servers. You create, store, and update this client
+/// instance to run your game on the client side.
 pub struct Client<WorldType: World> {
     config: Config,
     state: Option<ClientState<WorldType>>,
 }
 
 impl<WorldType: World> Client<WorldType> {
+    /// Constructs a new [`Client`].
+    ///
+    /// # Examples
+    ///
+    /// Using the default configuration parameters:
+    ///
+    /// ```
+    /// use crystalorb::{Config, client::Client};
+    /// use crystalorb_demo::DemoWorld;
+    ///
+    /// let client = Client::<DemoWorld>::new(Config::new());
+    /// ```
+    ///
+    /// Overriding some configuration parameter:
+    ///
+    /// ```
+    /// use crystalorb::{Config, client::Client};
+    /// use crystalorb_demo::DemoWorld;
+    ///
+    /// let client = Client::<DemoWorld>::new(Config {
+    ///     lag_compensation_latency: 0.5,
+    ///     ..Config::new()
+    /// });
+    /// ```
     pub fn new(config: Config) -> Self {
         Self {
             config: config.clone(),
@@ -26,6 +107,38 @@ impl<WorldType: World> Client<WorldType> {
         }
     }
 
+    /// Perform the next update for the current rendering frame. You would typically call this in
+    /// your game engine's update loop of some kind.
+    ///
+    /// # Examples
+    ///
+    /// Here is how one might call [`Client::update`] outside of any game engine:
+    ///
+    /// ```
+    /// use crystalorb::{Config, client::Client};
+    /// use crystalorb_demo::DemoWorld;
+    /// use crystalorb_mock_network::MockNetwork;
+    /// use std::time::Instant;
+    ///
+    /// // Using a mock network as an example...
+    /// let (_, (mut network, _)) =
+    ///    MockNetwork::new_mock_network::<DemoWorld>();
+    ///
+    /// let mut client = Client::<DemoWorld>::new(Config::new());
+    /// let startup_time = Instant::now();
+    /// let mut previous_time = Instant::now();
+    ///
+    /// loop {
+    ///     let current_time = Instant::now();
+    ///     let delta_seconds = current_time.duration_since(previous_time).as_secs_f64();
+    ///     let seconds_since_startup = current_time.duration_since(startup_time).as_secs_f64();
+    ///
+    ///     client.update(delta_seconds, seconds_since_startup, &mut network);
+    ///
+    ///     // ...Other update code omitted...
+    ///     # break;
+    /// }
+    /// ```
     pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
         delta_seconds: f64,
@@ -71,56 +184,154 @@ impl<WorldType: World> Client<WorldType> {
         }
     }
 
+    /// Get the current state/stage ("state" as in "state machine", not "simulation state") of the [`Client`], which provides access to extra functionality
+    /// depending on what state/stage it is currently in.
+    ///
+    /// # Example
+    ///
+    /// To check on the client's progress at connecting with the server, you can check the number
+    /// of clocksync samples during the client's [`SyncingClock`](ClientState::SyncingClock)
+    /// state:
+    ///
+    /// ```
+    /// use crystalorb::{Config, client::{Client, ClientState}};
+    /// use crystalorb_demo::DemoWorld;
+    ///
+    /// let client = Client::<DemoWorld>::new(Config::new());
+    ///
+    /// // ...Later on...
+    ///
+    /// if let ClientState::SyncingClock(syncing_clock_client) = client.state() {
+    ///     println!(
+    ///         "Connection progress: {}%",
+    ///         syncing_clock_client.sample_count() as f64
+    ///             / syncing_clock_client.samples_needed() as f64 * 100.0
+    ///     );
+    /// }
+    /// ```
+    ///
+    /// TODO: This is probably best if renamed to "stage" to avoid confusion.
     pub fn state(&self) -> &ClientState<WorldType> {
         self.state.as_ref().unwrap()
     }
 
+    /// Get the current state/stage ("state" as in "state machine", not "simulation state") of the [`Client`], which provides access to extra functionality
+    /// depending on what state/stage it is currently in.
+    ///
+    /// # Example
+    ///
+    /// To issue a command, you'll need to access the client in its [`Ready`](ClientState::Ready)
+    /// state:
+    ///
+    /// ```
+    /// use crystalorb::{Config, client::{Client, ClientState}};
+    /// use crystalorb_demo::{DemoWorld, DemoCommand, PlayerSide, PlayerCommand};
+    /// use crystalorb_mock_network::MockNetwork;
+    ///
+    /// // Using a mock network as an example...
+    /// let (_, (mut network, _)) =
+    ///    MockNetwork::new_mock_network::<DemoWorld>();
+    ///
+    /// let mut client = Client::<DemoWorld>::new(Config::new());
+    ///
+    /// // ...Later on...
+    ///
+    /// if let ClientState::Ready(ready_client) = client.state_mut() {
+    ///     let command = DemoCommand::new(PlayerSide::Left, PlayerCommand::Jump, true);
+    ///     ready_client.issue_command(command, &mut network);
+    /// }
+    /// ```
+    ///
+    /// TODO: This is probably best if renamed to "stage_mut" to avoid confusion.
     pub fn state_mut(&mut self) -> &mut ClientState<WorldType> {
         self.state.as_mut().unwrap()
     }
 }
 
+/// The [`Client`] undergoes several stages of initialization before it is ready to accept commands
+/// and be displayed to the player's screen. This enum provides access to different functionality
+/// depending on what stage the [`Client`] is at.
+///
+/// TODO: This is probably best if renamed to "stage" to avoid confusion.
 pub enum ClientState<WorldType: World> {
+    /// In this first stage, the [`Client`] tries to figure out the clock differences between the
+    /// local machine and the server machine. The [`Client`] collects a handful of "clock offset"
+    /// samples until it reaches the amount needed to make a good estimate. This timing difference
+    /// is necessary so that the [`Client`] can talk to the [`Server`](crate::server::Server) about
+    /// the timing of player commands and snapshots.
+    ///
+    /// You can observe the clock syncing progress by checking the [number of samples collected so
+    /// far](SyncingClockClient::sample_count) and comparing that number with the [number of
+    /// samples that are needed](SyncingClockClient::samples_needed).
     SyncingClock(SyncingClockClient),
+
+    /// The second stage is where the [`Client`] waits for the first
+    /// [`Server`](crate::server::Server) [snapshot](World::SnapshotType) to arrive, fastforwarded,
+    /// and generally be fully processed through the client pipeline so that it can be shown on the
+    /// screen, to flush out all the uninitialized simulation state.
     SyncingInitialState(SyncingInitialStateClient<WorldType>),
+
+    /// The third and final stage is where the [`Client`] is now ready for its [display
+    /// state](ReadyClient::display_state) to be shown onto the screen, and where the [`Client`] is
+    /// ready to accept commands from the user.
     Ready(ReadyClient<WorldType>),
 }
 
+/// The client interface while the client is in the initial clock syncing stage.
 pub struct SyncingClockClient(ClockSyncer);
 
 impl SyncingClockClient {
+    /// The number of clock offset samples collected so far.
     pub fn sample_count(&self) -> usize {
         self.0.sample_count()
     }
 
+    /// The number of clock offset samples needed to make a good estimate on the timing differences
+    /// between the client and the server.
     pub fn samples_needed(&self) -> usize {
         self.0.samples_needed()
     }
 }
 
+/// The client interface while the client is in the initial state syncing stage.
 pub struct SyncingInitialStateClient<WorldType: World>(ActiveClient<WorldType>);
 
 impl<WorldType: World> SyncingInitialStateClient<WorldType> {
+    /// The timestamp of the most recent frame that has completed its simulation.
+    /// This is typically one less than [`SyncingInitialStateClient::simulating_timestamp`].
     pub fn last_completed_timestamp(&self) -> Timestamp {
         self.0.last_completed_timestamp()
     }
 
+    /// The timestamp of the frame that is *in the process* of being simulated.
+    /// This is typically one more than [`SyncingInitialStateClient::simulating_timestamp`].
     pub fn simulating_timestamp(&self) -> Timestamp {
         self.0.simulating_timestamp()
     }
 }
 
+/// The client interface once the client is in the "ready" stage.
 pub struct ReadyClient<WorldType: World>(ActiveClient<WorldType>);
 
 impl<WorldType: World> ReadyClient<WorldType> {
+    /// The timestamp of the most recent frame that has completed its simulation.
+    /// This is typically one less than [`ReadyClient::simulating_timestamp`].
     pub fn last_completed_timestamp(&self) -> Timestamp {
         self.0.last_completed_timestamp()
     }
 
+    /// The timestamp of the frame that is *in the process* of being simulated.
+    /// This is typically one more than [`ReadyClient::simulating_timestamp`].
+    ///
+    /// This is also the timestamp that gets attached to the command when you call
+    /// [`ReadyClient::issue_command`].
     pub fn simulating_timestamp(&self) -> Timestamp {
         self.0.simulating_timestamp()
     }
 
+    /// A number that is used to identify the client among all the clients connected to the server.
+    /// This number may be useful, for example, to identify which piece of world state belongs to
+    /// which player.
     pub fn client_id(&self) -> usize {
         self.0
             .clocksyncer
@@ -142,12 +353,15 @@ impl<WorldType: World> ReadyClient<WorldType> {
         net.broadcast_message(command);
     }
 
+    /// Iterate through the commands that are being kept around. This is intended to be for
+    /// diagnostic purposes.
     pub fn buffered_commands(
         &self,
     ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {
         self.0.timekeeping_simulations.base_command_buffer.iter()
     }
 
+    /// Get the current display state that can be used to render the client's screen.
     pub fn display_state(&self) -> &Tweened<WorldType::DisplayStateType> {
         &self
             .0
@@ -197,7 +411,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
     }
 }
 
-pub struct ActiveClient<WorldType: World> {
+struct ActiveClient<WorldType: World> {
     clocksyncer: ClockSyncer,
 
     timekeeping_simulations:
@@ -270,6 +484,8 @@ impl<WorldType: World> ActiveClient<WorldType> {
         );
     }
 
+    /// Whether all the uninitialized state has been flushed out, and that the first display state
+    /// is available to be shown to the client's screen.
     pub fn is_ready(&self) -> bool {
         self.timekeeping_simulations.display_state.is_some()
     }
@@ -344,7 +560,7 @@ impl Display for FastforwardingHealth {
     }
 }
 
-pub struct ClientWorldSimulations<WorldType: World> {
+struct ClientWorldSimulations<WorldType: World> {
     /// The next server snapshot that needs applying after the current latest snapshot has been
     /// fully interpolated into.
     queued_snapshot: Option<Timestamped<WorldType::SnapshotType>>,

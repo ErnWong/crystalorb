@@ -1,3 +1,6 @@
+//! Contains traits for CrystalOrb to interface with your game physics world, along with internal
+//! structures that interfaces directly with your world.
+
 use crate::{
     command::{Command, CommandBuffer},
     fixed_timestepper::{FixedTimestepper, Stepper},
@@ -7,7 +10,34 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::Deref};
 use tracing::trace;
 
+/// The [`DisplayState`] represents the information about how to display the [`World`] at its
+/// current state. For example, while a [`World`] might contain information about player's position
+/// and velocities, some games may only need to know about the position to render it (unless
+/// you're doing some fancy motion-blur). You can think of a [`DisplayState`] as the "output" of a
+/// [`World`]. There is nothing stopping you from making the [`DisplayState`] the same structure as
+/// the [`World`] if it makes more sense for your game, but most of the time, the [`World`]
+/// structure may contain things that are inefficient to copy around (e.g. an entire physics engine)
 pub trait DisplayState: Send + Sync + Clone {
+    /// CrystalOrb needs to mix different [`DisplayState`]s from different [`World`]s together, as
+    /// well as mix [`DisplayState`] from two adjacent timestamps. The
+    /// [`from_interpolation`](DisplayState::from_interpolation) method tells CrystalOrb how to
+    /// perform this "mix" operation. Here, the `t` parameter is the interpolation parameter that
+    /// ranges between `0.0` and `1.0`, where `t = 0.0` represents the request to have 100% of
+    /// `state1` and 0% of `state2`, and where `t = 1.0` represents the request to have 0% of
+    /// `state1` and 100% of `state2`.
+    ///
+    /// A common operation to implement this function is through [linear
+    /// interpolation](https://en.wikipedia.org/wiki/Linear_interpolation), which looks like this:
+    ///
+    /// ```text
+    /// state1 * (1.0 - t) + state2 * t
+    /// ```
+    ///
+    /// However, for things involving rotation, you may need to use [spherical linear
+    /// interpolation](https://en.wikipedia.org/wiki/Slerp), or [circular
+    /// statistics](https://en.wikipedia.org/wiki/Mean_of_circular_quantities), and perhaps you may
+    /// need to convert between coordinate systems before/after performing the interpolation to get
+    /// the right transformations about the correct pivot points.
     fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self;
 }
 
@@ -28,6 +58,10 @@ impl<T: DisplayState> DisplayState for Timestamped<T> {
     }
 }
 
+/// This is the result when you interpolate/"blend"/"tween" between two [`DisplayState`]s of
+/// adjacent timestamps (similar to ["Inbetweening"](https://en.wikipedia.org/wiki/Inbetweening) in
+/// animation - the generation of intermediate frames). You get the [`DisplayState`] and a
+/// floating-point, non-whole-number timestamp.
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Tweened<T> {
     display_state: T,
@@ -35,10 +69,14 @@ pub struct Tweened<T> {
 }
 
 impl<T: DisplayState> Tweened<T> {
+    /// Get the resulting in-between [`DisplayState`].
     pub fn display_state(&self) -> &T {
         &self.display_state
     }
 
+    /// Get the "logical timestamp" that [`Tweened::display_state`] corresponds with. For
+    /// example, a `float_timestamp` of `123.4` represents the in-between frame that is 40% of
+    /// the way between frame `123` and frame `124`.
     pub fn float_timestamp(&self) -> f64 {
         self.timestamp
     }
@@ -52,7 +90,11 @@ impl<T: DisplayState> Deref for Tweened<T> {
 }
 
 impl<T: DisplayState> Tweened<T> {
-    pub fn from_interpolation(state1: &Timestamped<T>, state2: &Timestamped<T>, t: f64) -> Self {
+    pub(crate) fn from_interpolation(
+        state1: &Timestamped<T>,
+        state2: &Timestamped<T>,
+        t: f64,
+    ) -> Self {
         // Note: timestamps are in modulo arithmetic, so we need to work using the wrapped
         // difference value.
         let timestamp_difference: i16 = (state2.timestamp() - state1.timestamp()).into();
@@ -74,22 +116,91 @@ impl<T: DisplayState> From<Timestamped<T>> for Tweened<T> {
     }
 }
 
+/// Structures that implement the [`World`] trait are structures that are responsible for storing
+/// *and* simulating the game physics. The [`World`] is a simulation that is updated using its
+/// [`Stepper::step`] implementation. Players and any game logic outside of the physics simulation
+/// can interact with the physics simulation by applying [commands](Command) to the [`World`] (for
+/// example, a command to tell player 2's rigid body to jump, or a command to spawn a new player
+/// rigid body).
+///
+/// CrystalOrb needs two additional functionality for your world:
+/// (1) the ability to
+/// [create](World::snapshot) and [apply](World::apply_snapshot) [snapshots](World::SnapshotType)
+/// so that CrystalOrb can synchronize the states between the client and the server, and
+/// (2) the ability to [output](World::display_state) and [mix](DisplayState::from_interpolation)
+/// between the "display state" of the world.
+///
+/// # Conceptual examples with various physics engines
+///
+/// If you are using the [rapier physics
+/// engine](https://www.rapier.rs), then this [`World`] structure would contain things like the
+/// `PhysicsPipeline`, `BroadPhase`, `NarrowPhase`, `RigidBodySet`, `ColliderSet`, `JointSet`,
+/// `CCDSolver`, and any other pieces of game-specific state you need. The `Stepper::step` implementation
+/// for such a world would typically invoke `PhysicsPipeline::step`, as well as any other
+/// game-specific non-physics logic.
+///
+/// If you are using the [nphysics physics
+/// engine](https://www.nphysics.org), then this [`World`] structure would contain things like the
+/// `DefaultMechanicalWorld`, `DefaultGeometricalWorld`, `DefaultBodySet`, `DefaultColliderSet`,
+/// `DefaultJointConstraintSet`, and `DefaultForceGeneratorSet`, as well as any other pieces of
+/// game-specific state you need. The `Stepper::step` implementation for such a world would
+/// typically invoke `DefaultMechanicalWorld::step`, and any other game-specific update logic.
 pub trait World: Stepper + Default + Send + Sync + 'static {
+    /// The command that can be used by the game and the player to interact with the physics
+    /// simulation. Typically, this is an enum of some kind, but it is up to you.
     type CommandType: Command;
+
+    /// The subset of state information about the world that can be used to fully recreate the
+    /// world. Needs to be serializable so that it can be sent from the server to the client. There
+    /// is nothing stopping you from making the [`SnapshotType`](World::SnapshotType) the same type
+    /// as your [`World`] if you are ok with serializing the entire physics engine state. If you
+    /// think sending your entire [`World`] is a bit too heavy-weighted, you can hand-craft and
+    /// optimise your own `SnapshotType` structure to be as light-weight as possible.
     type SnapshotType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static;
+
+    /// The subset of state information about the world that is to be displayed/rendered. This is
+    /// used by the client to create the perfect blend of state information for the current
+    /// rendering frame. You could make this [`DisplayState`](World::DisplayStateType) the same
+    /// structure as your [`World`] if you don't mind CrystalOrb making lots of copies of your
+    /// entire [`World`] structure and performing interpolation on all your state variables.
     type DisplayStateType: DisplayState;
 
+    /// Each [`Command`] that the server receives from the client needs to be validated before
+    /// being applied as well as relayed to other clients. You can use this method to check that
+    /// the client has sufficient permission to issue such command. For example, you can prevent
+    /// other clients from moving players that they don't own. Clients can determine their own
+    /// `client_id` using the
+    /// [`ReadyClient::client_id`](crate::client::ReadyClient::client_id) method.
     fn command_is_valid(command: &Self::CommandType, client_id: usize) -> bool;
+
+    /// This describes how a [`Command`] affects the [`World`]. Use this method to update your
+    /// state. For example, you may want to apply forces/impulses to your rigid bodies, or simply
+    /// toggle some of your state variables that will affect how your [`Stepper::step`] will run.
     fn apply_command(&mut self, command: &Self::CommandType);
+
+    /// Apply a [snapshot](World::SnapshotType) generated from another [`World`]'s
+    /// [`World::snapshot`] method, so that this [`World`] will behave identically to that other
+    /// [`World`]. See [`World::SnapshotType`] for more information.
+    ///
+    /// Typically, the server generates snapshots that clients need to regularly apply.
     fn apply_snapshot(&mut self, snapshot: Self::SnapshotType);
+
+    /// Generate the subset of the world state information that is needed to recreate this
+    /// [`World`] and have it behave identically to this current [`World`]. See
+    /// [`World::SnapshotType`] for more information.
+    ///
+    /// Typically, the server generates snapshots that clients need to regularly apply.
     fn snapshot(&self) -> Self::SnapshotType;
+
+    /// Generate the subset of the world state information that is needed to render the world.
+    /// See [`World::DisplayStateType`] and [`DisplayState`].
     fn display_state(&self) -> Self::DisplayStateType;
 }
 
 /// Whether the [`WorldSimulation`] needs to wait for a snapshot to be applied before its display
 /// state can be considered usable.
 #[derive(PartialEq, Eq)]
-pub enum InitializationType {
+pub(crate) enum InitializationType {
     /// Implies that the world can be used as is without first being initialized with any snapshot.
     /// A good example would be the server's world simulations.
     PreInitialized,
@@ -100,7 +211,9 @@ pub enum InitializationType {
     NeedsInitialization,
 }
 
-pub struct WorldSimulation<WorldType: World, const INITIALIZATION_TYPE: InitializationType> {
+/// A "wrapper" for your [`World`] that is equipped with a `CommandBuffer`. This is responsible
+/// for applying the correct commands at the correct time while running your [`World`] simulation.
+pub(crate) struct WorldSimulation<WorldType: World, const INITIALIZATION_TYPE: InitializationType> {
     world: WorldType,
     command_buffer: CommandBuffer<WorldType::CommandType>,
     has_initialized: bool,
@@ -124,10 +237,6 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType> Default
 impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
     WorldSimulation<WorldType, INITIALIZATION_TYPE>
 {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// The timestamp for the next frame that is either about to be simulated, of is currently
     /// being simulated. This timestamp is useful for issuing commands to be applied to the
     /// world as soon as possible.
@@ -197,6 +306,7 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
         }
     }
 
+    /// Get a list of commands currently buffered. This is primarily for diagnostic purposes.
     pub fn buffered_commands(
         &self,
     ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {

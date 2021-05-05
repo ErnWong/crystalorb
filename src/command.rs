@@ -1,12 +1,47 @@
+//! Traits and structures relating to and for managing commands. Commands are messages sent from
+//! outside the physics simulation to alter how the physics simulation runs. For example, causing a
+//! rigid body for a player to jump requires a jump command, and causing a player to spawn requires
+//! a spawn command.
+
 use crate::timestamp::{Timestamp, Timestamped};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::Reverse, collections::BTreeMap, fmt::Debug, ops::Range};
 use tracing::warn;
 
+/// A command is a request to change the physics simulation in some way, issued from outside the
+/// physics simulation. It is the way in which players and any non-physics game logic can interact
+/// with the physics simulation.
+///
+/// # Example
+///
+/// ```
+/// use crystalorb::command::Command;
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Serialize, Deserialize, Debug, Clone)]
+/// struct Player(usize);
+///
+/// #[derive(Serialize, Deserialize, Debug, Clone)]
+/// enum GameCommand {
+///     Spawn(Player),
+///     Despawn(Player),
+///     Jump(Player),
+///     Left(Player),
+///     Right(Player),
+/// }
+///
+/// impl Command for GameCommand {};
+/// ```
 pub trait Command: Clone + Sync + Send + 'static + Serialize + DeserializeOwned + Debug {}
 
+/// A handy structure for receiving commands out-of-order, and consuming them in-order. This also
+/// unintuitively keeps track of the "current" timestamp for whatever uses this [`CommandBuffer`].
+/// This is because the [`CommandBuffer`] needs to maintain an acceptable window of command
+/// timestamps centered around the current timestamp, or else the command timestamps would be too
+/// far about and [wouldn't be
+/// comparable](crate::timestamp::Timestamp::comparable_range_with_midpoint).
 #[derive(Clone)]
-pub struct CommandBuffer<CommandType: Command> {
+pub(crate) struct CommandBuffer<CommandType: Command> {
     map: BTreeMap<Reverse<Timestamp>, Vec<CommandType>>,
     timestamp: Timestamp,
 }
@@ -21,6 +56,7 @@ impl<CommandType: Command> Default for CommandBuffer<CommandType> {
 }
 
 impl<CommandType: Command> CommandBuffer<CommandType> {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }
@@ -113,18 +149,16 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
         commands
     }
 
+    #[allow(dead_code)]
     pub fn commands_at(&self, timestamp: Timestamp) -> Option<impl Iterator<Item = &CommandType>> {
         self.map
             .get(&Reverse(timestamp))
             .map(|commands| commands.iter())
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.map.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (Timestamp, &Vec<CommandType>)> {

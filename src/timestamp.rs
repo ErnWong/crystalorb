@@ -1,3 +1,11 @@
+//! Types for identifying/indexing and comparing the time between simulation frames.
+//!
+//! Many things in CrystalOrb are timestamped. Each frame of a [`World`](crate::world::World)
+//! simulation are assigned a [`Timestamp`]. The corresponding
+//! [snapshots](crate::world::World::SnapshotType), [commands](crate::world::World::CommandType),
+//! and [display states](crate::world::World::DisplayStateType) are all timestamped so that the
+//! client and server knows which simulation frame they are associated with.
+
 use crate::fixed_timestepper::Stepper;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -7,6 +15,7 @@ use std::{
     ops::{Add, Deref, DerefMut, Range, Sub},
 };
 
+/// Represents and identifies a simulation instant.
 #[derive(Eq, PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub struct Timestamp(Wrapping<i16>);
 
@@ -14,14 +23,35 @@ impl Timestamp {
     /// See note about transitivity for Timestamp's Ord implementation.
     pub const MAX_COMPARABLE_RANGE: i16 = i16::MAX;
 
+    /// Find the corresponding timestamp for the current time in seconds.
     pub fn from_seconds(seconds: f64, timestep_seconds: f64) -> Self {
         Self::from(FloatTimestamp::from_seconds(seconds, timestep_seconds))
     }
 
+    /// Modify itself to become the timestamp of the next frame.
     pub fn increment(&mut self) {
         self.0 += Wrapping(1);
     }
 
+    /// Find the corresponding time in seconds for this timestamp. Since timestamps repeat over
+    /// time, this function returns the time closest to zero. This makes it useful to find the
+    /// number of seconds between two timestamps.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use crystalorb::timestamp::Timestamp;
+    /// use float_cmp::approx_eq;
+    /// const TIMESTEP: f64 = 1.0 / 60.0;
+    ///
+    /// // Given two timestamps.
+    /// let t1 = Timestamp::default();
+    /// let t2 = t1 + 50;
+    ///
+    /// // We can get the seconds between these two timestamps.
+    /// let seconds_difference = (t2 - t1).as_seconds(TIMESTEP);
+    /// assert!(approx_eq!(f64, seconds_difference, 50.0 / 60.0, ulps=1));
+    /// ```
     pub fn as_seconds(&self, timestep_seconds: f64) -> f64 {
         self.0 .0 as f64 * timestep_seconds
     }
@@ -94,27 +124,80 @@ impl Display for Timestamp {
     }
 }
 
+/// Representation of time in the same units as [`Timestamp`], but whereas [`Timestamp`] identifies
+/// which whole number of frames only, [`FloatTimestamp`] can represent any time in the continuous
+/// region between two adjacent frames.
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub struct FloatTimestamp(f64);
 
 impl FloatTimestamp {
+    /// Convert the time from seconds into [`Timestamp`] units (1 per frame, i.e. 1 per
+    /// timestep), and fit it into the [`Timestamp`] space.
     pub fn from_seconds(seconds: f64, timestep_seconds: f64) -> Self {
         Self::from_unwrapped(seconds / timestep_seconds)
     }
 
+    /// Fit the time in [`Timestamp`] units into the [`Timestamp`] space by wrapping.
     pub fn from_unwrapped(frames: f64) -> Self {
         let frames_wrapped = (frames + 15.0f64.exp2()).rem_euclid(16.0f64.exp2()) - 15.0f64.exp2();
         Self(frames_wrapped)
     }
 
+    /// Find the corresponding time in seconds for this float timestamp. Since timestamps
+    /// repeat over time, this function returns the time closest to zero. This makes it useful
+    /// to find the number of seconds between two float timestamps.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use crystalorb::timestamp::FloatTimestamp;
+    /// use float_cmp::approx_eq;
+    /// const TIMESTEP: f64 = 1.0 / 60.0;
+    ///
+    /// // Given two float timestamps.
+    /// let t1 = FloatTimestamp::from_unwrapped(123.2);
+    /// let t2 = FloatTimestamp::from_unwrapped(123.7);
+    ///
+    /// // We can get the seconds between these two float timestamps.
+    /// let seconds_difference = (t2 - t1).as_seconds(TIMESTEP);
+    /// assert!(approx_eq!(f64, seconds_difference, 0.5 / 60.0, ulps=1));
+    /// ```
     pub fn as_seconds(&self, timestep_seconds: f64) -> f64 {
         self.0 * timestep_seconds
     }
 
+    /// Round up to the next whole-number [`Timestamp`] (or its own value if it is already a
+    /// whole number).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use crystalorb::timestamp::{FloatTimestamp, Timestamp};
+    ///
+    /// let t1 = FloatTimestamp::from_unwrapped(123.4);
+    /// let t2 = FloatTimestamp::from_unwrapped(123.0);
+    ///
+    /// assert_eq!(t1.ceil(), Timestamp::default() + 124);
+    /// assert_eq!(t2.ceil(), Timestamp::default() + 123);
+    /// ```
     pub fn ceil(&self) -> Timestamp {
         Timestamp(Wrapping(self.0.ceil() as i16))
     }
 
+    /// Round down to the previous whole-number [`Timestamp`] (or its own value if it is
+    /// already a whole number).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use crystalorb::timestamp::{FloatTimestamp, Timestamp};
+    ///
+    /// let t1 = FloatTimestamp::from_unwrapped(123.4);
+    /// let t2 = FloatTimestamp::from_unwrapped(123.0);
+    ///
+    /// assert_eq!(t1.floor(), Timestamp::default() + 123);
+    /// assert_eq!(t2.floor(), Timestamp::default() + 123);
+    /// ```
     pub fn floor(&self) -> Timestamp {
         Timestamp(Wrapping(self.0.floor() as i16))
     }
@@ -133,6 +216,7 @@ impl From<Timestamp> for FloatTimestamp {
     }
 }
 
+/// Associate a [`Timestamp`] with another type.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Timestamped<T> {
     inner: T,
@@ -140,22 +224,27 @@ pub struct Timestamped<T> {
 }
 
 impl<T> Timestamped<T> {
+    /// Wrap the given data with the given [`Timestamp`].
     pub fn new(inner: T, timestamp: Timestamp) -> Self {
         Self { inner, timestamp }
     }
 
+    /// Get a reference to the inner data without the [`Timestamp`].
     pub fn inner(&self) -> &T {
         &self.inner
     }
 
+    /// Get a mutable reference to the inner data without the [`Timestamp`].
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 
+    /// Get the associated [`Timestamp`].
     pub fn timestamp(&self) -> Timestamp {
         self.timestamp
     }
 
+    /// Update the current [`Timestamp`] associated with the inner piece of data.
     pub fn set_timestamp(&mut self, timestamp: Timestamp) {
         self.timestamp = timestamp;
     }

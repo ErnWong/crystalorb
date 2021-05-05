@@ -26,6 +26,7 @@ itertools = "0.10.0"
 float-cmp = "0.8.0"
 test-env-log = {version = "0.2.7", default-features = false, features = ["trace"]}
 crystalorb-mock-network = {version = "0.1.0", path = "./crates/crystalorb-mock-network"}
+crystalorb-demo = {version = "0.1.0", path = "./examples/demo"}
 
 [workspace]
 members = [
@@ -34,5 +35,5 @@ members = [
   "crates/crystalorb-bevy-networking-turbulence"
 ]
 
-[profile.release.package.demo]
+[profile.release.package.crystalorb-demo]
 debug = true
