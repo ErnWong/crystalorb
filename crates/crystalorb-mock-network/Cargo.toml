@@ -5,7 +5,7 @@ authors = ["Ernest Wong <sudo@ernestwong.nz>"]
 categories = ["games", "simulation"]
 edition = "2018"
 keywords = ["netcode"]
-license = "Apache-2"
+license = "Apache-2.0"
 readme = "README.markdown"
 repository = "https://github.com/ErnWong/crystalorb"
 
