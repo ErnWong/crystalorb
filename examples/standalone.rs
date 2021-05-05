@@ -127,7 +127,7 @@ fn main() {
 
     let config = Config {
         lag_compensation_latency: 0.3,
-        interpolation_latency: 0.2,
+        blend_latency: 0.2,
         timestep_seconds: 1.0 / 60.0,
         clock_sync_needed_sample_count: 32,
         clock_sync_request_period: 0.2,

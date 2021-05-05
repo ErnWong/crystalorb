@@ -24,7 +24,7 @@ fn when_server_and_client_clocks_desync_then_client_should_resync_quickly() {
         // GIVEN a server and client in a perfect network.
         let mut mock_client_server = MockClientServer::new(Config {
             lag_compensation_latency: TIMESTEP_SECONDS * 16.0,
-            interpolation_latency: 0.2,
+            blend_latency: 0.2,
             timestep_seconds: TIMESTEP_SECONDS,
             clock_sync_needed_sample_count: 8,
             clock_sync_request_period: 0.0,
@@ -102,7 +102,7 @@ fn when_client_connects_then_client_calculates_correct_initial_clock_offset() {
         // GIVEN a server and client in a perfect network.
         let mut mock_client_server = MockClientServer::new(Config {
             lag_compensation_latency: TIMESTEP_SECONDS * 16.0,
-            interpolation_latency: 0.2,
+            blend_latency: 0.2,
             timestep_seconds: TIMESTEP_SECONDS,
             clock_sync_needed_sample_count: 8,
             clock_sync_request_period: 0.0,

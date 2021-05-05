@@ -24,7 +24,7 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
         );
         let mut mock_client_server = MockClientServer::new(Config {
             lag_compensation_latency: FRAMES_TO_LAG_BEHIND as f64 * TIMESTEP_SECONDS,
-            interpolation_latency: 0.2,
+            blend_latency: 0.2,
             timestep_seconds: TIMESTEP_SECONDS,
             clock_sync_needed_sample_count: 8,
             clock_sync_request_period: 0.0,
@@ -125,7 +125,7 @@ fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
         );
         let mut mock_client_server = MockClientServer::new(Config {
             lag_compensation_latency: FRAMES_TO_LAG_BEHIND as f64 * TIMESTEP_SECONDS,
-            interpolation_latency: 0.2,
+            blend_latency: 0.2,
             timestep_seconds: TIMESTEP_SECONDS,
             clock_sync_needed_sample_count: 8,
             clock_sync_request_period: 0.0,

@@ -460,7 +460,7 @@ impl Demo {
         let config = Config {
             timestep_seconds: TIMESTEP,
             //snapshot_send_period: 0.3,
-            //interpolation_latency: 0.5,
+            //blend_latency: 0.5,
             tweening_method: TweeningMethod::MostRecentlyPassed,
             ..Default::default()
         };

@@ -18,7 +18,7 @@ fn when_client_becomes_ready_state_should_already_be_initialised() {
         const FRAMES_TO_LAG_BEHIND: i32 = 10;
         let mut mock_client_server = MockClientServer::new(Config {
             lag_compensation_latency: FRAMES_TO_LAG_BEHIND as f64 * TIMESTEP_SECONDS,
-            interpolation_latency: 0.2,
+            blend_latency: 0.2,
             timestep_seconds: TIMESTEP_SECONDS,
             clock_sync_needed_sample_count: 8,
             clock_sync_request_period: 0.0,
@@ -92,7 +92,7 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
         const FRAMES_TO_LAG_BEHIND: i32 = 10;
         let mut mock_client_server = MockClientServer::new(Config {
             lag_compensation_latency: FRAMES_TO_LAG_BEHIND as f64 * TIMESTEP_SECONDS,
-            interpolation_latency: 0.2,
+            blend_latency: 0.2,
             timestep_seconds: TIMESTEP_SECONDS,
             clock_sync_needed_sample_count: 8,
             clock_sync_request_period: 0.0,

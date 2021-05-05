@@ -593,7 +593,7 @@ struct ClientWorldSimulations<WorldType: World> {
     /// The interpolation paramater to blend the `old_world` and `new_world` together into a
     /// single world state. The parameter is in the range `[0,1]` where 0 represents using only
     /// the `old_world`, and where 1 represents using only the `new_world`.
-    old_new_interpolation_t: f64,
+    blend_old_new_interpolation_t: f64,
 
     /// The latest interpolated state between `old_world` and `new_world` just before and just
     /// after the current requested render timestamp.
@@ -619,7 +619,7 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
             last_received_snapshot_timestamp: None,
             base_command_buffer: Default::default(),
             world_simulations: OldNew::new(),
-            old_new_interpolation_t: 1.0,
+            blend_old_new_interpolation_t: 1.0,
             states: OldNew::new(),
             display_state: Default::default(),
             config,
@@ -640,7 +640,7 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
             != old_world_simulation.last_completed_timestamp()
         {
             assert!(
-                self.old_new_interpolation_t <= 0.0,
+                self.blend_old_new_interpolation_t <= 0.0,
                 "Interpolation t advances only if timestamps are equal, and once they are equal, they remain equal even in timeskips."
             );
 
@@ -667,10 +667,10 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
                 new_world_simulation.last_completed_timestamp(),
                 old_world_simulation.last_completed_timestamp()
             );
-            if self.old_new_interpolation_t < 1.0 {
-                ReconciliationStatus::Blending(self.old_new_interpolation_t)
+            if self.blend_old_new_interpolation_t < 1.0 {
+                ReconciliationStatus::Blending(self.blend_old_new_interpolation_t)
             } else {
-                assert!(self.old_new_interpolation_t >= 1.0);
+                assert!(self.blend_old_new_interpolation_t >= 1.0);
                 ReconciliationStatus::AwaitingSnapshot
             }
         }
@@ -749,7 +749,7 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
         // We reset the old/new interpolation factor and begin slowly blending in from
         // the old world to the new world once the new world has caught up (aka
         // "fast-forwarded") to the old world's timestamp.
-        self.old_new_interpolation_t = 0.0;
+        self.blend_old_new_interpolation_t = 0.0;
     }
 
     fn simulate_next_frame(&mut self) {
@@ -797,7 +797,7 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
                 Timestamped::<WorldType::DisplayStateType>::from_interpolation(
                     &old,
                     &new,
-                    self.old_new_interpolation_t,
+                    self.blend_old_new_interpolation_t,
                 ),
             ),
             (None, Some(new)) => Some(new),
@@ -818,8 +818,9 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
 
         match self.infer_current_reconciliation_status() {
             ReconciliationStatus::Blending(_) => {
-                self.old_new_interpolation_t += self.config.interpolation_progress_per_frame();
-                self.old_new_interpolation_t = self.old_new_interpolation_t.clamp(0.0, 1.0);
+                self.blend_old_new_interpolation_t += self.config.blend_progress_per_frame();
+                self.blend_old_new_interpolation_t =
+                    self.blend_old_new_interpolation_t.clamp(0.0, 1.0);
                 self.simulate_next_frame();
                 self.publish_blended_state();
 

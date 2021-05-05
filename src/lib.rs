@@ -76,10 +76,11 @@ pub struct Config {
     /// When a client receives a snapshot update of the entire world from the server, the client
     /// uses this snapshot to update their simulation. However, immediately displaying the result
     /// of this update will have entities suddenly teleporting to their new destinations. Instead,
-    /// we keep simulating the world without the new snapshot information, and slowly fade into the
+    /// we keep simulating the world without the new snapshot information, and slowly blend into the
     /// world with the new snapshot information. We linearly interpolate from the old and new
-    /// worlds in `interpolation_latency` seconds.
-    pub interpolation_latency: f64,
+    /// worlds, taking `blend_latency` seconds before the user sees the entities in their
+    /// updated locations.
+    pub blend_latency: f64,
 
     /// The number of seconds that gets simulated with every [`World`](world::World)
     /// [`step`](fixed_timestepper::Stepper). This is the physics simulation "dt". This can be
@@ -218,7 +219,7 @@ impl Config {
     pub const fn new() -> Self {
         Self {
             lag_compensation_latency: 0.3,
-            interpolation_latency: 0.2,
+            blend_latency: 0.2,
             timestep_seconds: 1.0 / 60.0,
             clock_sync_needed_sample_count: 8,
             clock_sync_request_period: 0.2,
@@ -240,9 +241,8 @@ impl Config {
 
     /// Re-expresses the speed of blending the server snapshot in terms of the amount that the
     /// interpolation parameter `t` needs to be incremented on each step.
-    /// TODO: Rename to blending to avoid confusion
-    pub(crate) fn interpolation_progress_per_frame(&self) -> f64 {
-        self.timestep_seconds / self.interpolation_latency
+    pub(crate) fn blend_progress_per_frame(&self) -> f64 {
+        self.timestep_seconds / self.blend_latency
     }
 
     /// The number of samples N so that, before we calculate the rolling average, we skip the N
