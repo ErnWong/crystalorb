@@ -23,8 +23,8 @@ jobs:
           name: demo
           path: |
             examples/demo/index.html
-            examples/demo/pkg/demo.js
-            examples/demo/pkg/demo_bg.wasm
+            examples/demo/pkg/crystalorb_demo.js
+            examples/demo/pkg/crystalorb_demo_bg.wasm
   deploy-gh-pages:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
