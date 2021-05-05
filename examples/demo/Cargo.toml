@@ -2,7 +2,12 @@
 name = "crystalorb-demo"
 version = "0.1.0"
 authors = ["Ernest Wong <sudo@ernestwong.nz>"]
+categories = ["games", "simulation"]
 edition = "2018"
+keywords = ["netcode"]
+license = "Apache-2.0"
+readme = "README.markdown"
+repository = "https://github.com/ErnWong/crystalorb"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

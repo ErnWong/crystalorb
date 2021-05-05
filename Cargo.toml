@@ -6,7 +6,7 @@ categories = ["games", "simulation"]
 description = "Network-agnostic, high-level game networking library"
 edition = "2018"
 keywords = ["netcode"]
-license = "MIT"
+license = "Apache-2"
 readme = "README.markdown"
 repository = "https://github.com/ErnWong/crystalorb"
 
