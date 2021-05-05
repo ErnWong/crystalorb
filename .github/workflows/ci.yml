@@ -16,6 +16,9 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/toolchain@v1
       - uses: actions-rs/tarpaulin@v0.1
+        with:
+          run-types: "Doctests Tests"
+          args: "--ignore-tests --exclude-files examples --exclude-files crates"
       - uses: codecov/codecov-action@v1.0.2
       - uses: actions/upload-artifact@v1
         with:
