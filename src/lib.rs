@@ -135,7 +135,13 @@ pub struct Config {
     /// Due to floating-point rounding errors and due to the `update_delta_seconds_max` limit
     /// that CrystalOrb enforces, the simulation [`Timestamp`](timestamp::Timestamp) might
     /// slowly drift away from the intended value according to the system clock (which is a way
-    /// to make sure that different clients on different machines stay in sync in terms of time). When this time drift is small, CrystalOrb can compensate it in the next update by running extra simulation frames or some fewer frames than usual. However, if the timestamp drift becomes too large, it is not possible to correct all of this drift in one update using this method, and instead we need to perform a "time-skip" without running the corresponding simulation steps. The threshold for this drift before we start skipping some simulation frames is defined by this configuration parameter.
+    /// to make sure that different clients on different machines stay in sync in terms of time).
+    /// When this time drift is small, CrystalOrb can compensate it in the next update by running
+    /// extra simulation frames or some fewer frames than usual. However, if the timestamp drift
+    /// becomes too large, it is not possible to correct all of this drift in one update using this
+    /// method, and instead we need to perform a "time-skip" without running the corresponding
+    /// simulation steps. The threshold for this drift before we start skipping some simulation
+    /// frames is defined by this configuration parameter.
     ///
     /// Large timestamp drifts could happen when, for example, the game client has some system
     /// lag. If the game client is hosted in the web browser, for exmple, then large timestamp
@@ -143,7 +149,17 @@ pub struct Config {
     /// drifts can also occur on the laptop when the computer enters sleep mode, etc.
     pub timestamp_skip_threshold_seconds: f64,
 
-    /// When the [`Client`](client::Client) receives a [`Snapshot`](world::World::SnapshotType) from the [`Server`](server::Server), the snapshot is going to have a timestamp older than the current client simulation timestamp. Before the snapshot can be blended into the client, it needs to fastforwarded to the current timestamp by running more simulation frmes on the snapshot than on the world that is currently displayed on the client. This configuration parameter specifies how much faster the snapshot can be simulated compared with the existing client world during the fastforwarding process. A value of `2`, for example, would represent that the received server snapshot could only run at most `2` simulation steps every time the existing client world runs one step. In this scenario, if the server snapshot is `10` frames behind the client, then it would take `10` client frames before the server snapshot ctches up with the client.
+    /// When the [`Client`](client::Client) receives a [`Snapshot`](world::World::SnapshotType)
+    /// from the [`Server`](server::Server), the snapshot is going to have a timestamp older than
+    /// the current client simulation timestamp. Before the snapshot can be blended into the
+    /// client, it needs to fastforwarded to the current timestamp by running more simulation frmes
+    /// on the snapshot than on the world that is currently displayed on the client. This
+    /// configuration parameter specifies how much faster the snapshot can be simulated compared
+    /// with the existing client world during the fastforwarding process. A value of `2`, for
+    /// example, would represent that the received server snapshot could only run at most `2`
+    /// simulation steps every time the existing client world runs one step. In this scenario, if
+    /// the server snapshot is `10` frames behind the client, then it would take `10` client frames
+    /// before the server snapshot ctches up with the client.
     pub fastforward_max_per_step: usize,
 
     /// In crystalorb, the physics simulation is assumed to be running at a fixed timestep that is
