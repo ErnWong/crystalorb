@@ -4,14 +4,14 @@
 //! The [`Client`] structure is what you create, store, and update, analogous to the
 //! [`Server`](crate::server::Server) structure. The other structures in this module are what you
 //! access indirectly through your [`Client`] to get additional functionality, depending on what
-//! loading stage the [`Client`] is at (via [`Client::state`] or [`Client::state_mut`]).
+//! loading stage the [`Client`] is at (via [`Client::stage`] or [`Client::stage_mut`]).
 //!
 //! For the majority of the time, you would probably want to access the [`ReadyClient`] in order
 //! to:
 //!
 //! - [issue commands](ReadyClient::issue_command)
 //!     ```
-//!     use crystalorb::{Config, client::{Client, ClientState}};
+//!     use crystalorb::{Config, client::{Client, ClientStage}};
 //!     use crystalorb_demo::{DemoWorld, DemoCommand, PlayerSide, PlayerCommand};
 //!     use crystalorb_mock_network::MockNetwork;
 //!
@@ -23,7 +23,7 @@
 //!
 //!     // ...later on in your update loop, in response to a player input...
 //!
-//!     if let ClientState::Ready(ready_client) = client.state_mut() {
+//!     if let ClientStage::Ready(ready_client) = client.stage_mut() {
 //!         let command = DemoCommand::new(PlayerSide::Left, PlayerCommand::Jump, true);
 //!         ready_client.issue_command(command, &mut network);
 //!     }
@@ -33,7 +33,7 @@
 //!     ```
 //!     use crystalorb::{
 //!         Config,
-//!         client::{Client, ClientState},
+//!         client::{Client, ClientStage},
 //!         world::DisplayState,
 //!     };
 //!     use crystalorb_demo::{DemoWorld, DemoDisplayState};
@@ -47,7 +47,7 @@
 //!
 //!     // ...later on in your update loop...
 //!
-//!     if let ClientState::Ready(ready_client) = client.state() {
+//!     if let ClientStage::Ready(ready_client) = client.stage() {
 //!         render(ready_client.display_state().display_state());
 //!     }
 //!     ```
@@ -71,7 +71,7 @@ use tracing::{debug, info, trace, warn};
 #[derive(Debug)]
 pub struct Client<WorldType: World> {
     config: Config,
-    state: Option<ClientState<WorldType>>,
+    stage: Option<ClientStage<WorldType>>,
 }
 
 impl<WorldType: World> Client<WorldType> {
@@ -102,7 +102,7 @@ impl<WorldType: World> Client<WorldType> {
     pub fn new(config: Config) -> Self {
         Self {
             config: config.clone(),
-            state: Some(ClientState::SyncingClock(SyncingClockClient(
+            stage: Some(ClientStage::SyncingClock(SyncingClockClient(
                 ClockSyncer::new(config),
             ))),
         }
@@ -154,55 +154,55 @@ impl<WorldType: World> Client<WorldType> {
                 delta_seconds
             );
         }
-        let should_transition = match &mut self.state.as_mut().unwrap() {
-            ClientState::SyncingClock(SyncingClockClient(clocksyncer)) => {
+        let should_transition = match &mut self.stage.as_mut().unwrap() {
+            ClientStage::SyncingClock(SyncingClockClient(clocksyncer)) => {
                 clocksyncer.update(positive_delta_seconds, seconds_since_startup, net);
                 clocksyncer.is_ready()
             }
-            ClientState::SyncingInitialState(SyncingInitialStateClient(client)) => {
+            ClientStage::SyncingInitialState(SyncingInitialStateClient(client)) => {
                 client.update(positive_delta_seconds, seconds_since_startup, net);
                 client.is_ready()
             }
-            ClientState::Ready(ReadyClient(client)) => {
+            ClientStage::Ready(ReadyClient(client)) => {
                 client.update(positive_delta_seconds, seconds_since_startup, net);
                 false
             }
         };
         if should_transition {
-            self.state = Some(match self.state.take().unwrap() {
-                ClientState::SyncingClock(SyncingClockClient(clocksyncer)) => {
-                    ClientState::SyncingInitialState(SyncingInitialStateClient(ActiveClient::new(
+            self.stage = Some(match self.stage.take().unwrap() {
+                ClientStage::SyncingClock(SyncingClockClient(clocksyncer)) => {
+                    ClientStage::SyncingInitialState(SyncingInitialStateClient(ActiveClient::new(
                         seconds_since_startup,
                         self.config.clone(),
                         clocksyncer,
                     )))
                 }
-                ClientState::SyncingInitialState(SyncingInitialStateClient(client)) => {
-                    ClientState::Ready(ReadyClient(client))
+                ClientStage::SyncingInitialState(SyncingInitialStateClient(client)) => {
+                    ClientStage::Ready(ReadyClient(client))
                 }
-                ClientState::Ready(_) => unreachable!(),
+                ClientStage::Ready(_) => unreachable!(),
             });
         }
     }
 
-    /// Get the current state/stage ("state" as in "state machine", not "simulation state") of the [`Client`], which provides access to extra functionality
-    /// depending on what state/stage it is currently in.
+    /// Get the current stage of the [`Client`], which provides access to extra functionality
+    /// depending on what stage it is currently in.
     ///
     /// # Example
     ///
     /// To check on the client's progress at connecting with the server, you can check the number
-    /// of clocksync samples during the client's [`SyncingClock`](ClientState::SyncingClock)
-    /// state:
+    /// of clocksync samples during the client's [`SyncingClock`](ClientStage::SyncingClock)
+    /// stage:
     ///
     /// ```
-    /// use crystalorb::{Config, client::{Client, ClientState}};
+    /// use crystalorb::{Config, client::{Client, ClientStage}};
     /// use crystalorb_demo::DemoWorld;
     ///
     /// let client = Client::<DemoWorld>::new(Config::new());
     ///
     /// // ...Later on...
     ///
-    /// if let ClientState::SyncingClock(syncing_clock_client) = client.state() {
+    /// if let ClientStage::SyncingClock(syncing_clock_client) = client.stage() {
     ///     println!(
     ///         "Connection progress: {}%",
     ///         syncing_clock_client.sample_count() as f64
@@ -210,22 +210,20 @@ impl<WorldType: World> Client<WorldType> {
     ///     );
     /// }
     /// ```
-    ///
-    /// TODO: This is probably best if renamed to "stage" to avoid confusion.
-    pub fn state(&self) -> &ClientState<WorldType> {
-        self.state.as_ref().unwrap()
+    pub fn stage(&self) -> &ClientStage<WorldType> {
+        self.stage.as_ref().unwrap()
     }
 
-    /// Get the current state/stage ("state" as in "state machine", not "simulation state") of the [`Client`], which provides access to extra functionality
-    /// depending on what state/stage it is currently in.
+    /// Get the current stage f the [`Client`], which provides access to extra functionality
+    /// depending on what stage it is currently in.
     ///
     /// # Example
     ///
-    /// To issue a command, you'll need to access the client in its [`Ready`](ClientState::Ready)
-    /// state:
+    /// To issue a command, you'll need to access the client in its [`Ready`](ClientStage::Ready)
+    /// stage:
     ///
     /// ```
-    /// use crystalorb::{Config, client::{Client, ClientState}};
+    /// use crystalorb::{Config, client::{Client, ClientStage}};
     /// use crystalorb_demo::{DemoWorld, DemoCommand, PlayerSide, PlayerCommand};
     /// use crystalorb_mock_network::MockNetwork;
     ///
@@ -237,25 +235,21 @@ impl<WorldType: World> Client<WorldType> {
     ///
     /// // ...Later on...
     ///
-    /// if let ClientState::Ready(ready_client) = client.state_mut() {
+    /// if let ClientStage::Ready(ready_client) = client.stage_mut() {
     ///     let command = DemoCommand::new(PlayerSide::Left, PlayerCommand::Jump, true);
     ///     ready_client.issue_command(command, &mut network);
     /// }
     /// ```
-    ///
-    /// TODO: This is probably best if renamed to "stage_mut" to avoid confusion.
-    pub fn state_mut(&mut self) -> &mut ClientState<WorldType> {
-        self.state.as_mut().unwrap()
+    pub fn stage_mut(&mut self) -> &mut ClientStage<WorldType> {
+        self.stage.as_mut().unwrap()
     }
 }
 
 /// The [`Client`] undergoes several stages of initialization before it is ready to accept commands
 /// and be displayed to the player's screen. This enum provides access to different functionality
 /// depending on what stage the [`Client`] is at.
-///
-/// TODO: This is probably best if renamed to "stage" to avoid confusion.
 #[derive(Debug)]
-pub enum ClientState<WorldType: World> {
+pub enum ClientStage<WorldType: World> {
     /// In this first stage, the [`Client`] tries to figure out the clock differences between the
     /// local machine and the server machine. The [`Client`] collects a handful of "clock offset"
     /// samples until it reaches the amount needed to make a good estimate. This timing difference

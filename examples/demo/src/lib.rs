@@ -1,5 +1,5 @@
 use crystalorb::{
-    client::{Client, ClientState},
+    client::{Client, ClientStage},
     clocksync::ClockSyncMessage,
     command::Command,
     fixed_timestepper::Stepper,
@@ -519,7 +519,7 @@ impl Demo {
 
     pub fn issue_command(&mut self, command: DemoCommand) {
         let client = self.client_mut(command.player_side);
-        if let ClientState::Ready(ready_client) = client.client.state_mut() {
+        if let ClientStage::Ready(ready_client) = client.client.stage_mut() {
             ready_client.issue_command(command, &mut client.network);
         }
     }
@@ -538,8 +538,8 @@ impl Demo {
     }
 
     pub fn get_client_commands(&mut self, side: PlayerSide) -> Array {
-        match self.client(side).client.state() {
-            ClientState::Ready(client) => client
+        match self.client(side).client.stage() {
+            ClientStage::Ready(client) => client
                 .buffered_commands()
                 .map(|(timestamp, commands)| {
                     commands
@@ -588,29 +588,29 @@ impl Demo {
     }
 
     pub fn client_timestamp(&self, side: PlayerSide) -> String {
-        match self.client(side).client.state() {
-            ClientState::SyncingClock(client) => format!(
+        match self.client(side).client.stage() {
+            ClientStage::SyncingClock(client) => format!(
                 "Syncing {}/{}",
                 client.sample_count(),
                 client.samples_needed()
             ),
-            ClientState::SyncingInitialState(client) => {
+            ClientStage::SyncingInitialState(client) => {
                 format!("{}", client.last_completed_timestamp())
             }
-            ClientState::Ready(client) => format!("{}", client.last_completed_timestamp()),
+            ClientStage::Ready(client) => format!("{}", client.last_completed_timestamp()),
         }
     }
 
     pub fn client_display_state(&self, side: PlayerSide) -> Option<DemoDisplayState> {
-        match self.client(side).client.state() {
-            ClientState::Ready(client) => Some(client.display_state().display_state().clone()),
+        match self.client(side).client.stage() {
+            ClientStage::Ready(client) => Some(client.display_state().display_state().clone()),
             _ => None,
         }
     }
 
     pub fn client_reconciliation_status(&self, side: PlayerSide) -> String {
-        match self.client(side).client.state() {
-            ClientState::Ready(client) => format!("{}", client.reconciliation_status()),
+        match self.client(side).client.stage() {
+            ClientStage::Ready(client) => format!("{}", client.reconciliation_status()),
             _ => String::from("Inactive"),
         }
     }

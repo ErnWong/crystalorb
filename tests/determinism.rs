@@ -1,7 +1,7 @@
 #![feature(generic_associated_types)]
 
 use crystalorb::{
-    client::ClientState, timestamp::Timestamp, world::Tweened, Config, TweeningMethod,
+    client::ClientStage, timestamp::Timestamp, world::Tweened, Config, TweeningMethod,
 };
 use pretty_assertions::assert_eq;
 use test_env_log::test;
@@ -51,8 +51,8 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
             vec![],
             vec![8, 9, 10, 11, 12],
         ];
-        let start_timestamp = match mock_client_server.client_1.state() {
-            ClientState::Ready(client) => client.simulating_timestamp(),
+        let start_timestamp = match mock_client_server.client_1.stage() {
+            ClientStage::Ready(client) => client.simulating_timestamp(),
             _ => unreachable!(),
         };
         let target_timestamp =
@@ -61,8 +61,8 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
         let mut server_state_history: Vec<Tweened<MockWorld>> = Vec::new();
 
         while mock_client_server.server.display_state().timestamp() < target_timestamp {
-            let current_client_timestamp = match mock_client_server.client_1.state() {
-                ClientState::Ready(client) => {
+            let current_client_timestamp = match mock_client_server.client_1.stage() {
+                ClientStage::Ready(client) => {
                     Timestamp::default() + client.display_state().float_timestamp() as i16
                 }
                 _ => unreachable!(),
@@ -70,8 +70,8 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
             let update_client = current_client_timestamp < target_timestamp;
 
             if update_client {
-                match mock_client_server.client_1.state_mut() {
-                    ClientState::Ready(client) => {
+                match mock_client_server.client_1.stage_mut() {
+                    ClientStage::Ready(client) => {
                         let current_index = (i16::from(current_client_timestamp - start_timestamp))
                             .clamp(0, commands.len() as i16 - 1)
                             as usize;
@@ -92,8 +92,8 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
             server_state_history.push(mock_client_server.server.display_state().into());
 
             if update_client {
-                match mock_client_server.client_1.state_mut() {
-                    ClientState::Ready(client) => {
+                match mock_client_server.client_1.stage_mut() {
+                    ClientStage::Ready(client) => {
                         client_state_history.push(client.display_state().clone())
                     }
                     _ => unreachable!(),
@@ -148,8 +148,8 @@ fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
         mock_client_server.update_until_clients_ready(TIMESTEP_SECONDS * frames_per_update);
 
         // WHEN a single chosen client issue commands.
-        let start_timestamp = match mock_client_server.client_1.state() {
-            ClientState::Ready(client) => client.simulating_timestamp(),
+        let start_timestamp = match mock_client_server.client_1.stage() {
+            ClientStage::Ready(client) => client.simulating_timestamp(),
             _ => unreachable!(),
         };
         let target_timestamp = start_timestamp + 100;
@@ -158,8 +158,8 @@ fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
         let mut server_state_history: Vec<Tweened<MockWorld>> = Vec::new();
 
         while mock_client_server.server.display_state().timestamp() < target_timestamp {
-            let current_client_timestamp = match mock_client_server.client_1.state() {
-                ClientState::Ready(client) => {
+            let current_client_timestamp = match mock_client_server.client_1.stage() {
+                ClientStage::Ready(client) => {
                     Timestamp::default() + client.display_state().float_timestamp() as i16
                 }
                 _ => unreachable!(),
@@ -170,14 +170,14 @@ fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
             server_state_history.push(mock_client_server.server.display_state().into());
 
             if update_client {
-                match mock_client_server.client_1.state_mut() {
-                    ClientState::Ready(client) => {
+                match mock_client_server.client_1.stage_mut() {
+                    ClientStage::Ready(client) => {
                         client_1_state_history.push(client.display_state().clone())
                     }
                     _ => unreachable!(),
                 }
-                match mock_client_server.client_2.state_mut() {
-                    ClientState::Ready(client) => {
+                match mock_client_server.client_2.stage_mut() {
+                    ClientStage::Ready(client) => {
                         client_2_state_history.push(client.display_state().clone())
                     }
                     _ => unreachable!(),

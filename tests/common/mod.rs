@@ -1,5 +1,5 @@
 use crystalorb::{
-    client::{Client, ClientState},
+    client::{Client, ClientStage},
     command::Command,
     fixed_timestepper::Stepper,
     server::Server,
@@ -126,8 +126,8 @@ impl MockClientServer {
     }
 
     pub fn update_until_clients_ready(&mut self, delta_seconds: f64) {
-        while !matches!(self.client_1.state(), ClientState::Ready(_))
-            || !matches!(self.client_2.state(), ClientState::Ready(_))
+        while !matches!(self.client_1.stage(), ClientStage::Ready(_))
+            || !matches!(self.client_2.stage(), ClientStage::Ready(_))
         {
             self.update(delta_seconds);
         }

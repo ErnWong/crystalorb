@@ -1,7 +1,7 @@
 #![feature(generic_associated_types)]
 
 use crystalorb::{
-    client::{Client, ClientState},
+    client::{Client, ClientStage},
     command::Command,
     fixed_timestepper::Stepper,
     server::Server,
@@ -156,13 +156,13 @@ fn main() {
         let mut client_1_display_state = None;
         let mut client_2_display_state = None;
 
-        if let ClientState::Ready(ready_client_1) = client_1.state_mut() {
+        if let ClientStage::Ready(ready_client_1) = client_1.stage_mut() {
             if (0.0..1.0).contains(&(seconds_since_startup % 10.0)) {
                 ready_client_1.issue_command(MyCommand::Accelerate, &mut client_1_net);
             }
             client_1_display_state = Some(ready_client_1.display_state());
         }
-        if let ClientState::Ready(ready_client_2) = client_2.state_mut() {
+        if let ClientStage::Ready(ready_client_2) = client_2.stage_mut() {
             if (5.0..6.0).contains(&(seconds_since_startup % 10.0)) {
                 ready_client_2.issue_command(MyCommand::Decelerate, &mut client_2_net);
             }
