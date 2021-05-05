@@ -11,9 +11,11 @@
     <a href="https://github.com/ErnWong/crystalorb/actions/workflows/cd.yml"><img alt="cd" src="https://github.com/ErnWong/crystalorb/actions/workflows/cd.yml/badge.svg"></a>
     <a href="https://codecov.io/github/ErnWong/crystalorb?branch=master"><img alt="Coverage" src="https://codecov.io/github/ErnWong/crystalorb/coverage.svg?branch=master"></a>
   </p>
+  <hr>
   <a href="https://ernestwong.nz/crystalorb/demo" title="Demo">
     <img src="examples/demo/scripts/generate-screencapture/screencapture.apng">
   </a>
+  <hr>
 </div>
 
 ## Quick start
