@@ -71,7 +71,7 @@ use tracing::{debug, info, trace, warn};
 #[derive(Debug)]
 pub struct Client<WorldType: World> {
     config: Config,
-    stage: Option<ClientStage<WorldType>>,
+    stage: ClientStage<WorldType>,
 }
 
 impl<WorldType: World> Client<WorldType> {
@@ -102,9 +102,7 @@ impl<WorldType: World> Client<WorldType> {
     pub fn new(config: Config) -> Self {
         Self {
             config: config.clone(),
-            stage: Some(ClientStage::SyncingClock(SyncingClockClient(
-                ClockSyncer::new(config),
-            ))),
+            stage: ClientStage::SyncingClock(SyncingClockClient(ClockSyncer::new(config))),
         }
     }
 
@@ -154,7 +152,7 @@ impl<WorldType: World> Client<WorldType> {
                 delta_seconds
             );
         }
-        let should_transition = match &mut self.stage.as_mut().unwrap() {
+        let should_transition = match &mut self.stage {
             ClientStage::SyncingClock(SyncingClockClient(clocksyncer)) => {
                 clocksyncer.update(positive_delta_seconds, seconds_since_startup, net);
                 clocksyncer.is_ready()
@@ -169,11 +167,12 @@ impl<WorldType: World> Client<WorldType> {
             }
         };
         if should_transition {
-            self.stage = Some(match self.stage.take().unwrap() {
+            let config = self.config.clone();
+            take_mut::take(&mut self.stage, |stage| match stage {
                 ClientStage::SyncingClock(SyncingClockClient(clocksyncer)) => {
                     ClientStage::SyncingInitialState(SyncingInitialStateClient(ActiveClient::new(
                         seconds_since_startup,
-                        self.config.clone(),
+                        config,
                         clocksyncer,
                     )))
                 }
@@ -211,7 +210,7 @@ impl<WorldType: World> Client<WorldType> {
     /// }
     /// ```
     pub fn stage(&self) -> &ClientStage<WorldType> {
-        self.stage.as_ref().unwrap()
+        &self.stage
     }
 
     /// Get the current stage f the [`Client`], which provides access to extra functionality
@@ -241,7 +240,7 @@ impl<WorldType: World> Client<WorldType> {
     /// }
     /// ```
     pub fn stage_mut(&mut self) -> &mut ClientStage<WorldType> {
-        self.stage.as_mut().unwrap()
+        &mut self.stage
     }
 }
 
