@@ -715,6 +715,108 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
 
 impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
     fn step(&mut self) {
+        fn load_snapshot<WorldType: World>(
+            this: &mut ClientWorldSimulations<WorldType>,
+            snapshot: Timestamped<WorldType::SnapshotType>,
+        ) {
+            trace!("Loading new snapshot from server");
+
+            let OldNewResult {
+                old: old_world_simulation,
+                new: new_world_simulation,
+            } = this.world_simulations.get_mut();
+
+            // We can now safely discard commands from the buffer that are older than this
+            // server snapshot.
+            //
+            // Off-by-one check:
+            //
+            // snapshot has completed the frame at t=snapshot.timestamp(), and therefore
+            // has already applied commands that are scheduled for t=snapshot.timestamp().
+            this.base_command_buffer.drain_up_to(snapshot.timestamp());
+
+            new_world_simulation
+                .apply_completed_snapshot(snapshot, this.base_command_buffer.clone());
+
+            if new_world_simulation.last_completed_timestamp()
+                > old_world_simulation.last_completed_timestamp()
+            {
+                // The server should always be behind the client, even excluding the
+                // network latency. The client may momentarily fall behind due to, e.g.,
+                // browser tab sleeping, but once the browser tab wakes up, the client
+                // should automatically compensate, and if necessary, time skip to the
+                // correct timestamp to be ahead of the server. If even then the server
+                // continues to be ahead, then it might suggest that the client and the
+                // server's clocks are running at different rates, and some additional time
+                // syncing mechanism is needed.
+                warn!("Server's snapshot is newer than client!");
+            }
+
+            // We reset the old/new interpolation factor and begin slowly blending in from
+            // the old world to the new world once the new world has caught up (aka
+            // "fast-forwarded") to the old world's timestamp.
+            this.blend_old_new_interpolation_t = 0.0;
+        }
+
+        fn simulate_next_frame<WorldType: World>(this: &mut ClientWorldSimulations<WorldType>) {
+            trace!("Stepping old world by one frame");
+            let OldNewResult {
+                old: old_world_simulation,
+                new: new_world_simulation,
+            } = this.world_simulations.get_mut();
+            old_world_simulation.step();
+
+            trace!(
+                "Fastforwarding new world from timestamp {:?} to current timestamp {:?}",
+                new_world_simulation.last_completed_timestamp(),
+                old_world_simulation.last_completed_timestamp()
+            );
+            new_world_simulation.try_completing_simulations_up_to(
+                &old_world_simulation.last_completed_timestamp(),
+                this.config.fastforward_max_per_step,
+            );
+        }
+
+        fn publish_old_state<WorldType: World>(this: &mut ClientWorldSimulations<WorldType>) {
+            this.states.swap();
+            this.states
+                .set_new(this.world_simulations.get().old.display_state());
+        }
+
+        fn publish_blended_state<WorldType: World>(this: &mut ClientWorldSimulations<WorldType>) {
+            let OldNewResult {
+                old: old_world_simulation,
+                new: new_world_simulation,
+            } = this.world_simulations.get_mut();
+
+            assert_eq!(
+                old_world_simulation.last_completed_timestamp(),
+                new_world_simulation.last_completed_timestamp()
+            );
+
+            trace!("Blending the old and new world states");
+            let state_to_publish = match (
+                old_world_simulation.display_state(),
+                new_world_simulation.display_state(),
+            ) {
+                (Some(old), Some(new)) => Some(
+                    Timestamped::<WorldType::DisplayStateType>::from_interpolation(
+                        &old,
+                        &new,
+                        this.blend_old_new_interpolation_t,
+                    ),
+                ),
+                (None, Some(new)) => Some(new),
+                (Some(_), None) => {
+                    unreachable!("New world is always initialized before old world does")
+                }
+                (None, None) => None,
+            };
+
+            this.states.swap();
+            this.states.set_new(state_to_publish);
+        }
+
         trace!("Step...");
 
         match self.infer_current_reconciliation_status() {
@@ -833,108 +935,6 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                     self.infer_current_reconciliation_status()
                 );
             }
-        }
-
-        fn load_snapshot<WorldType: World>(
-            this: &mut ClientWorldSimulations<WorldType>,
-            snapshot: Timestamped<WorldType::SnapshotType>,
-        ) {
-            trace!("Loading new snapshot from server");
-
-            let OldNewResult {
-                old: old_world_simulation,
-                new: new_world_simulation,
-            } = this.world_simulations.get_mut();
-
-            // We can now safely discard commands from the buffer that are older than this
-            // server snapshot.
-            //
-            // Off-by-one check:
-            //
-            // snapshot has completed the frame at t=snapshot.timestamp(), and therefore
-            // has already applied commands that are scheduled for t=snapshot.timestamp().
-            this.base_command_buffer.drain_up_to(snapshot.timestamp());
-
-            new_world_simulation
-                .apply_completed_snapshot(snapshot, this.base_command_buffer.clone());
-
-            if new_world_simulation.last_completed_timestamp()
-                > old_world_simulation.last_completed_timestamp()
-            {
-                // The server should always be behind the client, even excluding the
-                // network latency. The client may momentarily fall behind due to, e.g.,
-                // browser tab sleeping, but once the browser tab wakes up, the client
-                // should automatically compensate, and if necessary, time skip to the
-                // correct timestamp to be ahead of the server. If even then the server
-                // continues to be ahead, then it might suggest that the client and the
-                // server's clocks are running at different rates, and some additional time
-                // syncing mechanism is needed.
-                warn!("Server's snapshot is newer than client!");
-            }
-
-            // We reset the old/new interpolation factor and begin slowly blending in from
-            // the old world to the new world once the new world has caught up (aka
-            // "fast-forwarded") to the old world's timestamp.
-            this.blend_old_new_interpolation_t = 0.0;
-        }
-
-        fn simulate_next_frame<WorldType: World>(this: &mut ClientWorldSimulations<WorldType>) {
-            trace!("Stepping old world by one frame");
-            let OldNewResult {
-                old: old_world_simulation,
-                new: new_world_simulation,
-            } = this.world_simulations.get_mut();
-            old_world_simulation.step();
-
-            trace!(
-                "Fastforwarding new world from timestamp {:?} to current timestamp {:?}",
-                new_world_simulation.last_completed_timestamp(),
-                old_world_simulation.last_completed_timestamp()
-            );
-            new_world_simulation.try_completing_simulations_up_to(
-                &old_world_simulation.last_completed_timestamp(),
-                this.config.fastforward_max_per_step,
-            );
-        }
-
-        fn publish_old_state<WorldType: World>(this: &mut ClientWorldSimulations<WorldType>) {
-            this.states.swap();
-            this.states
-                .set_new(this.world_simulations.get().old.display_state());
-        }
-
-        fn publish_blended_state<WorldType: World>(this: &mut ClientWorldSimulations<WorldType>) {
-            let OldNewResult {
-                old: old_world_simulation,
-                new: new_world_simulation,
-            } = this.world_simulations.get_mut();
-
-            assert_eq!(
-                old_world_simulation.last_completed_timestamp(),
-                new_world_simulation.last_completed_timestamp()
-            );
-
-            trace!("Blending the old and new world states");
-            let state_to_publish = match (
-                old_world_simulation.display_state(),
-                new_world_simulation.display_state(),
-            ) {
-                (Some(old), Some(new)) => Some(
-                    Timestamped::<WorldType::DisplayStateType>::from_interpolation(
-                        &old,
-                        &new,
-                        this.blend_old_new_interpolation_t,
-                    ),
-                ),
-                (None, Some(new)) => Some(new),
-                (Some(_), None) => {
-                    unreachable!("New world is always initialized before old world does")
-                }
-                (None, None) => None,
-            };
-
-            this.states.swap();
-            this.states.set_new(state_to_publish);
         }
     }
 }
