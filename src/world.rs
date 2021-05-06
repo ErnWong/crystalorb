@@ -226,7 +226,7 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType> Default
     fn default() -> Self {
         Self {
             world: Default::default(),
-            command_buffer: Default::default(),
+            command_buffer: CommandBuffer::new(),
             has_initialized: match INITIALIZATION_TYPE {
                 InitializationType::NeedsInitialization => false,
                 InitializationType::PreInitialized => true,
@@ -238,6 +238,11 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType> Default
 impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
     WorldSimulation<WorldType, INITIALIZATION_TYPE>
 {
+    /// Create a new [`WorldSimulation`].
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// The timestamp for the next frame that is either about to be simulated, of is currently
     /// being simulated. This timestamp is useful for issuing commands to be applied to the
     /// world as soon as possible.

@@ -49,14 +49,13 @@ pub(crate) struct CommandBuffer<CommandType: Command> {
 impl<CommandType: Command> Default for CommandBuffer<CommandType> {
     fn default() -> Self {
         Self {
-            map: Default::default(),
-            timestamp: Default::default(),
+            map: BTreeMap::new(),
+            timestamp: Timestamp::default(),
         }
     }
 }
 
 impl<CommandType: Command> CommandBuffer<CommandType> {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }

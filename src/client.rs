@@ -616,11 +616,11 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
             queued_snapshot: None,
             last_queued_snapshot_timestamp: None,
             last_received_snapshot_timestamp: None,
-            base_command_buffer: Default::default(),
+            base_command_buffer: CommandBuffer::new(),
             world_simulations: OldNew::new(),
             blend_old_new_interpolation_t: 1.0,
             states: OldNew::new(),
-            display_state: Default::default(),
+            display_state: None,
             config,
         };
         let OldNewResult { old, new } = client_world_simulations.world_simulations.get_mut();

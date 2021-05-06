@@ -35,7 +35,7 @@ impl<WorldType: World> Server<WorldType> {
     /// initialize the server's simulation timestamp.
     pub fn new(config: Config, seconds_since_startup: f64) -> Self {
         let mut server = Self {
-            timekeeping_simulation: TimeKeeper::new(Default::default(), config.clone()),
+            timekeeping_simulation: TimeKeeper::new(WorldSimulation::new(), config.clone()),
             seconds_since_last_snapshot: 0.0,
             config,
         };

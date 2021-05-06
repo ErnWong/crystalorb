@@ -80,7 +80,7 @@ impl ClockSyncer {
     pub fn new(config: Config) -> Self {
         Self {
             server_seconds_offset: None,
-            server_seconds_offset_samples: Default::default(),
+            server_seconds_offset_samples: VecDeque::new(),
             seconds_since_last_request_sent: 0.0,
             client_id: None,
             config,
