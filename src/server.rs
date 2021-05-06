@@ -79,15 +79,14 @@ impl<WorldType: World> Server<WorldType> {
 
     fn apply_validated_command<NetworkResourceType: NetworkResource>(
         &mut self,
-        command: Timestamped<WorldType::CommandType>,
+        command: &Timestamped<WorldType::CommandType>,
         command_source: Option<ConnectionHandleType>,
         net: &mut NetworkResourceType,
     ) {
         debug!("Received command from {:?} - {:?}", command_source, command);
 
         // Apply this command to our world later on.
-        self.timekeeping_simulation
-            .schedule_command(command.clone());
+        self.timekeeping_simulation.schedule_command(command);
 
         // Relay command to every other client.
         for (handle, mut connection) in net.connections() {
@@ -107,7 +106,7 @@ impl<WorldType: World> Server<WorldType> {
 
     fn receive_command<NetworkResourceType: NetworkResource>(
         &mut self,
-        command: Timestamped<WorldType::CommandType>,
+        command: &Timestamped<WorldType::CommandType>,
         command_source: ConnectionHandleType,
         net: &mut NetworkResourceType,
     ) {
@@ -116,7 +115,7 @@ impl<WorldType: World> Server<WorldType> {
         // && command.timestamp() >= self.timekeeping_simulation.last_completed_timestamp()
         // && command.timestamp() <= self.estimated_client_simulating_timestamp()
         {
-            self.apply_validated_command(command, Some(command_source), net);
+            self.apply_validated_command(&command, Some(command_source), net);
         }
     }
 
@@ -128,7 +127,7 @@ impl<WorldType: World> Server<WorldType> {
         net: &mut NetworkResourceType,
     ) {
         self.apply_validated_command(
-            Timestamped::new(command, self.estimated_client_simulating_timestamp()),
+            &Timestamped::new(command, self.estimated_client_simulating_timestamp()),
             None,
             net,
         );
@@ -179,7 +178,7 @@ impl<WorldType: World> Server<WorldType> {
             }
         }
         for (command, command_source) in new_commands {
-            self.receive_command(command.clone(), command_source, &mut *net);
+            self.receive_command(&command, command_source, &mut *net);
         }
         for (handle, clock_sync_message) in clock_syncs {
             net.send_message(handle, clock_sync_message)

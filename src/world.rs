@@ -262,7 +262,7 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
 
     /// Schedule a command to be applied to the world at the beginning of the frame with the
     /// given timestamp.
-    pub fn schedule_command(&mut self, command: Timestamped<WorldType::CommandType>) {
+    pub fn schedule_command(&mut self, command: &Timestamped<WorldType::CommandType>) {
         self.command_buffer.insert(command);
     }
 
@@ -291,7 +291,7 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
     /// out of order, and we do not want to skip past any stale commands.
     pub fn apply_completed_snapshot(
         &mut self,
-        completed_snapshot: Timestamped<WorldType::SnapshotType>,
+        completed_snapshot: &Timestamped<WorldType::SnapshotType>,
         rewound_command_buffer: CommandBuffer<WorldType::CommandType>,
     ) {
         self.world

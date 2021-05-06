@@ -344,11 +344,11 @@ impl<WorldType: World> ReadyClient<WorldType> {
         command: WorldType::CommandType,
         net: &mut NetworkResourceType,
     ) {
-        let command = Timestamped::new(command, self.simulating_timestamp());
+        let timestamped_command = Timestamped::new(command, self.simulating_timestamp());
         self.0
             .timekeeping_simulations
-            .receive_command(command.clone());
-        net.broadcast_message(command);
+            .receive_command(&timestamped_command);
+        net.broadcast_message(timestamped_command);
     }
 
     /// Iterate through the commands that are being kept around. This is intended to be for
@@ -461,7 +461,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
 
         for (_, mut connection) in net.connections() {
             while let Some(command) = connection.recv::<Timestamped<WorldType::CommandType>>() {
-                self.timekeeping_simulations.receive_command(command);
+                self.timekeeping_simulations.receive_command(&command);
             }
             while let Some(snapshot) = connection.recv::<Timestamped<WorldType::SnapshotType>>() {
                 self.timekeeping_simulations.receive_snapshot(snapshot);
@@ -675,11 +675,11 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
         }
     }
 
-    fn receive_command(&mut self, command: Timestamped<WorldType::CommandType>) {
+    fn receive_command(&mut self, command: &Timestamped<WorldType::CommandType>) {
         debug!("Received command {:?}", command);
         let OldNewResult { old, new } = self.world_simulations.get_mut();
-        self.base_command_buffer.insert(command.clone());
-        old.schedule_command(command.clone());
+        self.base_command_buffer.insert(command);
+        old.schedule_command(command);
         new.schedule_command(command);
     }
 
@@ -717,7 +717,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
     fn step(&mut self) {
         fn load_snapshot<WorldType: World>(
             this: &mut ClientWorldSimulations<WorldType>,
-            snapshot: Timestamped<WorldType::SnapshotType>,
+            snapshot: &Timestamped<WorldType::SnapshotType>,
         ) {
             trace!("Loading new snapshot from server");
 
@@ -736,7 +736,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
             this.base_command_buffer.drain_up_to(snapshot.timestamp());
 
             new_world_simulation
-                .apply_completed_snapshot(snapshot, this.base_command_buffer.clone());
+                .apply_completed_snapshot(&snapshot, this.base_command_buffer.clone());
 
             if new_world_simulation.last_completed_timestamp()
                 > old_world_simulation.last_completed_timestamp()
@@ -840,7 +840,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
             ReconciliationStatus::AwaitingSnapshot => {
                 if let Some(snapshot) = self.queued_snapshot.take() {
                     self.world_simulations.swap();
-                    load_snapshot(self, snapshot);
+                    load_snapshot(self, &snapshot);
                     simulate_next_frame(self);
                     publish_old_state(self);
 
@@ -880,7 +880,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
 
                 warn!("Abandoning previous snapshot for newer shapshot! Couldn't fastforward the previous snapshot in time.");
 
-                load_snapshot(self, snapshot);
+                load_snapshot(self, &snapshot);
                 simulate_next_frame(self);
                 publish_old_state(self);
 

@@ -111,7 +111,7 @@ impl<CommandType: Command> CommandBuffer<CommandType> {
         }
     }
 
-    pub fn insert(&mut self, command: Timestamped<CommandType>) {
+    pub fn insert(&mut self, command: &Timestamped<CommandType>) {
         if self
             .acceptable_timestamp_range()
             .contains(&command.timestamp())
@@ -186,10 +186,10 @@ mod tests {
             acceptable_range.end - 2,
             acceptable_range.end - 1,
         ];
-        command_buffer.insert(Timestamped::new(0, t[0]));
-        command_buffer.insert(Timestamped::new(1, t[1]));
-        command_buffer.insert(Timestamped::new(2, t[2]));
-        command_buffer.insert(Timestamped::new(3, t[3]));
+        command_buffer.insert(&Timestamped::new(0, t[0]));
+        command_buffer.insert(&Timestamped::new(1, t[1]));
+        command_buffer.insert(&Timestamped::new(2, t[2]));
+        command_buffer.insert(&Timestamped::new(3, t[3]));
         assert_eq!(
             *command_buffer.commands_at(t[0]).unwrap().next().unwrap(),
             0
@@ -239,10 +239,10 @@ mod tests {
             acceptable_range.end - 2,
             acceptable_range.end - 1,
         ];
-        command_buffer.insert(Timestamped::new(0, t[0]));
-        command_buffer.insert(Timestamped::new(1, t[1]));
-        command_buffer.insert(Timestamped::new(2, t[2]));
-        command_buffer.insert(Timestamped::new(3, t[3]));
+        command_buffer.insert(&Timestamped::new(0, t[0]));
+        command_buffer.insert(&Timestamped::new(1, t[1]));
+        command_buffer.insert(&Timestamped::new(2, t[2]));
+        command_buffer.insert(&Timestamped::new(3, t[3]));
         assert_eq!(
             *command_buffer.commands_at(t[0]).unwrap().next().unwrap(),
             0
@@ -294,11 +294,11 @@ mod tests {
             acceptable_range.end,
             acceptable_range.end + Timestamp::MAX_COMPARABLE_RANGE / 2,
         ];
-        command_buffer.insert(Timestamped::new(0, t[0]));
-        command_buffer.insert(Timestamped::new(1, t[1]));
-        command_buffer.insert(Timestamped::new(2, t[2]));
-        command_buffer.insert(Timestamped::new(3, t[3]));
-        command_buffer.insert(Timestamped::new(4, t[4]));
+        command_buffer.insert(&Timestamped::new(0, t[0]));
+        command_buffer.insert(&Timestamped::new(1, t[1]));
+        command_buffer.insert(&Timestamped::new(2, t[2]));
+        command_buffer.insert(&Timestamped::new(3, t[3]));
+        command_buffer.insert(&Timestamped::new(4, t[4]));
         assert!(command_buffer.commands_at(t[0]).is_none());
         assert_eq!(
             *command_buffer.commands_at(t[1]).unwrap().next().unwrap(),
@@ -316,14 +316,14 @@ mod tests {
     fn test_drain_up_to() {
         // GIVEN a command buffer with several commands.
         let mut command_buffer = CommandBuffer::<i32>::new();
-        command_buffer.insert(Timestamped::new(0, command_buffer.timestamp() + 1));
-        command_buffer.insert(Timestamped::new(1, command_buffer.timestamp() + 5));
-        command_buffer.insert(Timestamped::new(2, command_buffer.timestamp() + 2));
-        command_buffer.insert(Timestamped::new(3, command_buffer.timestamp() + 4));
-        command_buffer.insert(Timestamped::new(4, command_buffer.timestamp() + 8));
-        command_buffer.insert(Timestamped::new(5, command_buffer.timestamp() + 6));
-        command_buffer.insert(Timestamped::new(6, command_buffer.timestamp() + 7));
-        command_buffer.insert(Timestamped::new(7, command_buffer.timestamp() + 3));
+        command_buffer.insert(&Timestamped::new(0, command_buffer.timestamp() + 1));
+        command_buffer.insert(&Timestamped::new(1, command_buffer.timestamp() + 5));
+        command_buffer.insert(&Timestamped::new(2, command_buffer.timestamp() + 2));
+        command_buffer.insert(&Timestamped::new(3, command_buffer.timestamp() + 4));
+        command_buffer.insert(&Timestamped::new(4, command_buffer.timestamp() + 8));
+        command_buffer.insert(&Timestamped::new(5, command_buffer.timestamp() + 6));
+        command_buffer.insert(&Timestamped::new(6, command_buffer.timestamp() + 7));
+        command_buffer.insert(&Timestamped::new(7, command_buffer.timestamp() + 3));
 
         // WHEN we drain the command buffer up to a certain timestamp.
         let drained_commands = command_buffer.drain_up_to(command_buffer.timestamp() + 4);
