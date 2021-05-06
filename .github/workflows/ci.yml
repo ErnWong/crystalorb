@@ -66,7 +66,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D clippy::all
+          args: -- -D warnings -A incomplete_features
   cargo-lint:
     runs-on: ubuntu-latest
     strategy:
