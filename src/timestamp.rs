@@ -139,7 +139,8 @@ impl FloatTimestamp {
 
     /// Fit the time in [`Timestamp`] units into the [`Timestamp`] space by wrapping.
     pub fn from_unwrapped(frames: f64) -> Self {
-        let frames_wrapped = (frames + 15.0f64.exp2()).rem_euclid(16.0f64.exp2()) - 15.0f64.exp2();
+        let frames_wrapped =
+            (frames + 15.0_f64.exp2()).rem_euclid(16.0_f64.exp2()) - 15.0_f64.exp2();
         Self(frames_wrapped)
     }
 
