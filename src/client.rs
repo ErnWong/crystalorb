@@ -847,10 +847,9 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                     assert!(
                         matches!(
                             self.infer_current_reconciliation_status(),
-                            ReconciliationStatus::Fastforwarding(FastforwardingHealth::Healthy)
-                                | ReconciliationStatus::Fastforwarding(
-                                    FastforwardingHealth::Overshot
-                                )
+                            ReconciliationStatus::Fastforwarding(
+                                FastforwardingHealth::Healthy | FastforwardingHealth::Overshot
+                            )
                         ) || matches!(
                             self.infer_current_reconciliation_status(),
                             ReconciliationStatus::Blending(t) if t == 0.0
