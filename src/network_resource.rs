@@ -29,9 +29,9 @@ pub type ConnectionHandleType = usize;
 /// reliable but unordered.
 ///
 /// This interface is based off on the interface provided by the
-/// [bevy_networking_turbulence](https://github.com/smokku/bevy_networking_turbulence) plugin. See
-/// [crystalorb-bevy-networking-turbulence](https://github.com/ErnWong/crystalorb/tree/crates/crystalorb-bevy-networking-turbulence)
-/// for an example for integrating with bevy_networking_turbulence.
+/// [`bevy_networking_turbulence`](https://github.com/smokku/bevy_networking_turbulence) plugin. See
+/// [`crystalorb-bevy-networking-turbulence`](https://github.com/ErnWong/crystalorb/tree/crates/crystalorb-bevy-networking-turbulence)
+/// for an example for integrating with `bevy_networking_turbulence`.
 pub trait NetworkResource {
     /// The [`Connection`] structure that CrystalOrb will use to send/receive messages from a
     /// specific remote machine. This may probably be a wrapper to a mutable reference to some

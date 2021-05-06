@@ -388,7 +388,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
     /// The timestamp of the most recently received snapshot, regardless of whether it got queued
     /// or discarded.
     ///
-    /// Unlike [ReadyClient::last_queued_snapshot_timestamp], this does not get updated when it
+    /// Unlike [`ReadyClient::last_queued_snapshot_timestamp`], this does not get updated when it
     /// becomes too old to be compared with the current timestamp. This is primarily used for
     /// diagnostic purposes.
     ///

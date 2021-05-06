@@ -92,9 +92,9 @@ impl Sub<Timestamp> for Timestamp {
 
 impl Ord for Timestamp {
     /// Note: This is technically not transitive, since we are doing wrapped differences.
-    /// To guarantee transitivity (for example, to use in BTreeMaps), ensure that all values being
-    /// compared against each other are at most std::i16::MAX length of each other.
-    /// (Maybe std::i16::MAX is off by one, but it is at least on the conservative side)
+    /// To guarantee transitivity (for example, to use in `BTreeMap`s), ensure that all values being
+    /// compared against each other are at most `std::i16::MAX` length of each other.
+    /// (Maybe `std::i16::MAX` is off by one, but it is at least on the conservative side)
     fn cmp(&self, other: &Self) -> Ordering {
         let difference: Wrapping<i16> = self.0 - other.0;
         match difference {

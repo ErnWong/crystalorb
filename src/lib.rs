@@ -50,7 +50,7 @@ impl TweeningMethod {
     }
 }
 
-/// Configuration parameters that tweak how CrystlOrb works.
+/// Configuration parameters that tweak how CrystalOrb works.
 ///
 /// For starters, you can just pass in the default values when you are creating the
 /// [`client::Client`] and [`server::Server`] instances.
@@ -195,7 +195,7 @@ impl Config {
     /// });
     /// ```
     ///
-    /// You can use Default::defult() too:
+    /// You can use `Default::default()` too:
     ///
     /// ```
     /// use crystalorb::{Config, client::Client};

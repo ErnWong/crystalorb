@@ -14,37 +14,38 @@ pub trait Stepper {
     fn step(&mut self);
 }
 
-/// A [Stepper] that has a notion of timestamps that get incremented on each step. Each step
-/// "completes" a frame for a particular [Timestamp].
+/// A [`Stepper`] that has a notion of timestamps that get incremented on each step. Each step
+/// "completes" a frame for a particular [`Timestamp`].
 pub(crate) trait FixedTimestepper: Stepper {
-    /// The [Timestamp] of the frame that was last completed by the previous step.
+    /// The [`Timestamp`] of the frame that was last completed by the previous step.
     fn last_completed_timestamp(&self) -> Timestamp;
 
-    /// Override the [Timestamp].
+    /// Override the [`Timestamp`].
     fn reset_last_completed_timestamp(&mut self, corrected_timestamp: Timestamp);
 
-    /// Optional template method that [TimeKeeper] can call after completing a batch of step calls.
+    /// Optional template method that [`TimeKeeper`] can call after completing a batch of step
+    /// calls.
     fn post_update(&mut self, _timestep_overshoot_seconds: f64) {}
 }
 
-/// The method for [TimeKeeper] to decide the last step to call as part of an
+/// The method for [`TimeKeeper`] to decide the last step to call as part of an
 /// [update](TimeKeeper::update) call.
 #[derive(PartialEq, Eq, Debug)]
 pub(crate) enum TerminationCondition {
-    /// [TimeKeeper::update] will stop on or just before the target time. As a result, the internal
-    /// overshoot counter will always be zero or negative.
+    /// [`TimeKeeper::update`] will stop on or just before the target time. As a result, the
+    /// internal overshoot counter will always be zero or negative.
     LastUndershoot,
 
-    /// [TimeKeeper::update] will stop on or just after the target time. As a result, the internal
-    /// overshoot counter will always be zero or positive.
+    /// [`TimeKeeper::update`] will stop on or just after the target time. As a result, the
+    /// internal overshoot counter will always be zero or positive.
     FirstOvershoot,
 }
 
 impl TerminationCondition {
-    /// Given a [FloatTimestamp], decompose it into an quantised [Timestamp] and the associated
-    /// overshoot (in seconds) of that quantised [Timestamp] relative to the target
-    /// [FloatTimestamp]. This is what the last completed timestamp and the overshoot of a
-    /// [TimeKeeper] would be if it caught up to the given target float timestamp.
+    /// Given a [`FloatTimestamp`], decompose it into an quantised [`Timestamp`] and the associated
+    /// overshoot (in seconds) of that quantised [`Timestamp`] relative to the target
+    /// [`FloatTimestamp`]. This is what the last completed timestamp and the overshoot of a
+    /// [`TimeKeeper`] would be if it caught up to the given target float timestamp.
     pub fn decompose_float_timestamp(
         &self,
         float_timestamp: FloatTimestamp,
@@ -71,15 +72,15 @@ impl TerminationCondition {
     }
 }
 
-/// Given something that can be stepped through in fixed timesteps (aka a [FixedTimestepper]), the
-/// [TimeKeeper] provides higher-level functionality that makes sure the stepper is always caught
-/// up with the external clock. You can call [TimeKeeper::update] at a framerate different to the
-/// internal stepper's fixed timestep, and the [TimeKeeper] will execute an appropriate number of
-/// steps on the stepper to meet the external framerate as close as possible.
+/// Given something that can be stepped through in fixed timesteps (aka a [`FixedTimestepper`]),
+/// the [`TimeKeeper`] provides higher-level functionality that makes sure the stepper is always
+/// caught up with the external clock. You can call [`TimeKeeper::update`] at a framerate different
+/// to the internal stepper's fixed timestep, and the [`TimeKeeper`] will execute an appropriate
+/// number of steps on the stepper to meet the external framerate as close as possible.
 #[derive(Debug)]
 pub(crate) struct TimeKeeper<T: FixedTimestepper, const TERMINATION_CONDITION: TerminationCondition>
 {
-    /// The stepper whose time is managed by this [TimeKeeper].
+    /// The stepper whose time is managed by this [`TimeKeeper`].
     stepper: T,
 
     /// The number of seconds that the stepper has overshooted the requested render timestamp.
@@ -91,7 +92,8 @@ pub(crate) struct TimeKeeper<T: FixedTimestepper, const TERMINATION_CONDITION: T
 impl<T: FixedTimestepper, const TERMINATION_CONDITION: TerminationCondition>
     TimeKeeper<T, TERMINATION_CONDITION>
 {
-    /// Wrap the given [FixedTimestepper] with a [TimeKeeper] that will manage the stepper's time.
+    /// Wrap the given [`FixedTimestepper`] with a [`TimeKeeper`] that will manage the stepper's
+    /// time.
     pub fn new(stepper: T, config: Config) -> Self {
         Self {
             stepper,
@@ -104,7 +106,7 @@ impl<T: FixedTimestepper, const TERMINATION_CONDITION: TerminationCondition>
     /// try and reach the time delta. Stops when it reaches the configured [maximum step
     /// quota](Config::update_delta_seconds_max) to avoid freezing the process. If the stepper's
     /// timestamp desyncs too far away from the expected timestamp calculated from the absolute
-    /// `server_seconds_since_startup` time, then this [TimeKeeper] attempts to compensate this
+    /// `server_seconds_since_startup` time, then this [`TimeKeeper`] attempts to compensate this
     /// drift by stretching/compressing the given time delta.
     pub fn update(&mut self, delta_seconds: f64, server_seconds_since_startup: f64) {
         let compensated_delta_seconds =
@@ -144,11 +146,12 @@ impl<T: FixedTimestepper, const TERMINATION_CONDITION: TerminationCondition>
     /// negative refers that our timekeeper needs to catchup.
     ///
     /// Drift can build up due to several reasong:
+    ///
     /// - Floating point rounding errors (unlikely),
-    /// - A [TimeKeeper::update] call with a `delta_seconds` that was too large that it exceeded
-    /// the configured update limit. See [Config::update_delta_seconds_max].
+    /// - A [`TimeKeeper::update`] call with a `delta_seconds` that was too large that it exceeded
+    ///   the configured update limit. See [`Config::update_delta_seconds_max`].
     /// - Your external clock itself is drifting, because, for example, it is syncing with another
-    /// machine's clock over the network.
+    ///   machine's clock over the network.
     pub fn timestamp_drift_seconds(&self, server_seconds_since_startup: f64) -> f64 {
         let frame_drift = self.current_logical_timestamp()
             - self.target_logical_timestamp(server_seconds_since_startup);

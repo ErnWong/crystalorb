@@ -251,10 +251,10 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
         self.command_buffer.insert(command);
     }
 
-    /// Tries to "fast-forward" the world simulation so that the timestamp of the last
-    /// completed frame matches the target timestamp. If the maximum number of steps is
-    /// reached, the last_completed_timestamp() will not match the target timestamp yet, since
-    /// no frames are to be skipped over.
+    /// Tries to "fast-forward" the world simulation so that the timestamp of the last completed
+    /// frame matches the target timestamp. If the maximum number of steps is reached, the
+    /// `last_completed_timestamp()` will not match the target timestamp yet, since no frames are
+    /// to be skipped over.
     pub fn try_completing_simulations_up_to(
         &mut self,
         target_completed_timestamp: &Timestamp,

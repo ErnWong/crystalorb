@@ -163,8 +163,8 @@ impl ClockSyncer {
         &self.client_id
     }
 
-    /// The difference in seconds between client's seconds_since_startup and server's
-    /// seconds_since_startup, where a positive value refers that an earlier client time value
+    /// The difference in seconds between client's `seconds_since_startup` and server's
+    /// `seconds_since_startup`, where a positive value refers that an earlier client time value
     /// corresponds to the same instant as a later server time value. Since servers start
     /// earlier than clients, this value should in theory always be positive. The value stored
     /// here is the "effective" offset that is used by the client, and may be up to date with
