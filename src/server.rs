@@ -182,7 +182,8 @@ impl<WorldType: World> Server<WorldType> {
             self.receive_command(command.clone(), command_source, &mut *net);
         }
         for (handle, clock_sync_message) in clock_syncs {
-            net.send_message(handle, clock_sync_message).unwrap();
+            net.send_message(handle, clock_sync_message)
+                .expect("Connection from which clocksync request came from should still exist");
         }
 
         self.timekeeping_simulation
