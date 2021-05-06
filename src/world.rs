@@ -42,6 +42,16 @@ pub trait DisplayState: Send + Sync + Clone + Debug {
 }
 
 impl<T: DisplayState> DisplayState for Timestamped<T> {
+    /// Interpolate between two timestamped display states. If the two timestamps are
+    /// different, then the interpolation parameter `t` must be either `0.0` or `1.0`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timestamps are different but the interpolation parameter is not `0.0` nor
+    /// `1.0`, since timestamps are whole number values and cannot be continuously
+    /// interpolated. Interpolating between two display states of different timestamps is known
+    /// as "tweening" (i.e. animation in-betweening) and should be done using
+    /// [`Tweened::from_interpolation`].
     fn from_interpolation(state1: &Self, state2: &Self, t: f64) -> Self {
         if t == 0.0 {
             state1.clone()

@@ -40,6 +40,10 @@ pub enum TweeningMethod {
 impl TweeningMethod {
     /// Depending on the tweening method, conditionally snap the interpolation parameter to 0.0 or
     /// 1.0.
+    ///
+    /// # Panics
+    ///
+    /// Asserts that `t` is within `0.0..=1.0`.
     pub fn shape_interpolation_t(&self, t: f64) -> f64 {
         assert!((0.0..=1.0).contains(&t));
         match self {
