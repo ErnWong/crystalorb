@@ -272,11 +272,11 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
     /// to be skipped over.
     pub fn try_completing_simulations_up_to(
         &mut self,
-        target_completed_timestamp: &Timestamp,
+        target_completed_timestamp: Timestamp,
         max_steps: usize,
     ) {
         for _ in 0..max_steps {
-            if self.last_completed_timestamp() >= *target_completed_timestamp {
+            if self.last_completed_timestamp() >= target_completed_timestamp {
                 break;
             }
             self.step();

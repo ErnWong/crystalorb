@@ -772,7 +772,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                 old_world_simulation.last_completed_timestamp()
             );
             new_world_simulation.try_completing_simulations_up_to(
-                &old_world_simulation.last_completed_timestamp(),
+                old_world_simulation.last_completed_timestamp(),
                 this.config.fastforward_max_per_step,
             );
         }

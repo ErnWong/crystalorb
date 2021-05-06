@@ -52,7 +52,7 @@ impl Timestamp {
     /// let seconds_difference = (t2 - t1).as_seconds(TIMESTEP);
     /// assert!(approx_eq!(f64, seconds_difference, 50.0 / 60.0, ulps=1));
     /// ```
-    pub fn as_seconds(&self, timestep_seconds: f64) -> f64 {
+    pub fn as_seconds(self, timestep_seconds: f64) -> f64 {
         self.0 .0 as f64 * timestep_seconds
     }
 
@@ -163,7 +163,7 @@ impl FloatTimestamp {
     /// let seconds_difference = (t2 - t1).as_seconds(TIMESTEP);
     /// assert!(approx_eq!(f64, seconds_difference, 0.5 / 60.0, ulps=1));
     /// ```
-    pub fn as_seconds(&self, timestep_seconds: f64) -> f64 {
+    pub fn as_seconds(self, timestep_seconds: f64) -> f64 {
         self.0 * timestep_seconds
     }
 
@@ -181,7 +181,7 @@ impl FloatTimestamp {
     /// assert_eq!(t1.ceil(), Timestamp::default() + 124);
     /// assert_eq!(t2.ceil(), Timestamp::default() + 123);
     /// ```
-    pub fn ceil(&self) -> Timestamp {
+    pub fn ceil(self) -> Timestamp {
         Timestamp(Wrapping(self.0.ceil() as i16))
     }
 
@@ -199,7 +199,7 @@ impl FloatTimestamp {
     /// assert_eq!(t1.floor(), Timestamp::default() + 123);
     /// assert_eq!(t2.floor(), Timestamp::default() + 123);
     /// ```
-    pub fn floor(&self) -> Timestamp {
+    pub fn floor(self) -> Timestamp {
         Timestamp(Wrapping(self.0.floor() as i16))
     }
 }
