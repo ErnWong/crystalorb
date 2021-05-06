@@ -636,8 +636,19 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
         } = self.world_simulations.get();
 
         if new_world_simulation.last_completed_timestamp()
-            != old_world_simulation.last_completed_timestamp()
+            == old_world_simulation.last_completed_timestamp()
         {
+            assert_eq!(
+                new_world_simulation.last_completed_timestamp(),
+                old_world_simulation.last_completed_timestamp()
+            );
+            if self.blend_old_new_interpolation_t < 1.0 {
+                ReconciliationStatus::Blending(self.blend_old_new_interpolation_t)
+            } else {
+                assert!(self.blend_old_new_interpolation_t >= 1.0);
+                ReconciliationStatus::AwaitingSnapshot
+            }
+        } else {
             assert!(
                 self.blend_old_new_interpolation_t <= 0.0,
                 "Interpolation t advances only if timestamps are equal, and once they are equal, they remain equal even in timeskips."
@@ -661,17 +672,6 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
                 FastforwardingHealth::Healthy
             };
             ReconciliationStatus::Fastforwarding(fastforward_status)
-        } else {
-            assert_eq!(
-                new_world_simulation.last_completed_timestamp(),
-                old_world_simulation.last_completed_timestamp()
-            );
-            if self.blend_old_new_interpolation_t < 1.0 {
-                ReconciliationStatus::Blending(self.blend_old_new_interpolation_t)
-            } else {
-                assert!(self.blend_old_new_interpolation_t >= 1.0);
-                ReconciliationStatus::AwaitingSnapshot
-            }
         }
     }
 
