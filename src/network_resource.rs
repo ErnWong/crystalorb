@@ -70,6 +70,11 @@ pub trait NetworkResource {
     ///
     /// CrystalOrb will invoke this method with the three message types as specified in
     /// [`NetworkResource`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NotFound`](std::io::ErrorKind::NotFound) [`std::io::Error`] if a connection with
+    /// the given `handle` could not be found.
     fn send_message<MessageType>(
         &mut self,
         handle: ConnectionHandleType,
