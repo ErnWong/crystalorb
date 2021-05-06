@@ -3,6 +3,7 @@ name = "crystalorb-mock-network"
 version = "0.1.0"
 authors = ["Ernest Wong <sudo@ernestwong.nz>"]
 categories = ["games", "simulation"]
+description = "Mock, offline, in-memory transport layer for CrystalOrb"
 edition = "2018"
 keywords = ["netcode"]
 license = "Apache-2.0"

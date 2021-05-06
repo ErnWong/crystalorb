@@ -3,6 +3,7 @@ name = "crystalorb-demo"
 version = "0.1.0"
 authors = ["Ernest Wong <sudo@ernestwong.nz>"]
 categories = ["games", "simulation"]
+description = "Visual and interactive demo for CrystalOrb using the Rapier physics engine"
 edition = "2018"
 keywords = ["netcode"]
 license = "Apache-2.0"
