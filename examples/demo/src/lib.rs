@@ -1,5 +1,5 @@
 use crystalorb::{
-    client::{Client, ClientStage},
+    client::{Client, ClientStage, ClientStageMut},
     clocksync::ClockSyncMessage,
     command::Command,
     fixed_timestepper::Stepper,
@@ -519,7 +519,7 @@ impl Demo {
 
     pub fn issue_command(&mut self, command: DemoCommand) {
         let client = self.client_mut(command.player_side);
-        if let ClientStage::Ready(ready_client) = client.client.stage_mut() {
+        if let ClientStageMut::Ready(mut ready_client) = client.client.stage_mut() {
             ready_client.issue_command(command, &mut client.network);
         }
     }

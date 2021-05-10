@@ -100,11 +100,8 @@ impl<T: DisplayState> Deref for Tweened<T> {
 }
 
 impl<T: DisplayState> Tweened<T> {
-    pub(crate) fn from_interpolation(
-        state1: &Timestamped<T>,
-        state2: &Timestamped<T>,
-        t: f64,
-    ) -> Self {
+    /// Interpolate between two timestamped dispay states to find the in-between display state.
+    pub fn from_interpolation(state1: &Timestamped<T>, state2: &Timestamped<T>, t: f64) -> Self {
         // Note: timestamps are in modulo arithmetic, so we need to work using the wrapped
         // difference value.
         let timestamp_difference: i16 = (state2.timestamp() - state1.timestamp()).into();

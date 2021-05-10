@@ -11,7 +11,7 @@
 //!
 //! - [issue commands](ReadyClient::issue_command)
 //!     ```
-//!     use crystalorb::{Config, client::{Client, ClientStage}};
+//!     use crystalorb::{Config, client::{Client, ClientStageMut}};
 //!     use crystalorb_demo::{DemoWorld, DemoCommand, PlayerSide, PlayerCommand};
 //!     use crystalorb_mock_network::MockNetwork;
 //!
@@ -23,7 +23,7 @@
 //!
 //!     // ...later on in your update loop, in response to a player input...
 //!
-//!     if let ClientStage::Ready(ready_client) = client.stage_mut() {
+//!     if let ClientStageMut::Ready(mut ready_client) = client.stage_mut() {
 //!         let command = DemoCommand::new(PlayerSide::Left, PlayerCommand::Jump, true);
 //!         ready_client.issue_command(command, &mut network);
 //!     }
@@ -62,7 +62,11 @@ use crate::{
     world::{DisplayState, InitializationType, Tweened, World, WorldSimulation},
     Config,
 };
-use std::fmt::{Display, Formatter};
+use std::{
+    borrow::{Borrow, BorrowMut},
+    fmt::{Display, Formatter},
+    marker::PhantomData,
+};
 use tracing::{debug, info, trace, warn};
 
 /// This is the top-level structure of CrystalOrb for your game client, analogous to the
@@ -71,7 +75,7 @@ use tracing::{debug, info, trace, warn};
 #[derive(Debug)]
 pub struct Client<WorldType: World> {
     config: Config,
-    stage: ClientStage<WorldType>,
+    stage: ClientStageInternal<WorldType>,
 }
 
 impl<WorldType: World> Client<WorldType> {
@@ -102,7 +106,7 @@ impl<WorldType: World> Client<WorldType> {
     pub fn new(config: Config) -> Self {
         Self {
             config: config.clone(),
-            stage: ClientStage::SyncingClock(SyncingClockClient(ClockSyncer::new(config))),
+            stage: ClientStageInternal::SyncingClock(ClockSyncer::new(config)),
         }
     }
 
@@ -153,15 +157,15 @@ impl<WorldType: World> Client<WorldType> {
             );
         }
         let should_transition = match &mut self.stage {
-            ClientStage::SyncingClock(SyncingClockClient(clocksyncer)) => {
+            ClientStageInternal::SyncingClock(clocksyncer) => {
                 clocksyncer.update(positive_delta_seconds, seconds_since_startup, net);
                 clocksyncer.is_ready()
             }
-            ClientStage::SyncingInitialState(SyncingInitialStateClient(client)) => {
+            ClientStageInternal::SyncingInitialState(client) => {
                 client.update(positive_delta_seconds, seconds_since_startup, net);
                 client.is_ready()
             }
-            ClientStage::Ready(ReadyClient(client)) => {
+            ClientStageInternal::Ready(client) => {
                 client.update(positive_delta_seconds, seconds_since_startup, net);
                 false
             }
@@ -169,23 +173,24 @@ impl<WorldType: World> Client<WorldType> {
         if should_transition {
             let config = self.config.clone();
             take_mut::take(&mut self.stage, |stage| match stage {
-                ClientStage::SyncingClock(SyncingClockClient(clocksyncer)) => {
-                    ClientStage::SyncingInitialState(SyncingInitialStateClient(ActiveClient::new(
+                ClientStageInternal::SyncingClock(clocksyncer) => {
+                    ClientStageInternal::SyncingInitialState(ActiveClient::new(
                         seconds_since_startup,
                         config,
                         clocksyncer,
-                    )))
+                    ))
                 }
-                ClientStage::SyncingInitialState(SyncingInitialStateClient(client)) => {
-                    ClientStage::Ready(ReadyClient(client))
+                ClientStageInternal::SyncingInitialState(client) => {
+                    ClientStageInternal::Ready(client)
                 }
-                ClientStage::Ready(_) => unreachable!(),
+                ClientStageInternal::Ready(_) => unreachable!(),
             });
         }
     }
 
     /// Get the current stage of the [`Client`], which provides access to extra functionality
-    /// depending on what stage it is currently in.
+    /// depending on what stage it is currently in. See [`Client::stage_mut`], which provides
+    /// functionality to mutate the client in some way.
     ///
     /// # Example
     ///
@@ -209,12 +214,13 @@ impl<WorldType: World> Client<WorldType> {
     ///     );
     /// }
     /// ```
-    pub fn stage(&self) -> &ClientStage<WorldType> {
-        &self.stage
+    pub fn stage(&self) -> ClientStage<WorldType> {
+        ClientStage::from(&self.stage)
     }
 
     /// Get the current stage f the [`Client`], which provides access to extra functionality
-    /// depending on what stage it is currently in.
+    /// depending on what stage it is currently in. For shareable immutable version, see
+    /// [`Client::stage`].
     ///
     /// # Example
     ///
@@ -222,7 +228,7 @@ impl<WorldType: World> Client<WorldType> {
     /// stage:
     ///
     /// ```
-    /// use crystalorb::{Config, client::{Client, ClientStage}};
+    /// use crystalorb::{Config, client::{Client, ClientStageMut}};
     /// use crystalorb_demo::{DemoWorld, DemoCommand, PlayerSide, PlayerCommand};
     /// use crystalorb_mock_network::MockNetwork;
     ///
@@ -234,21 +240,69 @@ impl<WorldType: World> Client<WorldType> {
     ///
     /// // ...Later on...
     ///
-    /// if let ClientStage::Ready(ready_client) = client.stage_mut() {
+    /// if let ClientStageMut::Ready(mut ready_client) = client.stage_mut() {
     ///     let command = DemoCommand::new(PlayerSide::Left, PlayerCommand::Jump, true);
     ///     ready_client.issue_command(command, &mut network);
     /// }
     /// ```
-    pub fn stage_mut(&mut self) -> &mut ClientStage<WorldType> {
-        &mut self.stage
+    pub fn stage_mut(&mut self) -> ClientStageMut<WorldType> {
+        ClientStageMut::from(&mut self.stage)
+    }
+}
+
+/// See [`ClientStage`].
+#[derive(Debug)]
+enum ClientStageInternal<WorldType: World> {
+    /// See [`ClientStage::SyncingClock`].
+    SyncingClock(ClockSyncer),
+
+    /// See [`ClientStage::SyncingInitialState`]
+    SyncingInitialState(ActiveClient<WorldType>),
+
+    /// See [`ClientStage::Ready`]
+    Ready(ActiveClient<WorldType>),
+}
+
+impl<'a, WorldType: World> From<&'a ClientStageInternal<WorldType>> for ClientStage<'a, WorldType> {
+    fn from(stage: &'a ClientStageInternal<WorldType>) -> ClientStage<'a, WorldType> {
+        match stage {
+            ClientStageInternal::SyncingClock(clocksyncer) => {
+                ClientStage::SyncingClock(clocksyncer.into())
+            }
+            ClientStageInternal::SyncingInitialState(active_client) => {
+                ClientStage::SyncingInitialState(active_client.into())
+            }
+            ClientStageInternal::Ready(active_client) => ClientStage::Ready(active_client.into()),
+        }
+    }
+}
+
+impl<'a, WorldType: World> From<&'a mut ClientStageInternal<WorldType>>
+    for ClientStageMut<'a, WorldType>
+{
+    fn from(stage: &'a mut ClientStageInternal<WorldType>) -> ClientStageMut<'a, WorldType> {
+        match stage {
+            ClientStageInternal::SyncingClock(clocksyncer) => {
+                ClientStageMut::SyncingClock(clocksyncer.into())
+            }
+            ClientStageInternal::SyncingInitialState(active_client) => {
+                ClientStageMut::SyncingInitialState(active_client.into())
+            }
+            ClientStageInternal::Ready(active_client) => {
+                ClientStageMut::Ready(active_client.into())
+            }
+        }
     }
 }
 
 /// The [`Client`] undergoes several stages of initialization before it is ready to accept commands
 /// and be displayed to the player's screen. This enum provides access to different functionality
 /// depending on what stage the [`Client`] is at.
+///
+/// This is the immutable version that is returned by [`Client::stage`]. See [`Client::stage_mut`]
+/// and [`ClientStageMut`] for mutable access.
 #[derive(Debug)]
-pub enum ClientStage<WorldType: World> {
+pub enum ClientStage<'a, WorldType: World> {
     /// In this first stage, the [`Client`] tries to figure out the clock differences between the
     /// local machine and the server machine. The [`Client`] collects a handful of "clock offset"
     /// samples until it reaches the amount needed to make a good estimate. This timing difference
@@ -258,64 +312,148 @@ pub enum ClientStage<WorldType: World> {
     /// You can observe the clock syncing progress by checking the [number of samples collected so
     /// far](SyncingClockClient::sample_count) and comparing that number with the [number of
     /// samples that are needed](SyncingClockClient::samples_needed).
-    SyncingClock(SyncingClockClient),
+    SyncingClock(SyncingClockClient<&'a ClockSyncer>),
 
     /// The second stage is where the [`Client`] waits for the first
     /// [`Server`](crate::server::Server) [snapshot](World::SnapshotType) to arrive, fastforwarded,
     /// and generally be fully processed through the client pipeline so that it can be shown on the
     /// screen, to flush out all the uninitialized simulation state.
-    SyncingInitialState(SyncingInitialStateClient<WorldType>),
+    SyncingInitialState(SyncingInitialStateClient<WorldType, &'a ActiveClient<WorldType>>),
 
     /// The third and final stage is where the [`Client`] is now ready for its [display
     /// state](ReadyClient::display_state) to be shown onto the screen, and where the [`Client`] is
     /// ready to accept commands from the user.
-    Ready(ReadyClient<WorldType>),
+    Ready(ReadyClient<WorldType, &'a ActiveClient<WorldType>>),
+}
+
+/// The [`Client`] undergoes several stages of initialization before it is ready to accept commands
+/// and be displayed to the player's screen. This enum provides access to different functionality
+/// depending on what stage the [`Client`] is at.
+///
+/// This is the mutable version that is returned by [`Client::stage_mut`]. See [`Client::stage`]
+/// and [`ClientStage`] for immutable access.
+#[derive(Debug)]
+pub enum ClientStageMut<'a, WorldType: World> {
+    /// The first stage. See [`ClientStage::SyncingClock`] for more info.
+    SyncingClock(SyncingClockClient<&'a mut ClockSyncer>),
+
+    /// The second stage. See [`ClientStage::SyncingInitialState`] for more info.
+    SyncingInitialState(SyncingInitialStateClient<WorldType, &'a mut ActiveClient<WorldType>>),
+
+    /// The third stage. See [`ClientStage::Ready`] for more info.
+    Ready(ReadyClient<WorldType, &'a mut ActiveClient<WorldType>>),
 }
 
 /// The client interface while the client is in the initial clock syncing stage.
 #[derive(Debug)]
-pub struct SyncingClockClient(ClockSyncer);
+pub struct SyncingClockClient<ClockSyncerRefType>(ClockSyncerRefType)
+where
+    ClockSyncerRefType: Borrow<ClockSyncer>;
 
-impl SyncingClockClient {
+impl<'a> From<&'a ClockSyncer> for SyncingClockClient<&'a ClockSyncer> {
+    fn from(clocksyncer: &'a ClockSyncer) -> Self {
+        SyncingClockClient(clocksyncer)
+    }
+}
+
+impl<'a> From<&'a mut ClockSyncer> for SyncingClockClient<&'a mut ClockSyncer> {
+    fn from(clocksyncer: &'a mut ClockSyncer) -> Self {
+        SyncingClockClient(clocksyncer)
+    }
+}
+
+impl<ClockSyncerRefType> SyncingClockClient<ClockSyncerRefType>
+where
+    ClockSyncerRefType: Borrow<ClockSyncer>,
+{
     /// The number of clock offset samples collected so far.
     pub fn sample_count(&self) -> usize {
-        self.0.sample_count()
+        self.0.borrow().sample_count()
     }
 
     /// The number of clock offset samples needed to make a good estimate on the timing differences
     /// between the client and the server.
     pub fn samples_needed(&self) -> usize {
-        self.0.samples_needed()
+        self.0.borrow().samples_needed()
     }
 }
 
 /// The client interface while the client is in the initial state syncing stage.
 #[derive(Debug)]
-pub struct SyncingInitialStateClient<WorldType: World>(ActiveClient<WorldType>);
+pub struct SyncingInitialStateClient<WorldType, ActiveClientRefType>(
+    ActiveClientRefType,
+    PhantomData<WorldType>,
+)
+where
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
+    WorldType: World;
 
-impl<WorldType: World> SyncingInitialStateClient<WorldType> {
+impl<'a, WorldType: World> From<&'a ActiveClient<WorldType>>
+    for SyncingInitialStateClient<WorldType, &'a ActiveClient<WorldType>>
+{
+    fn from(active_client: &'a ActiveClient<WorldType>) -> Self {
+        SyncingInitialStateClient(active_client, PhantomData)
+    }
+}
+
+impl<'a, WorldType: World> From<&'a mut ActiveClient<WorldType>>
+    for SyncingInitialStateClient<WorldType, &'a mut ActiveClient<WorldType>>
+{
+    fn from(active_client: &'a mut ActiveClient<WorldType>) -> Self {
+        SyncingInitialStateClient(active_client, PhantomData)
+    }
+}
+
+impl<WorldType, ActiveClientRefType> SyncingInitialStateClient<WorldType, ActiveClientRefType>
+where
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
+    WorldType: World,
+{
     /// The timestamp of the most recent frame that has completed its simulation.
     /// This is typically one less than [`SyncingInitialStateClient::simulating_timestamp`].
     pub fn last_completed_timestamp(&self) -> Timestamp {
-        self.0.last_completed_timestamp()
+        self.0.borrow().last_completed_timestamp()
     }
 
     /// The timestamp of the frame that is *in the process* of being simulated.
     /// This is typically one more than [`SyncingInitialStateClient::simulating_timestamp`].
     pub fn simulating_timestamp(&self) -> Timestamp {
-        self.0.simulating_timestamp()
+        self.0.borrow().simulating_timestamp()
     }
 }
 
 /// The client interface once the client is in the "ready" stage.
 #[derive(Debug)]
-pub struct ReadyClient<WorldType: World>(ActiveClient<WorldType>);
+pub struct ReadyClient<WorldType, ActiveClientRefType>(ActiveClientRefType, PhantomData<WorldType>)
+where
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
+    WorldType: World;
 
-impl<WorldType: World> ReadyClient<WorldType> {
+impl<'a, WorldType: World> From<&'a ActiveClient<WorldType>>
+    for ReadyClient<WorldType, &'a ActiveClient<WorldType>>
+{
+    fn from(active_client: &'a ActiveClient<WorldType>) -> Self {
+        ReadyClient(active_client, PhantomData)
+    }
+}
+
+impl<'a, WorldType: World> From<&'a mut ActiveClient<WorldType>>
+    for ReadyClient<WorldType, &'a mut ActiveClient<WorldType>>
+{
+    fn from(active_client: &'a mut ActiveClient<WorldType>) -> Self {
+        ReadyClient(active_client, PhantomData)
+    }
+}
+
+impl<WorldType, ActiveClientRefType> ReadyClient<WorldType, ActiveClientRefType>
+where
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
+    WorldType: World,
+{
     /// The timestamp of the most recent frame that has completed its simulation.
     /// This is typically one less than [`ReadyClient::simulating_timestamp`].
     pub fn last_completed_timestamp(&self) -> Timestamp {
-        self.0.last_completed_timestamp()
+        self.0.borrow().last_completed_timestamp()
     }
 
     /// The timestamp of the frame that is *in the process* of being simulated.
@@ -324,7 +462,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
     /// This is also the timestamp that gets attached to the command when you call
     /// [`ReadyClient::issue_command`].
     pub fn simulating_timestamp(&self) -> Timestamp {
-        self.0.simulating_timestamp()
+        self.0.borrow().simulating_timestamp()
     }
 
     /// A number that is used to identify the client among all the clients connected to the server.
@@ -332,23 +470,10 @@ impl<WorldType: World> ReadyClient<WorldType> {
     /// which player.
     pub fn client_id(&self) -> usize {
         self.0
+            .borrow()
             .clocksyncer
             .client_id()
             .expect("Client should be connected by the time it is ready")
-    }
-
-    /// Issue a command from this client's player to the world. The command will be scheduled
-    /// to the current simulating timestamp (the previously completed timestamp + 1).
-    pub fn issue_command<NetworkResourceType: NetworkResource>(
-        &mut self,
-        command: WorldType::CommandType,
-        net: &mut NetworkResourceType,
-    ) {
-        let timestamped_command = Timestamped::new(command, self.simulating_timestamp());
-        self.0
-            .timekeeping_simulations
-            .receive_command(&timestamped_command);
-        net.broadcast_message(timestamped_command);
     }
 
     /// Iterate through the commands that are being kept around. This is intended to be for
@@ -356,13 +481,18 @@ impl<WorldType: World> ReadyClient<WorldType> {
     pub fn buffered_commands(
         &self,
     ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {
-        self.0.timekeeping_simulations.base_command_buffer.iter()
+        self.0
+            .borrow()
+            .timekeeping_simulations
+            .base_command_buffer
+            .iter()
     }
 
     /// Get the current display state that can be used to render the client's screen.
     pub fn display_state(&self) -> &Tweened<WorldType::DisplayStateType> {
         &self
             .0
+            .borrow()
             .timekeeping_simulations
             .display_state
             .as_ref()
@@ -381,6 +511,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
     pub fn last_queued_snapshot_timestamp(&self) -> &Option<Timestamp> {
         &self
             .0
+            .borrow()
             .timekeeping_simulations
             .last_queued_snapshot_timestamp
     }
@@ -396,6 +527,7 @@ impl<WorldType: World> ReadyClient<WorldType> {
     pub fn last_received_snapshot_timestamp(&self) -> &Option<Timestamp> {
         &self
             .0
+            .borrow()
             .timekeeping_simulations
             .last_received_snapshot_timestamp
     }
@@ -404,13 +536,37 @@ impl<WorldType: World> ReadyClient<WorldType> {
     /// client is currently at. For more information, refer to [`ReconciliationStatus`].
     pub fn reconciliation_status(&self) -> ReconciliationStatus {
         self.0
+            .borrow()
             .timekeeping_simulations
             .infer_current_reconciliation_status()
     }
 }
 
+impl<WorldType, ActiveClientRefType> ReadyClient<WorldType, ActiveClientRefType>
+where
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>> + BorrowMut<ActiveClient<WorldType>>,
+    WorldType: World,
+{
+    /// Issue a command from this client's player to the world. The command will be scheduled
+    /// to the current simulating timestamp (the previously completed timestamp + 1).
+    pub fn issue_command<NetworkResourceType: NetworkResource>(
+        &mut self,
+        command: WorldType::CommandType,
+        net: &mut NetworkResourceType,
+    ) {
+        let timestamped_command = Timestamped::new(command, self.simulating_timestamp());
+        self.0
+            .borrow_mut()
+            .timekeeping_simulations
+            .receive_command(&timestamped_command);
+        net.broadcast_message(timestamped_command);
+    }
+}
+
+/// The internal CrystalOrb structure used to actively run the simulations, which is not
+/// constructed until the [`ClockSyncer`] is ready.
 #[derive(Debug)]
-struct ActiveClient<WorldType: World> {
+pub struct ActiveClient<WorldType: World> {
     clocksyncer: ClockSyncer,
 
     timekeeping_simulations:
@@ -450,6 +606,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
         self.last_completed_timestamp() + 1
     }
 
+    /// Perform the next update for the current rendering frame.
     pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
         delta_seconds: f64,

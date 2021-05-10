@@ -1,7 +1,10 @@
 #![feature(generic_associated_types)]
 
 use crystalorb::{
-    client::ClientStage, timestamp::Timestamp, world::Tweened, Config, TweeningMethod,
+    client::{ClientStage, ClientStageMut},
+    timestamp::Timestamp,
+    world::Tweened,
+    Config, TweeningMethod,
 };
 use pretty_assertions::assert_eq;
 use test_env_log::test;
@@ -71,7 +74,7 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
 
             if update_client {
                 match mock_client_server.client_1.stage_mut() {
-                    ClientStage::Ready(client) => {
+                    ClientStageMut::Ready(mut client) => {
                         let current_index = (i16::from(current_client_timestamp - start_timestamp))
                             .clamp(0, commands.len() as i16 - 1)
                             as usize;
@@ -93,7 +96,7 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
 
             if update_client {
                 match mock_client_server.client_1.stage_mut() {
-                    ClientStage::Ready(client) => {
+                    ClientStageMut::Ready(client) => {
                         client_state_history.push(client.display_state().clone())
                     }
                     _ => unreachable!(),
@@ -171,13 +174,13 @@ fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
 
             if update_client {
                 match mock_client_server.client_1.stage_mut() {
-                    ClientStage::Ready(client) => {
+                    ClientStageMut::Ready(client) => {
                         client_1_state_history.push(client.display_state().clone())
                     }
                     _ => unreachable!(),
                 }
                 match mock_client_server.client_2.stage_mut() {
-                    ClientStage::Ready(client) => {
+                    ClientStageMut::Ready(client) => {
                         client_2_state_history.push(client.display_state().clone())
                     }
                     _ => unreachable!(),

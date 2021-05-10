@@ -173,7 +173,8 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
         for _ in 0..100 {
             mock_client_server.update(TIMESTEP_SECONDS)
         }
-        let display_state = match mock_client_server.client_1.stage() {
+        let client_1_stage = mock_client_server.client_1.stage();
+        let display_state = match &client_1_stage {
             ClientStage::Ready(client) => client.display_state(),
             _ => unreachable!(),
         };

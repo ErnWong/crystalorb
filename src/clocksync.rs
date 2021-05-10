@@ -51,7 +51,7 @@ pub struct ClockSyncMessage {
 /// effective clock offset that is used by the client once the effective clock offset deviates too
 /// far from the rolling average.
 #[derive(Debug)]
-pub(crate) struct ClockSyncer {
+pub struct ClockSyncer {
     /// The difference in seconds between client's seconds_since_startup and server's
     /// seconds_since_startup, where a positive value refers that an earlier client time value
     /// corresponds to the same instant as a later server time value. Since servers start
