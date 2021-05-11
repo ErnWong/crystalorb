@@ -61,14 +61,13 @@ use crate::{
     network_resource::{Connection, NetworkResource},
     old_new::{OldNew, OldNewResult},
     timestamp::{Timestamp, Timestamped},
-    world::{DisplayState, InitializationType, Tweened, World, WorldSimulation},
+    world::{DisplayState, InitializationType, Simulation, Tweened, World},
     Config,
 };
 use std::fmt::{Display, Formatter};
 use tracing::{debug, info, trace, warn};
 
 pub mod stage;
-
 use stage::{Stage, StageMut, StageOwned};
 
 /// This is the top-level structure of CrystalOrb for your game client, analogous to the
@@ -405,8 +404,7 @@ struct ClientWorldSimulations<WorldType: World> {
     /// `world_simulation.get().new` has the latest server snapshot applied.
     /// `world_simulation.get().old` does not have the latest server snapshot applied.
     /// Old and new gets swapped every time a new queued server snapshot is applied.
-    world_simulations:
-        OldNew<WorldSimulation<WorldType, { InitializationType::NeedsInitialization }>>,
+    world_simulations: OldNew<Simulation<WorldType, { InitializationType::NeedsInitialization }>>,
 
     /// The interpolation paramater to blend the `old_world` and `new_world` together into a
     /// single world state. The parameter is in the range `[0,1]` where 0 represents using only
