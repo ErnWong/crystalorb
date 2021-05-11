@@ -1,6 +1,6 @@
 #![feature(generic_associated_types)]
 
-use crystalorb::{client::ClientStage, Config, TweeningMethod};
+use crystalorb::{client::stage::Stage, Config, TweeningMethod};
 use test_env_log::test;
 
 mod common;
@@ -42,7 +42,7 @@ fn when_server_and_client_clocks_desync_then_client_should_resync_quickly() {
         // GIVEN that the client is ready and synced up.
         mock_client_server.update_until_clients_ready(TIMESTEP_SECONDS);
         match mock_client_server.client_1.stage() {
-            ClientStage::Ready(client) => {
+            Stage::Ready(client) => {
                 assert_eq!(
                     client.last_completed_timestamp(),
                     mock_client_server
@@ -64,7 +64,7 @@ fn when_server_and_client_clocks_desync_then_client_should_resync_quickly() {
             mock_client_server.update(TIMESTEP_SECONDS);
         }
         match mock_client_server.client_1.stage() {
-            ClientStage::Ready(client) => {
+            Stage::Ready(client) => {
                 assert_eq!(
                     client.last_completed_timestamp(),
                     mock_client_server
@@ -125,7 +125,7 @@ fn when_client_connects_then_client_calculates_correct_initial_clock_offset() {
 
         // THEN the client should accurately offset its own clock to agree with the server.
         match mock_client_server.client_1.stage() {
-            ClientStage::Ready(client) => {
+            Stage::Ready(client) => {
                 assert_eq!(
                     client.last_completed_timestamp(),
                     mock_client_server

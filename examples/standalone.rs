@@ -1,7 +1,7 @@
 #![feature(generic_associated_types)]
 
 use crystalorb::{
-    client::{Client, ClientStage, ClientStageMut},
+    client::{stage::StageMut, Client},
     command::Command,
     fixed_timestepper::Stepper,
     server::Server,
@@ -157,25 +157,23 @@ fn main() {
         let mut client_1_stage = client_1.stage_mut();
         let mut client_2_stage = client_2.stage_mut();
 
-        let client_1_display_state =
-            if let ClientStageMut::Ready(ready_client_1) = &mut client_1_stage {
-                if (0.0..1.0).contains(&(seconds_since_startup % 10.0)) {
-                    ready_client_1.issue_command(MyCommand::Accelerate, &mut client_1_net);
-                }
-                Some(ready_client_1.display_state())
-            } else {
-                None
-            };
+        let client_1_display_state = if let StageMut::Ready(ready_client_1) = &mut client_1_stage {
+            if (0.0..1.0).contains(&(seconds_since_startup % 10.0)) {
+                ready_client_1.issue_command(MyCommand::Accelerate, &mut client_1_net);
+            }
+            Some(ready_client_1.display_state())
+        } else {
+            None
+        };
 
-        let client_2_display_state =
-            if let ClientStageMut::Ready(ready_client_2) = &mut client_2_stage {
-                if (5.0..6.0).contains(&(seconds_since_startup % 10.0)) {
-                    ready_client_2.issue_command(MyCommand::Decelerate, &mut client_2_net);
-                }
-                Some(ready_client_2.display_state())
-            } else {
-                None
-            };
+        let client_2_display_state = if let StageMut::Ready(ready_client_2) = &mut client_2_stage {
+            if (5.0..6.0).contains(&(seconds_since_startup % 10.0)) {
+                ready_client_2.issue_command(MyCommand::Decelerate, &mut client_2_net);
+            }
+            Some(ready_client_2.display_state())
+        } else {
+            None
+        };
 
         println!(
             "Server: {:?}, Client 1: {:?}, Client 2: {:?}",

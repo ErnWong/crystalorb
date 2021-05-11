@@ -6,7 +6,7 @@ use std::{error::Error, fmt::Debug};
 
 /// Used for identifying each connection. Note that this is how the
 /// [`Server`](crate::server::Server) determines the
-/// [`client_id`](crate::client::ReadyClient::client_id) for each client, so they should be unique
+/// [`client_id`](crate::client::stage::Ready::client_id) for each client, so they should be unique
 /// among all clients that is or has once connected during the server's uptime.
 pub type ConnectionHandleType = usize;
 

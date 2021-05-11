@@ -177,7 +177,8 @@ pub trait World: Stepper + Default + Send + Sync + 'static {
     /// the client has sufficient permission to issue such command. For example, you can prevent
     /// other clients from moving players that they don't own. Clients can determine their own
     /// `client_id` using the
-    /// [`ReadyClient::client_id`](crate::client::ReadyClient::client_id) method.
+    /// [`Ready::client_id`](crate::client::stage::Ready::client_id) method from the
+    /// [`Ready`](crate::client::stage::Stage::Ready) stage.
     fn command_is_valid(command: &Self::CommandType, client_id: usize) -> bool;
 
     /// This describes how a [`Command`] affects the [`World`]. Use this method to update your

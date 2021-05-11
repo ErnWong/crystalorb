@@ -1,6 +1,6 @@
 #![feature(generic_associated_types)]
 
-use crystalorb::{client::ClientStage, Config, TweeningMethod};
+use crystalorb::{client::stage::Stage, Config, TweeningMethod};
 use itertools::iproduct;
 use pretty_assertions::assert_eq;
 use test_env_log::test;
@@ -47,7 +47,7 @@ fn when_client_becomes_ready_state_should_already_be_initialised() {
         // THEN all clients' states are initialised to that server's state.
         for client in &[mock_client_server.client_1, mock_client_server.client_2] {
             match client.stage() {
-                ClientStage::Ready(ready_client) => {
+                Stage::Ready(ready_client) => {
                     assert_eq!(
                         ready_client.display_state().dx,
                         1234,
@@ -116,12 +116,12 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
         }
         let last_accepted_snapshot_timestamp_before_disconnect =
             match mock_client_server.client_1.stage() {
-                ClientStage::Ready(client) => client.last_queued_snapshot_timestamp().clone(),
+                Stage::Ready(client) => client.last_queued_snapshot_timestamp().clone(),
                 _ => unreachable!(),
             };
         let last_received_snapshot_timestamp_before_disconnect =
             match mock_client_server.client_1.stage() {
-                ClientStage::Ready(client) => client.last_received_snapshot_timestamp().clone(),
+                Stage::Ready(client) => client.last_received_snapshot_timestamp().clone(),
                 _ => unreachable!(),
             };
         mock_client_server.update(*long_delay_seconds);
@@ -145,7 +145,7 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
             mock_client_server.update(TIMESTEP_SECONDS);
             last_received_snapshot_timestamp_after_disconnect =
                 match mock_client_server.client_1.stage() {
-                    ClientStage::Ready(client) => client.last_received_snapshot_timestamp().clone(),
+                    Stage::Ready(client) => client.last_received_snapshot_timestamp().clone(),
                     _ => unreachable!(),
                 };
         }
@@ -153,7 +153,7 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
         // THEN that client should accept the server's new snapshots.
         let last_accepted_snapshot_timestamp_after_disconnect =
             match mock_client_server.client_1.stage() {
-                ClientStage::Ready(client) => client.last_queued_snapshot_timestamp().clone(),
+                Stage::Ready(client) => client.last_queued_snapshot_timestamp().clone(),
                 _ => unreachable!(),
             };
         assert_eq!(
@@ -175,7 +175,7 @@ fn when_client_doesnt_receive_snapshot_for_a_while_then_new_snapshot_is_still_ac
         }
         let client_1_stage = mock_client_server.client_1.stage();
         let display_state = match &client_1_stage {
-            ClientStage::Ready(client) => client.display_state(),
+            Stage::Ready(client) => client.display_state(),
             _ => unreachable!(),
         };
         assert_eq!(

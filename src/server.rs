@@ -5,7 +5,8 @@
 //! [`Client`](crate::client::Client) structure. Unlike the [`Client`](crate::client::Client), the
 //! [`Server`] does not need a "loading" stage, and can be used directly after creation.
 //!
-//! The interface shares some similarities with the [`ReadyClient`](crate::client::ReadyClient).
+//! The interface shares some similarities with the the [`Ready`](crate::client::stage::Ready)
+//! client stage.
 
 use crate::{
     clocksync::ClockSyncMessage,

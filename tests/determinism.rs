@@ -1,7 +1,7 @@
 #![feature(generic_associated_types)]
 
 use crystalorb::{
-    client::{ClientStage, ClientStageMut},
+    client::stage::{Stage, StageMut},
     timestamp::Timestamp,
     world::Tweened,
     Config, TweeningMethod,
@@ -55,7 +55,7 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
             vec![8, 9, 10, 11, 12],
         ];
         let start_timestamp = match mock_client_server.client_1.stage() {
-            ClientStage::Ready(client) => client.simulating_timestamp(),
+            Stage::Ready(client) => client.simulating_timestamp(),
             _ => unreachable!(),
         };
         let target_timestamp =
@@ -65,7 +65,7 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
 
         while mock_client_server.server.display_state().timestamp() < target_timestamp {
             let current_client_timestamp = match mock_client_server.client_1.stage() {
-                ClientStage::Ready(client) => {
+                Stage::Ready(client) => {
                     Timestamp::default() + client.display_state().float_timestamp() as i16
                 }
                 _ => unreachable!(),
@@ -74,7 +74,7 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
 
             if update_client {
                 match mock_client_server.client_1.stage_mut() {
-                    ClientStageMut::Ready(mut client) => {
+                    StageMut::Ready(mut client) => {
                         let current_index = (i16::from(current_client_timestamp - start_timestamp))
                             .clamp(0, commands.len() as i16 - 1)
                             as usize;
@@ -96,7 +96,7 @@ fn while_all_commands_originate_from_single_client_then_that_client_should_match
 
             if update_client {
                 match mock_client_server.client_1.stage_mut() {
-                    ClientStageMut::Ready(client) => {
+                    StageMut::Ready(client) => {
                         client_state_history.push(client.display_state().clone())
                     }
                     _ => unreachable!(),
@@ -152,7 +152,7 @@ fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
 
         // WHEN a single chosen client issue commands.
         let start_timestamp = match mock_client_server.client_1.stage() {
-            ClientStage::Ready(client) => client.simulating_timestamp(),
+            Stage::Ready(client) => client.simulating_timestamp(),
             _ => unreachable!(),
         };
         let target_timestamp = start_timestamp + 100;
@@ -162,7 +162,7 @@ fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
 
         while mock_client_server.server.display_state().timestamp() < target_timestamp {
             let current_client_timestamp = match mock_client_server.client_1.stage() {
-                ClientStage::Ready(client) => {
+                Stage::Ready(client) => {
                     Timestamp::default() + client.display_state().float_timestamp() as i16
                 }
                 _ => unreachable!(),
@@ -173,14 +173,15 @@ fn while_no_commands_are_issued_then_all_clients_should_match_server_exactly() {
             server_state_history.push(mock_client_server.server.display_state().into());
 
             if update_client {
+                // TODO: Mut seems unnecessary.
                 match mock_client_server.client_1.stage_mut() {
-                    ClientStageMut::Ready(client) => {
+                    StageMut::Ready(client) => {
                         client_1_state_history.push(client.display_state().clone())
                     }
                     _ => unreachable!(),
                 }
                 match mock_client_server.client_2.stage_mut() {
-                    ClientStageMut::Ready(client) => {
+                    StageMut::Ready(client) => {
                         client_2_state_history.push(client.display_state().clone())
                     }
                     _ => unreachable!(),
