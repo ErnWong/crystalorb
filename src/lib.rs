@@ -4,8 +4,14 @@
 #![feature(const_generics)]
 #![feature(generic_associated_types)]
 #![deny(missing_docs)]
-#![doc = include_str!("../README.markdown")]
 #![deny(missing_debug_implementations)]
+#![warn(clippy::pedantic, clippy::cargo, clippy::unwrap_used)]
+#![allow(
+    clippy::must_use_candidate,
+    clippy::too_many_lines,
+    clippy::module_name_repetitions
+)]
+#![doc = include_str!("../README.markdown")]
 
 pub mod client;
 pub mod clocksync;
