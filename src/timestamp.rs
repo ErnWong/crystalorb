@@ -15,6 +15,8 @@ use std::{
     ops::{Add, Deref, DerefMut, Range, Sub},
 };
 
+pub(crate) mod always_increasing;
+
 /// Represents and identifies a simulation instant.
 #[derive(Eq, PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub struct Timestamp(Wrapping<i16>);

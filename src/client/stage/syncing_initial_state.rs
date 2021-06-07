@@ -1,39 +1,37 @@
-use crate::{timestamp::Timestamp, world::World};
+use crate::{
+    client::{simulator::Simulator, stage::Active},
+    timestamp::Timestamp,
+};
 use std::{borrow::Borrow, marker::PhantomData};
-
-use super::ActiveClient;
 
 /// The client interface while the client is in the initial [state syncing
 /// stage](super#stage-2---syncing-initial-state-stage).
 #[derive(Debug)]
-pub struct SyncingInitialState<WorldType, ActiveClientRefType>(
-    ActiveClientRefType,
-    PhantomData<WorldType>,
-)
+pub struct SyncingInitialState<SimulatorType, RefType>(RefType, PhantomData<SimulatorType>)
 where
-    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
-    WorldType: World;
+    SimulatorType: Simulator,
+    RefType: Borrow<Active<SimulatorType>>;
 
-impl<'a, WorldType: World> From<&'a ActiveClient<WorldType>>
-    for SyncingInitialState<WorldType, &'a ActiveClient<WorldType>>
+impl<'a, SimulatorType: Simulator> From<&'a Active<SimulatorType>>
+    for SyncingInitialState<SimulatorType, &'a Active<SimulatorType>>
 {
-    fn from(active_client: &'a ActiveClient<WorldType>) -> Self {
+    fn from(active_client: &'a Active<SimulatorType>) -> Self {
         Self(active_client, PhantomData)
     }
 }
 
-impl<'a, WorldType: World> From<&'a mut ActiveClient<WorldType>>
-    for SyncingInitialState<WorldType, &'a mut ActiveClient<WorldType>>
+impl<'a, SimulatorType: Simulator> From<&'a mut Active<SimulatorType>>
+    for SyncingInitialState<SimulatorType, &'a mut Active<SimulatorType>>
 {
-    fn from(active_client: &'a mut ActiveClient<WorldType>) -> Self {
+    fn from(active_client: &'a mut Active<SimulatorType>) -> Self {
         Self(active_client, PhantomData)
     }
 }
 
-impl<WorldType, ActiveClientRefType> SyncingInitialState<WorldType, ActiveClientRefType>
+impl<SimulatorType, RefType> SyncingInitialState<SimulatorType, RefType>
 where
-    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
-    WorldType: World,
+    SimulatorType: Simulator,
+    RefType: Borrow<Active<SimulatorType>>,
 {
     /// The timestamp of the most recent frame that has completed its simulation.
     /// This is typically one less than [`SyncingInitialState::simulating_timestamp`].

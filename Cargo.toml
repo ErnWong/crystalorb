@@ -19,6 +19,7 @@ default = [
 tracing = "0.1.22"
 serde = "1.0.118"
 take_mut = "0.2.2"
+#type-freak = "0.2.0"
 
 [dev-dependencies]
 tracing-subscriber = "0.2.17"

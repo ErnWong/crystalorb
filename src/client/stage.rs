@@ -33,7 +33,9 @@
 //! [server]: crate::server::Server
 //! [snapshot]: crate::world::World::SnapshotType
 
-use crate::{clocksync::ClockSyncer, network_resource::NetworkResource, world::World, Config};
+use crate::{
+    client::simulator::Simulator, clocksync::ClockSyncer, network_resource::NetworkResource, Config,
+};
 
 mod syncing_clock;
 pub use syncing_clock::SyncingClock;
@@ -44,14 +46,15 @@ pub use syncing_initial_state::SyncingInitialState;
 mod ready;
 pub use ready::Ready;
 
-use super::ActiveClient;
+mod active;
+pub use active::Active;
 
 /// The internal, owned stage. Hosts the client's states and structures depending on what stage the
 /// client is at.
 ///
 /// See the [module-level documentation](self) for more information.
 #[derive(Debug)]
-pub(crate) enum StageOwned<WorldType: World> {
+pub(crate) enum StageOwned<SimulatorType: Simulator> {
     /// The [first stage][module-stage].
     ///
     /// See the relevant section in the [module-level documentation][module-stage] for more
@@ -66,7 +69,7 @@ pub(crate) enum StageOwned<WorldType: World> {
     /// info.
     ///
     /// [module-stage]: self#stage-2---syncing-initial-state-stage
-    SyncingInitialState(ActiveClient<WorldType>),
+    SyncingInitialState(Active<SimulatorType>),
 
     /// The [third stage][module-stage].
     ///
@@ -74,10 +77,10 @@ pub(crate) enum StageOwned<WorldType: World> {
     /// info.
     ///
     /// [module-stage]: self#stage-3---ready-stage
-    Ready(ActiveClient<WorldType>),
+    Ready(Active<SimulatorType>),
 }
 
-impl<WorldType: World> StageOwned<WorldType> {
+impl<SimulatorType: Simulator> StageOwned<SimulatorType> {
     pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
         delta_seconds: f64,
@@ -104,7 +107,7 @@ impl<WorldType: World> StageOwned<WorldType> {
             let config = config.clone();
             take_mut::take(self, |stage| match stage {
                 StageOwned::SyncingClock(clocksyncer) => StageOwned::SyncingInitialState(
-                    ActiveClient::new(seconds_since_startup, config, clocksyncer),
+                    Active::new(seconds_since_startup, config, clocksyncer),
                 ),
                 StageOwned::SyncingInitialState(client) => StageOwned::Ready(client),
                 StageOwned::Ready(_) => unreachable!(),
@@ -113,8 +116,10 @@ impl<WorldType: World> StageOwned<WorldType> {
     }
 }
 
-impl<'a, WorldType: World> From<&'a StageOwned<WorldType>> for Stage<'a, WorldType> {
-    fn from(stage: &'a StageOwned<WorldType>) -> Stage<'a, WorldType> {
+impl<'a, SimulatorType: Simulator> From<&'a StageOwned<SimulatorType>>
+    for Stage<'a, SimulatorType>
+{
+    fn from(stage: &'a StageOwned<SimulatorType>) -> Stage<'a, SimulatorType> {
         match stage {
             StageOwned::SyncingClock(clocksyncer) => Stage::SyncingClock(clocksyncer.into()),
             StageOwned::SyncingInitialState(active_client) => {
@@ -125,8 +130,10 @@ impl<'a, WorldType: World> From<&'a StageOwned<WorldType>> for Stage<'a, WorldTy
     }
 }
 
-impl<'a, WorldType: World> From<&'a mut StageOwned<WorldType>> for StageMut<'a, WorldType> {
-    fn from(stage: &'a mut StageOwned<WorldType>) -> StageMut<'a, WorldType> {
+impl<'a, SimulatorType: Simulator> From<&'a mut StageOwned<SimulatorType>>
+    for StageMut<'a, SimulatorType>
+{
+    fn from(stage: &'a mut StageOwned<SimulatorType>) -> StageMut<'a, SimulatorType> {
         match stage {
             StageOwned::SyncingClock(clocksyncer) => StageMut::SyncingClock(clocksyncer.into()),
             StageOwned::SyncingInitialState(active_client) => {
@@ -147,7 +154,7 @@ impl<'a, WorldType: World> From<&'a mut StageOwned<WorldType>> for StageMut<'a, 
 /// [get-stage]: crate::client::Client::stage
 /// [get-stagemut]: crate::client::Client::stage_mut
 #[derive(Debug)]
-pub enum Stage<'a, WorldType: World> {
+pub enum Stage<'a, SimulatorType: Simulator> {
     /// The [first stage][module-stage].
     ///
     /// See the relevant section in the [module-level documentation][module-stage] for more
@@ -162,7 +169,7 @@ pub enum Stage<'a, WorldType: World> {
     /// info.
     ///
     /// [module-stage]: self#stage-2---syncing-initial-state-stage
-    SyncingInitialState(SyncingInitialState<WorldType, &'a ActiveClient<WorldType>>),
+    SyncingInitialState(SyncingInitialState<SimulatorType, &'a Active<SimulatorType>>),
 
     /// The [third stage][module-stage].
     ///
@@ -170,7 +177,7 @@ pub enum Stage<'a, WorldType: World> {
     /// info.
     ///
     /// [module-stage]: self#stage-3---ready-stage
-    Ready(Ready<WorldType, &'a ActiveClient<WorldType>>),
+    Ready(Ready<SimulatorType, &'a Active<SimulatorType>>),
 }
 
 /// This is the mutable view of the client's [stage](self) that is returned by
@@ -183,7 +190,7 @@ pub enum Stage<'a, WorldType: World> {
 /// [get-stage]: crate::client::Client::stage
 /// [get-stagemut]: crate::client::Client::stage_mut
 #[derive(Debug)]
-pub enum StageMut<'a, WorldType: World> {
+pub enum StageMut<'a, SimulatorType: Simulator> {
     /// The [first stage][module-stage].
     ///
     /// See the relevant section in the [module-level documentation][module-stage] for more
@@ -198,7 +205,7 @@ pub enum StageMut<'a, WorldType: World> {
     /// info.
     ///
     /// [module-stage]: self#stage-2---syncing-initial-state-stage
-    SyncingInitialState(SyncingInitialState<WorldType, &'a mut ActiveClient<WorldType>>),
+    SyncingInitialState(SyncingInitialState<SimulatorType, &'a mut Active<SimulatorType>>),
 
     /// The [third stage][module-stage].
     ///
@@ -206,5 +213,5 @@ pub enum StageMut<'a, WorldType: World> {
     /// info.
     ///
     /// [module-stage]: self#stage-3---ready-stage
-    Ready(Ready<WorldType, &'a mut ActiveClient<WorldType>>),
+    Ready(Ready<SimulatorType, &'a mut Active<SimulatorType>>),
 }
