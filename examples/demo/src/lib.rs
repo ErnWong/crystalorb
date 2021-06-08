@@ -340,20 +340,20 @@ impl World for DemoWorld {
         let body_doodad = self.bodies.get(self.doodad.body_handle).unwrap();
         DemoSnapshot {
             player_left: PlayerSnapshot {
-                position: body_left.position().clone(),
-                linvel: body_left.linvel().clone(),
+                position: *body_left.position(),
+                linvel: *body_left.linvel(),
                 angvel: body_left.angvel(),
                 input: self.player_left.input,
             },
             player_right: PlayerSnapshot {
-                position: body_right.position().clone(),
-                linvel: body_right.linvel().clone(),
+                position: *body_right.position(),
+                linvel: *body_right.linvel(),
                 angvel: body_right.angvel(),
                 input: self.player_right.input,
             },
             doodad: PlayerSnapshot {
-                position: body_doodad.position().clone(),
-                linvel: body_doodad.linvel().clone(),
+                position: *body_doodad.position(),
+                linvel: *body_doodad.linvel(),
                 angvel: body_doodad.angvel(),
                 input: self.doodad.input,
             },
@@ -365,9 +365,9 @@ impl World for DemoWorld {
         let body_right = self.bodies.get(self.player_right.body_handle).unwrap();
         let body_doodad = self.bodies.get(self.doodad.body_handle).unwrap();
         DemoDisplayState {
-            player_left_position: body_left.position().clone(),
-            player_right_position: body_right.position().clone(),
-            doodad_position: body_doodad.position().clone(),
+            player_left_position: *body_left.position(),
+            player_right_position: *body_right.position(),
+            doodad_position: *body_doodad.position(),
         }
     }
 }
