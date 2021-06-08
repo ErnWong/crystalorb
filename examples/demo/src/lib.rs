@@ -38,7 +38,7 @@ pub struct DemoWorld {
 
 pub struct Player {
     body_handle: RigidBodyHandle,
-    collider_handle: ColliderHandle,
+    _collider_handle: ColliderHandle,
     input: PlayerInput,
 }
 
@@ -271,17 +271,17 @@ impl DemoWorld {
             ccd_solver: CCDSolver::new(),
             player_left: Player {
                 body_handle: left_body_handle,
-                collider_handle: left_collider_handle,
+                _collider_handle: left_collider_handle,
                 input: Default::default(),
             },
             player_right: Player {
                 body_handle: right_body_handle,
-                collider_handle: right_collider_handle,
+                _collider_handle: right_collider_handle,
                 input: Default::default(),
             },
             doodad: Player {
                 body_handle: doodad_body_handle,
-                collider_handle: doodad_collider_handle,
+                _collider_handle: doodad_collider_handle,
                 input: Default::default(),
             },
         }
