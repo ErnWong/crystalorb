@@ -1,36 +1,24 @@
-use bevy_networking_turbulence::{Connection, ConnectionHandle, NetworkResource};
-use crystalorb::{
-    clocksync::ClockSyncMessage,
-    network_resource::{Connection, ConnectionHandleType, NetworkResource},
-    timestamp::Timestamped,
-    world::World,
+#![feature(generic_associated_types)]
+
+use bevy_networking_turbulence::{ConnectionHandle, NetworkResource};
+use crystalorb::network_resource::{
+    Connection as ConnectionTrait, ConnectionHandleType, NetworkResource as NetworkResourceTrait,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::{convert::TryInto, error::Error, fmt::Debug};
+use std::fmt::Debug;
 use turbulence::MessageChannels;
 
 pub struct WrappedNetworkResource<'a>(pub &'a mut NetworkResource);
 pub struct WrappedConnection<'a>(pub &'a mut MessageChannels);
 
-impl<'a> NetworkResource for WrappedNetworkResource<'a> {
+impl<'a> NetworkResourceTrait for WrappedNetworkResource<'a> {
     type ConnectionType<'b> = WrappedConnection<'b>;
 
-    fn broadcast_message<MessageType>(&mut self, message: MessageType)
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        self.0.broadcast_message(message);
-    }
-
-    fn send_message<MessageType>(
-        &mut self,
-        handle: usize,
-        message: MessageType,
-    ) -> Result<Option<MessageType>, Box<dyn Error + Send>>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
-        self.0.send_message(handle.try_into().unwrap(), message)
+    fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
+        self.0
+            .connections
+            .get_mut(&(handle as ConnectionHandle))
+            .map(|connection| WrappedConnection(connection.channels().unwrap()))
     }
 
     fn connections<'c>(
@@ -43,13 +31,9 @@ impl<'a> NetworkResource for WrappedNetworkResource<'a> {
             )
         }))
     }
-
-    fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
-        WrappedConnection(self.0.connections.get_mut(handle as ConnectionHandle))
-    }
 }
 
-impl<'a> Connection for WrappedConnection<'a> {
+impl<'a> ConnectionTrait for WrappedConnection<'a> {
     fn recv<MessageType>(&mut self) -> Option<MessageType>
     where
         MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
