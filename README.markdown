@@ -13,7 +13,7 @@
   </p>
   <hr>
   <a href="https://ernestwong.nz/crystalorb/demo" title="Demo">
-    <img src="examples/demo/scripts/generate-screencapture/screencapture.apng">
+    <img src="https://github.com/ErnWong/crystalorb/blob/1a905001b8d3532a119e77c21a5ddd22e527fa6b/assets/screencapture.apng?raw=true">
   </a>
   <hr>
 </div>
