@@ -10,6 +10,11 @@ license = "Apache-2.0"
 readme = "README.markdown"
 repository = "https://github.com/ErnWong/crystalorb"
 
+[features]
+default = ["use-udp"]
+use-udp = ["bevy_networking_turbulence/use-udp"]
+use-webrtc = ["bevy_networking_turbulence/use-webrtc"]
+
 [dependencies]
 bevy_networking_turbulence = {version = "0.2.0", default-features = false}
 crystalorb = {version = "0.1.0", path="../../"}
