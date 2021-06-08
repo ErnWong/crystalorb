@@ -1,4 +1,6 @@
 #![feature(generic_associated_types)]
+#![feature(extended_key_value_attributes)]
+#![doc = include_str!("../README.markdown")]
 
 use bevy_networking_turbulence::{ConnectionHandle, NetworkResource};
 use crystalorb::network_resource::{
