@@ -11,5 +11,8 @@ readme = "README.markdown"
 repository = "https://github.com/ErnWong/crystalorb"
 
 [dependencies]
-crystalorb = {version = "0.1.0", path="../../"}
+crystalorb = {version = "0.1.0", path = "../../"}
 serde = {version = "1.0.118", features = ["derive"]}
+
+[dev-dependencies]
+crystalorb-demo = {path = "../../examples/demo"}
