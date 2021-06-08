@@ -20,7 +20,7 @@
 
 ## Quick start
 
-You may copy the [standalone](examples/standalone.rs) example to use as a starting template, and build off from there. You may also want to check out [crystalorb-mock-network](crates/crystalorb-mock-network) and [crystalorb-bevy-networking-turbulence](crates/crystalorb-bev-networking-turbulence), either to use directly in your projects, or as examples for you to integrate your own choice of networking layer.
+You may copy the [standalone](examples/standalone.rs) example to use as a starting template, and build off from there. You may also want to check out [crystalorb-mock-network](crates/crystalorb-mock-network) and [crystalorb-bevy-networking-turbulence](crates/crystalorb-bevy-networking-turbulence), either to use directly in your projects, or as examples for you to integrate your own choice of networking layer.
 
 If you prefer a more visual and interactive example, there is the [demo shown above](https://ernestwong.nz/crystalorb/demo) that uses the [Rapier physics engine](https://rapier.rs). Feel free to use the demo's [source code](examples/demo) as a starting template for your next project.
 
