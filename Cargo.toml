@@ -26,8 +26,8 @@ pretty_assertions = "0.7.1"
 itertools = "0.10.0"
 float-cmp = "0.8.0"
 test-env-log = {version = "0.2.7", default-features = false, features = ["trace"]}
-crystalorb-mock-network = {version = "0.1.0", path = "./crates/crystalorb-mock-network"}
-crystalorb-demo = {version = "0.1.0", path = "./examples/demo"}
+crystalorb-mock-network = {path = "./crates/crystalorb-mock-network"}
+crystalorb-demo = {path = "./examples/demo"}
 
 [workspace]
 members = [
