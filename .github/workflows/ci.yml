@@ -18,6 +18,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
+          args: --all
   test:
     runs-on: ubuntu-latest
     steps:
@@ -27,6 +28,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --all
   test-coverage:
     runs-on: ubuntu-latest
     steps:
@@ -68,7 +70,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings -A incomplete_features
+          args: --all -- -D warnings -A incomplete_features
   cargo-lint:
     runs-on: ubuntu-latest
     strategy:
