@@ -121,10 +121,12 @@ impl MockConnection {
         let key = TypeId::of::<T>();
         self.channels
             .get_mut(&key)
-            .expect(&format!(
-                "Message of type {:?} should be registered",
-                type_name::<T>()
-            ))
+            .unwrap_or_else(|| {
+                panic!(
+                    "Message of type {:?} should be registered",
+                    type_name::<T>()
+                )
+            })
             .as_any()
             .downcast_mut()
             .expect("Channel is of the right type")
