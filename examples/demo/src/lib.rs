@@ -13,15 +13,7 @@ use crystalorb::{
 };
 use crystalorb_mock_network::MockNetwork;
 use js_sys::Array;
-use rapier2d::{
-    dynamics::{
-        CCDSolver, IntegrationParameters, JointSet, RigidBodyBuilder, RigidBodyHandle, RigidBodySet,
-    },
-    geometry::{BroadPhase, ColliderBuilder, ColliderHandle, ColliderSet, NarrowPhase},
-    math::{Isometry, Real},
-    na::Vector2,
-    pipeline::PhysicsPipeline,
-};
+use rapier2d::{na::Vector2, prelude::*};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use tracing::Level;
@@ -32,6 +24,7 @@ const TIMESTEP: f64 = 1.0 / 64.0;
 
 pub struct DemoWorld {
     pipeline: PhysicsPipeline,
+    island_manager: IslandManager,
     broad_phase: BroadPhase,
     narrow_phase: NarrowPhase,
     bodies: RigidBodySet,
@@ -185,41 +178,41 @@ impl DemoWorld {
     pub fn new() -> Self {
         let mut bodies = RigidBodySet::new();
         let mut colliders = ColliderSet::new();
-        colliders.insert(
+        colliders.insert_with_parent(
             ColliderBuilder::cuboid(1.0, 100.0).restitution(0.5).build(),
             bodies.insert(
                 RigidBodyBuilder::new_static()
-                    .translation(0.0, 0.0)
+                    .translation(vector![0.0, 0.0])
                     .ccd_enabled(true)
                     .build(),
             ),
             &mut bodies,
         );
-        colliders.insert(
+        colliders.insert_with_parent(
             ColliderBuilder::cuboid(1.0, 100.0).restitution(0.5).build(),
             bodies.insert(
                 RigidBodyBuilder::new_static()
-                    .translation(180.0, 0.0)
+                    .translation(vector![180.0, 0.0])
                     .ccd_enabled(true)
                     .build(),
             ),
             &mut bodies,
         );
-        colliders.insert(
+        colliders.insert_with_parent(
             ColliderBuilder::cuboid(180.0, 1.0).restitution(0.5).build(),
             bodies.insert(
                 RigidBodyBuilder::new_static()
-                    .translation(0.0, 0.0)
+                    .translation(vector![0.0, 0.0])
                     .ccd_enabled(true)
                     .build(),
             ),
             &mut bodies,
         );
-        colliders.insert(
+        colliders.insert_with_parent(
             ColliderBuilder::cuboid(180.0, 1.0).restitution(0.5).build(),
             bodies.insert(
                 RigidBodyBuilder::new_static()
-                    .translation(0.0, 100.0)
+                    .translation(vector![0.0, 100.0])
                     .ccd_enabled(true)
                     .build(),
             ),
@@ -227,23 +220,23 @@ impl DemoWorld {
         );
         let left_body_handle = bodies.insert(
             RigidBodyBuilder::new_dynamic()
-                .translation(10.0, 80.0)
+                .translation(vector![10.0, 80.0])
                 .ccd_enabled(true)
                 .build(),
         );
         let right_body_handle = bodies.insert(
             RigidBodyBuilder::new_dynamic()
-                .translation(150.0, 80.0)
+                .translation(vector![150.0, 80.0])
                 .ccd_enabled(true)
                 .build(),
         );
         let doodad_body_handle = bodies.insert(
             RigidBodyBuilder::new_dynamic()
-                .translation(80.0, 80.0)
+                .translation(vector![80.0, 80.0])
                 .ccd_enabled(true)
                 .build(),
         );
-        let left_collider_handle = colliders.insert(
+        let left_collider_handle = colliders.insert_with_parent(
             ColliderBuilder::ball(10.0)
                 .density(0.1)
                 .restitution(0.5)
@@ -251,7 +244,7 @@ impl DemoWorld {
             left_body_handle,
             &mut bodies,
         );
-        let right_collider_handle = colliders.insert(
+        let right_collider_handle = colliders.insert_with_parent(
             ColliderBuilder::ball(10.0)
                 .density(0.1)
                 .restitution(0.5)
@@ -259,7 +252,7 @@ impl DemoWorld {
             right_body_handle,
             &mut bodies,
         );
-        let doodad_collider_handle = colliders.insert(
+        let doodad_collider_handle = colliders.insert_with_parent(
             ColliderBuilder::ball(10.0)
                 .density(0.1)
                 .restitution(0.5)
@@ -269,6 +262,7 @@ impl DemoWorld {
         );
         Self {
             pipeline: PhysicsPipeline::new(),
+            island_manager: IslandManager::new(),
             broad_phase: BroadPhase::new(),
             narrow_phase: NarrowPhase::new(),
             bodies,
@@ -400,6 +394,7 @@ impl Stepper for DemoWorld {
                 dt: TIMESTEP as f32,
                 ..Default::default()
             },
+            &mut self.island_manager,
             &mut self.broad_phase,
             &mut self.narrow_phase,
             &mut self.bodies,
