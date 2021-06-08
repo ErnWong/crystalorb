@@ -1,6 +1,6 @@
 # crystalorb-mock-network
 
-Provides an implementation of `crystalorb::network_recource::NetworkResource` that works offline, backed using `VecDeque`.
+Provides an implementation of `crystalorb::network_recource::NetworkResource` that works offline, backed using `VecDeque`, allowing [`CrystalOrb`](https://github.com/ErnWong/crystalorb) to work offline for demo and testing purposes.
 
 ## Usage
 
