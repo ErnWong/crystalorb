@@ -9,7 +9,11 @@
 #![allow(
     clippy::must_use_candidate,
     clippy::too_many_lines,
-    clippy::module_name_repetitions
+    clippy::module_name_repetitions,
+    clippy::cast_lossless, // TODO: Fix these. See issue #1
+    clippy::cast_sign_loss, // TODO: Fix these. See issue #1
+    clippy::cast_possible_truncation, // TODO: Fix these. See issue #1
+    clippy::cast_precision_loss, // TODO: Fix these. See issue #1
 )]
 #![doc = include_str!("../README.markdown")]
 
