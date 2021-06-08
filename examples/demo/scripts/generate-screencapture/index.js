@@ -6,8 +6,13 @@ const UPNG = require('@pdf-lib/upng').default;
 
 const WIDTH = 800;
 const HEIGHT = 450;
-const DESTINATION = path.resolve(__dirname, 'screencapture.apng');
 const FRAMERATE = 60;
+
+// We place the generated screenshot at a location that has a lower probability of being moved
+// in the future, since README's image link will need to be absolute in order to work in docs.rs
+const REPO_ROOT_DIR = path.resolve(__dirname, '..', '..', '..', '..');
+const ASSETS_DIR = path.resolve(REPO_ROOT_DIR, 'assets');
+const DESTINATION = path.resolve(ASSETS_DIR, 'screencapture.apng');
 
 const keymap = new Map();
 
@@ -106,4 +111,6 @@ act(8.5, "right", "off", "left");
   await util.promisify(fs.writeFile)(DESTINATION, apng);
 
   console.log('Done');
+
+  console.warn('Remember to update README.markdown image link to point to the new commit hash');
 })();
