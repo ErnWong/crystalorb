@@ -1,0 +1,1059 @@
+<html>
+  <head>
+    <meta content="text/html;charset=utf-8" http-equip="Content-Type" />
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Girassol&family=Roboto+Condensed:ital,wght@0,400;0,700;1,700&display=swap">
+    <style>
+      :root {
+        color-scheme: light dark;
+
+        --bg-color: white;
+
+        --main-color: rgba(56, 163, 138, 1.0);
+        --main-color-fg: rgba(255, 255, 255, 1.0);
+        --main-color-less-contrast: rgba(63, 183, 155, 0.7);
+        --main-color-less-contrast-fg: rgba(255, 255, 255, 0.7);
+        --main-color-darker: rgba(31, 100, 89, 1.0);
+        --main-color-darker-less-contrast: rgba(31, 100, 89, 0.7);
+        --main-color-mid: rgba(43, 131, 112, 1.0);
+        --main-color-mid-less-contrast: rgba(43, 131, 112, 0.7);
+
+        --grey-color: rgba(110, 110, 110, 1.0);
+        --grey-color-mid: rgba(87, 87, 87, 1.0);
+        --grey-color-darker: rgba(66, 66, 66, 1.0);
+        --grey-color-less-contrast: rgba(122, 122, 122, 0.7);
+
+        --heading-shadow: rgb(160, 0, 0);
+
+        --latency-fg: #757575;
+        --latency-bg: rgba(137, 137, 137, 0);
+        --latency-highlighted-bg: rgba(137, 137, 137, 0.2);
+        --latency-highlighted-fg: var(--latency-fg);
+
+        --connected-color: var(--main-color);
+        --disconnected-color: rgba(230, 0, 106, 1.0);
+
+        --blue-mid: #3366cc;
+        --blue-dark: #003399;
+        --blue-light: #33aadd;
+
+        --black-mid: #404040;
+        --black-dark: black;
+        --black-light: #808080;
+
+        --red-mid: #ff6600;
+        --red-dark: #cc0000;
+        --red-light: #ff9900;
+
+        --red-fg: #3d180d;
+
+        --soft-shadow: rgba(0, 0, 0, 0.5);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-color: rgb(13,17,23);
+        }
+      }
+      html {
+        background: linear-gradient(to right, rgb(13,17,23) 50%, white 50%);
+        background: var(--bg-color);
+        height: 100%;
+      }
+      html.screencapture {
+        background: transparent;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        font-family: "Roboto Condensed", sans-serif;
+        font-size: 12px;
+        margin: 0;
+        min-height: 100%;
+      }
+      header {
+        width: 500px;
+        text-align: center;
+        margin: 10px auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        flex-grow: 1;
+      }
+      .screencapture header {
+        display: none;
+      }
+      h1 {
+        font-family: "Girassol", serif;
+        font-size: 50px;
+        text-shadow: 0 3px var(--heading-shadow);
+        margin: 0;
+        color: var(--main-color);
+      }
+      body > header p {
+        text-transform: uppercase;
+        color: var(--main-color-mid);
+        font-style: italic;
+        font-weight: bold;
+        line-height: 1.5;
+      }
+      abbr {
+        text-decoration-color: var(--main-color-mid-less-contrast);
+      }
+      .demo {
+        display: flex;
+        align-items: start;
+        text-align: center;
+        text-transform: uppercase;
+        padding: 80px 0;
+        margin: auto;
+        width: 100%;
+        overflow-x: auto;
+        box-sizing: border-box;
+        flex-grow: 1;
+      }
+      .machine {
+        flex-shrink: 0;
+        width: 180px;
+        margin: 0;
+        color: var(--main-color-fg);
+        box-shadow: 0 3px 10px var(--soft-shadow);
+        position: relative;
+        border-radius: 3px;
+      }
+      #client-left {
+        margin-left: auto;
+      }
+      #client-right {
+        margin-right: auto;
+      }
+      .machine > *:first-child {
+        border-radius: 3px 3px 0 0;
+      }
+      .machine > *:last-child {
+        border-radius: 0 0 3px 3px;
+      }
+      .machine > h2, .machine > .timestamp {
+        margin: 0;
+        padding: 4px;
+        font-size: 1em;
+        position: relative; /* so shadows don't get clipped by element below */
+        letter-spacing: 2px;
+        background-color: var(--main-color-darker);
+      }
+      .machine > .status {
+        padding: 4px;
+        background-color: var(--main-color-darker);
+      }
+      .ready, .loading {
+        width: 100%;
+        height: 100px;
+        background-color: var(--main-color-darker-less-contrast);
+        position: relative;
+      }
+      .ready svg, .loading svg {
+        width: 100%;
+        height: 100px;
+        transition: opacity 0.8s;
+      }
+      .ready svg {
+        opacity: 1;
+      }
+      .loading svg {
+        opacity: 0;
+      }
+      .loading::before, .ready::before {
+        content: 'Loading...';
+        display: flex;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        letter-spacing: 2px;
+        transition: opacity 0.8s;
+        font-style: italic;
+      }
+      .loading::before {
+        opacity: 1;
+      }
+      .ready::before {
+        opacity: 0;
+      }
+      .command-buffer {
+        height: 60px;
+        overflow-y: scroll;
+        margin: 0;
+        padding: 10px;
+        list-style: none;
+        text-align: left;
+        background-color: var(--main-color-darker-less-contrast);
+        color: var(--main-color-less-contrast-fg);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0);
+      }
+      .command-buffer::-webkit-scrollbar {
+        width: 6px;
+      }
+      .command-buffer::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.5);
+      }
+      .connection {
+        width: 100px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      .connection > * {
+        margin: 10px;
+      }
+      .connection > svg {
+        stroke: var(--latency-fg);
+        fill: transparent;
+        margin: 10px auto 0;
+        opacity: 0.5;
+      }
+      .connection > svg + label + svg {
+        margin: 0 auto 10px;
+      }
+      .connected > button, .disconnected > button {
+        padding: 6px 10px;
+        font-size: 10px;
+        width: 108px;
+        color: white;
+        --shadow: var(--grey-color-darker);
+        --mid-tone: var(--grey-color-mid);
+        --hover: var(--grey-color);
+      }
+      .connected, .disconnected {
+        font-weight: bold;
+        letter-spacing: 2px;
+        font-size: 10px;
+        position: absolute;
+        top: -80px;
+        left: 50%;
+        width: 200px;
+        margin-left: -100px;
+      }
+      .connected::before, .disconnected::before,
+      .connected::after, .disconnected::after {
+        content: '';
+        display: block;
+        position: absolute;
+        width: 30px;
+        top: 23%;
+        color: var(--grey-color-less-contrast);
+        border-top: solid currentColor 1px;
+        height: 35px;
+      }
+      .connected::before, .disconnected::before {
+        border-left: solid currentColor 1px;
+        border-radius: 3px 0 0 0;
+        left: 0;
+      }
+      .connected::after, .disconnected::after {
+        border-right: solid currentColor 1px;
+        border-radius: 0 3px 0 0;
+        right: 0;
+      }
+      .connected span, .disconnected span {
+        position: relative;
+        display: block;
+        margin: 10px;
+      }
+      .connected span {
+        color: var(--connected-color);
+      }
+      .disconnected span {
+        color: var(--disconnected-color);
+        animation: blink 1s linear infinite;
+      }
+      .screencapture .disconnected span {
+        animation: none;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 1;
+        }
+        60% {
+          opacity: 0;
+        }
+        100% {
+          opacity: 0;
+        }
+      }
+      .signal {
+        user-select: none;
+        height: 14px;
+        width: 80px;
+        position: relative;
+      }
+      .signal canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .latency {
+        color: var(--latency-fg);
+        background-color: var(--latency-bg);
+        cursor: text;
+        transition: background-color 0.1s;
+        border-radius: 3px;
+      }
+      .latency > input {
+        color: inherit;
+        width: 35px;
+        border: none;
+        text-align: center;
+        background-color: transparent;
+        -moz-appearance: textfield;
+      }
+      .latency > input:focus {
+        outline: none;
+      }
+      .latency > input::-webkit-outer-spin-button,
+      .latency > input::-webkit-inner-spin-button {
+        display: none;
+      }
+      .latency:hover, .latency:focus-within {
+        color: var(--latency-highlighted-fg);
+        background-color: var(--latency-highlighted-bg);
+      }
+      .highlight {
+        stroke: var(--highlight);
+        fill: none;
+      }
+      .mid-tone {
+        fill: var(--mid-tone);
+      }
+      .shadow {
+        fill: var(--shadow);
+      }
+      .reflected-highlight {
+        stroke: var(--reflected-highlight);
+      }
+      .billiard-blue {
+        --mid-tone: var(--blue-mid);
+        --shadow: var(--blue-dark);
+        --highlight: white;
+        --reflected-highlight: var(--blue-mid);
+      }
+      .billiard-black {
+        --mid-tone: var(--black-mid);
+        --shadow: var(--black-dark);
+        --highlight: white;
+        --reflected-highlight: var(--black-light);
+      }
+      .billiard-red {
+        --mid-tone: var(--red-mid);
+        --shadow: var(--red-dark);
+        --highlight: white;
+        --reflected-highlight: var(--red-mid);
+      }
+      .billiard-text {
+        font-size: 8px;
+        font-weight: bold;
+        text-anchor: middle;
+        dominant-baseline: middle;
+      }
+      #slowdown-controls {
+        position: absolute;
+        bottom: -115px;
+        width: 322px;
+        left: calc(50% - 161px);
+        display: flex;
+        justify-content: center;
+        filter: drop-shadow(0 3px 5px var(--soft-shadow));
+      }
+      #slowdown-controls input {
+        width: 0;
+        height: 0;
+        margin: 0;
+      }
+      #slowdown-controls input + label {
+        display: inline-block;
+        font-size: 12px;
+        vertical-align: middle;
+        color: white;
+        height: 30px;
+        width: 46px;
+        box-sizing: border-box;
+        line-height: 30px;
+        --shadow: var(--grey-color-darker);
+        --mid-tone: var(--grey-color-mid);
+        --hover: var(--grey-color);
+        --soft-shadow: transparent;
+        border-right: 1px solid var(--grey-color-darker);
+        border-left: 1px solid var(--grey-color);
+      }
+      #slowdown-controls input + label > .material-icons {
+        line-height: inherit;
+      }
+      #slowdown-controls label:first-of-type {
+        border-radius: 3px 0 0 3px;
+        border-left: none;
+      }
+      #slowdown-controls label:last-of-type {
+        border-radius: 0 3px 3px 0;
+        border-right: none;
+      }
+      #timeskip-controls {
+        position: absolute;
+        bottom: -60px;
+        width: 400px;
+        left: calc(50% - 200px);
+        color: var(--grey-color-darker);
+        vertical-align: middle;
+      }
+      #time-controls {
+        opacity: 0.3;
+        transition: opacity 0.3s;
+      }
+      #time-controls:hover {
+        opacity: 1.0;
+      }
+      #timeskip-controls span {
+        display: inline-block;
+        width: 55px;
+        vertical-align: middle;
+        font-weight: bold;
+        letter-spacing: 2px;
+      }
+      #timeskip-controls button {
+        font-size: 12px;
+        vertical-align: middle;
+        color: white;
+        height: 30px;
+        --shadow: var(--grey-color-darker);
+        --mid-tone: var(--grey-color-mid);
+        --hover: var(--grey-color);
+      }
+      .keyboard-controls {
+        position: absolute;
+        bottom: -20px;
+        left: calc(50% - 50px);
+      }
+      #client-left .keyboard-controls {
+        color: var(--red-fg);
+        --hover: var(--red-light);
+        --mid-tone: var(--red-mid);
+        --shadow: var(--red-dark);
+      }
+      #client-right .keyboard-controls {
+        color: white;
+        --hover: var(--blue-light);
+        --mid-tone: var(--blue-mid);
+        --shadow: var(--blue-dark);
+      }
+      button {
+        --soft-shadow: rgba(0, 0, 0, 0.5);
+        border-radius: 2px;
+        border: none;
+      }
+      button,
+      #slowdown-controls input + label {
+        background-color: var(--mid-tone);
+        transition: background-color 0.1s;
+        box-shadow: 0 4px 0 var(--shadow),
+          0 7px 10px var(--soft-shadow);
+        font-family: "Roboto Condensed", sans-serif;
+        font-weight: bold;
+        user-select: none;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        padding: 1px 6px 1px 8px; /* Note: compensate letter-spacing */
+        margin-bottom: 4px;
+      }
+      button:hover, button:focus,
+      #slowdown-controls input + label:hover,
+      #slowdown-controls input:focus + label {
+        background-color: var(--hover);
+        box-shadow: 0 4px 0 var(--mid-tone),
+          0 7px 10px var(--soft-shadow);
+        outline: none;
+      }
+      button.pressed:hover, button:hover:active,
+      button.pressed:focus, button:focus:active,
+      #slowdown-controls input:checked + label:hover,
+      #slowdown-controls input:checked + label:focus,
+      #slowdown-controls input:active + label:hover,
+      #slowdown-controls input:focus + label {
+        box-shadow: 0 0 0 var(--mid-tone),
+          0 3px 10px var(--soft-shadow);
+      }
+      button.pressed, button:active,
+      #slowdown-controls input:checked + label,
+      #slowdown-controls input + label:active {
+        margin-top: 4px;
+        margin-bottom: 0px;
+        box-shadow: 0 0 0 var(--shadow),
+          0 3px 10px var(--soft-shadow);
+      }
+      .keyboard-controls > * {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+        position: absolute;
+        color: inherit;
+      }
+      .keyboard-controls .up {
+        top: 0;
+        left: 35px;
+      }
+      .keyboard-controls .left {
+        top: 39px;
+        left: 0;
+      }
+      .keyboard-controls .down {
+        top: 39px;
+        left: 35px;
+      }
+      .keyboard-controls .right {
+        top: 39px;
+        left: 70px;
+      }
+      .keyboard-controls .material-icons {
+        line-height: inherit;
+        margin: 0 -6px 0 -8px;
+      }
+    </style>
+  </head>
+  <body>
+    <svg style="display: none">
+      <defs>
+        <g id="billiard">
+          <path class="shadow" d="M 0,-10 A 10,10 0 0,0 0,10 L 0,-10" fill="#003399" transform="rotate(225)" />
+          <path class="mid-tone" d="M 0,-10 A 10,10 0 0,0 0,10 A 5,10 0 0,0 0,-10" fill="#3366cc" transform="rotate(45)" />
+          <path class="highlight" d="M -5.8,-5.2 A 8,8 0 0,1 -2.0,-7.8" fill="transparent" stroke="white" stroke-linecap="round" stroke-width="1.5px" />
+          <path class="highlight" d="M -7.4,-2.88 A 8,8 0 0,1 -7,-3.9" fill="transparent" stroke="white" stroke-linecap="round" stroke-width="1.5px" />
+          <path class="reflected-highlight" d="M -5.8,-5.2 A 8,8 0 0,1 -2.0,-7.8" fill="transparent" stroke="#3366cc" stroke-linecap="round" transform="scale(-1)" stroke-width="1.5px" />
+          <path class="reflected-highlight" d="M -7.4,-2.88 A 8,8 0 0,1 -7,-3.9" fill="transparent" stroke="#3366cc" stroke-linecap="round" transform="scale(-1)" stroke-width="1.5px" />
+          <circle cx="0" cy="0" r="5" fill="white" />
+        </g>
+      </defs>
+    </svg>
+    <header>
+      <h1>CrystalOrb</h1>
+      <p>
+        <abbr title="This means that CrystalOrb doesn't care what underlying transport layer you use. You'll need to bring your own transport layer.">Network-agnostic</abbr>,
+        <abbr title="This means that CrystalOrb is focused only on solving the state synchronization problem. You'll need to bring your own physics engine.">high-level</abbr>
+        game networking library<br/>
+        for
+        <abbr title="Clients don't need to wait for the server's confirmation before reacting to the player's input">client-side prediction</abbr>
+        and
+        <abbr title="Clients will tweak their predictions based on the server's authoritative updates">server reconciliation</abbr></p>
+    </header>
+    <div class="demo">
+      <div class="machine" id="client-left">
+        <h2>Client</h2>
+        <div id="client-left-screen" class="loading">
+          <svg>
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-red" id="client-left-body-left" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-blue" id="client-left-body-right" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-black" id="client-left-body-none" />
+            <text x="0" y="0" class="billiard-text" id="client-left-body-left-rotate" style="tranform: translateY(-100px)">5</text>
+            <text x="0" y="0" class="billiard-text" id="client-left-body-right-rotate" style="transform: translateY(-100px)">3</text>
+            <text x="0" y="0" class="billiard-text" id="client-left-body-none-rotate" style="transform: translateY(-100px)">8</text>
+          </svg>
+        </div>
+        <div class="timestamp" id="timestamp-left">Syncing</div>
+        <ul class="command-buffer" id="commands-left"></ul>
+        <div class="keyboard-controls">
+          <button class="up" id="key-w">W</button>
+          <button class="left" id="key-a">A</button>
+          <button class="down" id="key-s">S</button>
+          <button class="right" id="key-d">D</button>
+        </div>
+        <div class="status" id="status-left">Loading</div>
+      </div>
+      <div class="connection" id="connection-left">
+        <div id="connection-left-status" class="disconnected">
+          <button id="connect-left" class="connect">Connect</button>
+          <span>Disconnected</span>
+        </div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-server-clocksync"></canvas>
+        </div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-server-command"></canvas>
+        </div>
+        <svg width="80" height="10">
+          <path d="M 0 10 L 80 10 L 70 0" />
+        </svg>
+        <label class="latency"><input type="number" value="100" min="0" max="9999" maxlength="4" id="delay-left"> ms</label>
+        <svg width="80" height="10">
+          <path d="M 80 0 L 0 0 L 10 10" />
+        </svg>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-client-command"></canvas>
+        </div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-client-clocksync"></canvas>
+        </div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-left-client-snapshot"></canvas>
+        </div>
+      </div>
+      <div class="machine" id="server">
+        <h2>Server</h2>
+        <div id="server-screen" class="ready">
+          <svg>
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-red" id="server-body-left" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-blue" id="server-body-right" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-black" id="server-body-none" />
+            <text x="0" y="0" class="billiard-text" id="server-body-left-rotate" style="transform: translateY(-100px)">5</text>
+            <text x="0" y="0" class="billiard-text" id="server-body-right-rotate" style="transform: translateY(-100px)">3</text>
+            <text x="0" y="0" class="billiard-text" id="server-body-none-rotate" style="transform: translateY(-100px)">8</text>
+          </svg>
+        </div>
+        <div class="timestamp" id="timestamp-server">Syncing</div>
+        <div id="time-controls">
+          <div id="timeskip-controls">
+            <button id="timeskip-backwards">−1 min</button>
+            <span>Time Skip</span>
+            <button id="timeskip-forwards">+1 min</button>
+          </div>
+          <div id="slowdown-controls">
+            <input type="radio" name="slowdown-radio" value="pause" id="slowdown-pause" />
+            <label for="slowdown-pause"><span class="material-icons">&#xE034;</span></label>
+            <input type="radio" name="slowdown-radio" value="32" id="slowdown-32" />
+            <label for="slowdown-32">1/32</label>
+            <input type="radio" name="slowdown-radio" value="16" id="slowdown-16" />
+            <label for="slowdown-16">1/16</label>
+            <input type="radio" name="slowdown-radio" value="8" id="slowdown-8" />
+            <label for="slowdown-8">1/8</label>
+            <input type="radio" name="slowdown-radio" value="4" id="slowdown-4" />
+            <label for="slowdown-4">1/4</label>
+            <input type="radio" name="slowdown-radio" value="2" id="slowdown-2" />
+            <label for="slowdown-2">1/2</label>
+            <input type="radio" name="slowdown-radio" value="1" id="slowdown-1" checked />
+            <label for="slowdown-1"><span class="material-icons">&#xE037;</span></label>
+          </div>
+        </div>
+        <ul class="command-buffer" id="commands-server"></ul>
+      </div>
+      <div class="connection" id="connection-right">
+        <div id="connection-right-status" class="disconnected">
+          <button id="connect-right" class="connect">Connect</button>
+          <span>Disconnected</span>
+        </div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-server-clocksync"></canvas>
+        </div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-server-command"></canvas>
+        </div>
+        <svg width="80" height="10">
+          <path d="M 80 10 L 0 10 L 10 0" />
+        </svg>
+        <label class="latency"><input type="number" value="100" id="delay-right" min="0" max="9999" maxlength="4"> ms</label>
+        <svg width="80" height="10">
+          <path d="M 0 0 L 80 0 L 70 10" />
+        </svg>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-client-command"></canvas>
+        </div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-client-clocksync"></canvas>
+        </div>
+        <div class="signal">
+          <canvas height="14" width="80" id="signal-right-client-snapshot"></canvas>
+        </div>
+      </div>
+      <div class="machine" id="client-right">
+        <h2>Client</h2>
+        <div id="client-right-screen" class="loading">
+          <svg>
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-red" id="client-right-body-left" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-blue" id="client-right-body-right" />
+            <use x="0" y="-100" xlink:href="#billiard" class="billiard-black" id="client-right-body-none" />
+            <text x="0" y="0" class="billiard-text" id="client-right-body-left-rotate" style="transform: translateY(-100px)">5</text>
+            <text x="0" y="0" class="billiard-text" id="client-right-body-right-rotate" style="transform: translateY(-100px)">3</text>
+            <text x="0" y="0" class="billiard-text" id="client-right-body-none-rotate" style="transform: translateY(-100px)">8</text>
+          </svg>
+        </div>
+        <div class="timestamp" id="timestamp-right">Syncing</div>
+        <ul class="command-buffer" id="commands-right"></ul>
+        <div class="keyboard-controls">
+          <button class="up" id="key-up"><span class="material-icons">&#xE316;</span></button>
+          <button class="left" id="key-left"><span class="material-icons">&#xE314;</span></button>
+          <button class="down" id="key-down"><span class="material-icons">&#xE313;</span></button>
+          <button class="right" id="key-right"><span class="material-icons">&#xE315;</span></button>
+        </div>
+        <div class="status" id="status-right">Loading</div>
+      </div>
+    </div>
+    <script type="module">
+      import init, { Demo, DemoCommand, PlayerSide, PlayerCommand, CommsChannel } from './pkg/crystalorb_demo.js';
+
+      let IS_SCREEN_CAPTURE = false;
+      if (new URL(document.location).searchParams.has("screencapture")) {
+        document.documentElement.classList.add("screencapture");
+        IS_SCREEN_CAPTURE = true;
+      }
+
+      async function run() {
+        await init();
+        const demo = new Demo(0.0);
+
+        const latencies = new Map();
+
+        const signals = (() => {
+          const Signal = (direction, message, reverse, side, comms_channel) => ({
+            canvas: document.getElementById(`signal-${direction}-${message}`),
+            direction,
+            message,
+            reverse,
+            side,
+            comms_channel,
+            activity: [],
+          });
+          return [
+            Signal('left-server',  'command',    false, PlayerSide.Left,  CommsChannel.ToServerCommand),
+            Signal('left-server',  'clocksync',  false, PlayerSide.Left,  CommsChannel.ToServerClocksync),
+            Signal('left-client',  'command',    true,  PlayerSide.Left,  CommsChannel.ToClientCommand),
+            Signal('left-client',  'clocksync',  true,  PlayerSide.Left,  CommsChannel.ToClientClocksync),
+            Signal('left-client',  'snapshot',   true,  PlayerSide.Left,  CommsChannel.ToClientSnapshot),
+            Signal('right-server', 'command',    true,  PlayerSide.Right, CommsChannel.ToServerCommand),
+            Signal('right-server', 'clocksync',  true,  PlayerSide.Right, CommsChannel.ToServerClocksync),
+            Signal('right-client', 'command',    false, PlayerSide.Right, CommsChannel.ToClientCommand),
+            Signal('right-client', 'clocksync',  false, PlayerSide.Right, CommsChannel.ToClientClocksync),
+            Signal('right-client', 'snapshot',   false, PlayerSide.Right, CommsChannel.ToClientSnapshot),
+          ];
+        })();
+
+        function update_network_delays() {
+        const latency_left = document.getElementById('delay-left').value / 1000;
+        const latency_right = document.getElementById('delay-right').value / 1000;
+          demo.set_network_delay(PlayerSide.Left, latency_left);
+          demo.set_network_delay(PlayerSide.Right, latency_right);
+          latencies.set(PlayerSide.Left, latency_left);
+          latencies.set(PlayerSide.Right, latency_right);
+        }
+
+        update_network_delays();
+        document.getElementById('delay-left').addEventListener('change', update_network_delays);
+        document.getElementById('delay-right').addEventListener('change', update_network_delays);
+        function enter_to_blur(event) {
+          if (event.code == "Enter") {
+            event.target.blur();
+          }
+        }
+        function select_on_focus(event) {
+          event.target.select();
+        }
+        document.getElementById('delay-left').addEventListener('change', update_network_delays);
+        document.getElementById('delay-right').addEventListener('change', update_network_delays);
+        document.getElementById('delay-left').addEventListener('keydown', enter_to_blur);
+        document.getElementById('delay-right').addEventListener('keydown', enter_to_blur);
+        document.getElementById('delay-left').addEventListener('focus', select_on_focus);
+        document.getElementById('delay-right').addEventListener('focus', select_on_focus);
+
+        const timestamp_left = document.getElementById('timestamp-left');
+        const timestamp_right = document.getElementById('timestamp-right');
+        const timestamp_server = document.getElementById('timestamp-server');
+        const status_left = document.getElementById('status-left');
+        const status_right = document.getElementById('status-right');
+
+        function get_display_state_elements(machine) {
+          return {
+            body_left: document.getElementById(`${machine}-body-left`),
+            body_right: document.getElementById(`${machine}-body-right`),
+            body_doodad: document.getElementById(`${machine}-body-none`),
+            rotate_left: document.getElementById(`${machine}-body-left-rotate`),
+            rotate_right: document.getElementById(`${machine}-body-right-rotate`),
+            rotate_doodad: document.getElementById(`${machine}-body-none-rotate`),
+            screen: document.getElementById(`${machine}-screen`),
+          };
+        }
+        const display_left = get_display_state_elements('client-left');
+        const display_right = get_display_state_elements('client-right');
+        const display_server = get_display_state_elements('server');
+
+        const commands_left = document.getElementById('commands-left');
+        const commands_right = document.getElementById('commands-right');
+        const commands_server = document.getElementById('commands-server');
+
+        const INPUT_MAP = new Map([
+          ["KeyW", {side: PlayerSide.Left, command: PlayerCommand.Jump, element: document.getElementById('key-w')}],
+          ["KeyA", {side: PlayerSide.Left, command: PlayerCommand.Left, element: document.getElementById('key-a')}],
+          ["KeyS", {side: PlayerSide.Left, command: null, element: document.getElementById('key-s')}],
+          ["KeyD", {side: PlayerSide.Left, command: PlayerCommand.Right, element: document.getElementById('key-d')}],
+          ["ArrowUp", {side: PlayerSide.Right, command: PlayerCommand.Jump, element: document.getElementById('key-up')}],
+          ["ArrowLeft", {side: PlayerSide.Right, command: PlayerCommand.Left, element: document.getElementById('key-left')}],
+          ["ArrowDown", {side: PlayerSide.Right, command: null, element: document.getElementById('key-down')}],
+          ["ArrowRight", {side: PlayerSide.Right, command: PlayerCommand.Right, element: document.getElementById('key-right')}],
+        ])
+
+        function on_keydown(code) {
+          const input = INPUT_MAP.get(code);
+          if (input) {
+            if (input.command !== null) {
+              demo.issue_command(new DemoCommand(input.side, input.command, true));
+            }
+            input.element.classList.add('pressed');
+          }
+        }
+        function on_keyup(code) {
+          const input = INPUT_MAP.get(code);
+          if (input) {
+            if (input.command !== null) {
+              demo.issue_command(new DemoCommand(input.side, input.command, false));
+            }
+            input.element.classList.remove('pressed');
+          }
+        }
+        for (const [code, input] of INPUT_MAP.entries()) {
+          let is_keydown = false;
+          let is_spacedown = false;
+          let is_mousedown_on_button = false;
+          function try_keydown() {
+            if (is_keydown || is_spacedown || is_mousedown_on_button) {
+              // Don't double trigger.
+              return;
+            }
+            on_keydown(code);
+          }
+          function try_keyup() {
+            if (is_keydown || is_spacedown || is_mousedown_on_button) {
+              // Don't early trigger when something is still pressed.
+              return;
+            }
+            on_keyup(code);
+          }
+          input.element.addEventListener('mousedown', () => {
+            try_keydown(code);
+            is_mousedown_on_button = true;
+          });
+          window.addEventListener('mouseup', event => {
+            if (is_mousedown_on_button) {
+              is_mousedown_on_button = false;
+              try_keyup(code);
+            }
+          });
+          window.addEventListener('keydown', event => {
+            if (!event.repeat && event.code == code) {
+              try_keydown(code);
+              is_keydown = true;
+            }
+          });
+          window.addEventListener('keyup', event => {
+            if (!event.repeat && event.code == code) {
+              is_keydown = false;
+              try_keyup(code);
+            }
+          });
+          input.element.addEventListener('keydown', event => {
+            if (!event.repeat && event.code == 'Space') {
+              try_keydown(code);
+              is_spacedown = true;
+            }
+          });
+          input.element.addEventListener('keyup', event => {
+            if (!event.repeat && event.code == 'Space') {
+              is_spacedown = false;
+              try_keyup(code);
+            }
+          });
+        }
+
+        document.getElementById('connect-left').addEventListener('click', event => {
+          switch (event.target.className) {
+            case "connect": {
+              demo.connect(PlayerSide.Left);
+              document.getElementById('connection-left-status').getElementsByTagName('span')[0].textContent = "Connected";
+              document.getElementById('connection-left-status').className = "connected";
+              event.target.textContent = "Disconnect";
+              event.target.className = "disconnect";
+              break;
+            }
+            case "disconnect": {
+              demo.disconnect(PlayerSide.Left);
+              document.getElementById('connection-left-status').getElementsByTagName('span')[0].textContent = "Disconnected";
+              document.getElementById('connection-left-status').className = "disconnected";
+              event.target.textContent = "Connect";
+              event.target.className = "connect";
+              break;
+            }
+          }
+        });
+
+        document.getElementById('connect-right').addEventListener('click', event => {
+          switch (event.target.className) {
+            case "connect": {
+              demo.connect(PlayerSide.Right);
+              document.getElementById('connection-right-status').getElementsByTagName('span')[0].textContent = "Connected";
+              document.getElementById('connection-right-status').className = "connected";
+              event.target.textContent = "Disconnect";
+              event.target.className = "disconnect";
+              break;
+            }
+            case "disconnect": {
+              demo.disconnect(PlayerSide.Right);
+              document.getElementById('connection-right-status').getElementsByTagName('span')[0].textContent = "Disconnected";
+              document.getElementById('connection-right-status').className = "disconnected";
+              event.target.textContent = "Connect";
+              event.target.className = "connect";
+              break;
+            }
+          }
+        });
+
+        for (const i of [1, 2, 4, 8, 16, 32, "pause"]) {
+          document.getElementById(`slowdown-${i}`).addEventListener('change', event => {
+            if (event.target.checked) {
+              slowdown_amount = i === "pause" ? Number.POSITIVE_INFINITY : i;
+            }
+          });
+        }
+
+        function update_display_state_elements(elements, display_state) {
+          if (display_state) {
+            const left_x = display_state.player_left_translation_x();
+            const left_y = 100 - display_state.player_left_translation_y();
+            const right_x = display_state.player_right_translation_x();
+            const right_y = 100 - display_state.player_right_translation_y();
+            const doodad_x = display_state.doodad_translation_x();
+            const doodad_y = 100 - display_state.doodad_translation_y();
+            elements.body_left.setAttribute("x", left_x);
+            elements.body_left.setAttribute("y", left_y);
+            elements.rotate_left.style.transform = `translate(${left_x}px, ${left_y}px) rotate(${-display_state.player_left_angle()}rad)`;
+            elements.body_right.setAttribute("x", right_x);
+            elements.body_right.setAttribute("y", right_y);
+            elements.rotate_right.style.transform = `translate(${right_x}px, ${right_y}px) rotate(${-display_state.player_right_angle()}rad)`;
+            elements.body_doodad.setAttribute("x", doodad_x);
+            elements.body_doodad.setAttribute("y", doodad_y);
+            elements.rotate_doodad.style.transform = `translate(${doodad_x}px, ${doodad_y}px) rotate(${-display_state.doodad_angle()}rad)`;
+            elements.screen.className = "ready";
+          } else {
+            elements.screen.className = "loading";
+          }
+        }
+
+        const PULSE_DURATION = 0.3;
+
+        function kernel(x) {
+          // Shape:
+          // +1       .
+          //         /|
+          // +0_____/ |______
+          //   -x -1  0    +x
+
+          if (x > 0) return 0;
+          return Math.max(0, x + 1.0);
+        }
+
+        let start_time = Date.now() / 1000;
+        let prev_update_time = 0.0;
+        let prev_frame_time = 0.0;
+
+        document.getElementById("timeskip-backwards").addEventListener("click", () => {
+          start_time += 60 * slowdown_amount;
+        });
+
+        document.getElementById("timeskip-forwards").addEventListener("click", () => {
+          start_time -= 60 * slowdown_amount;
+        });
+
+        let slowdown_counter = 0;
+        let slowdown_amount = 1;
+        let simulation_now = 0;
+
+        function next_animation_frame() {
+          const now = Date.now() / 1000 - start_time;
+          const delta_seconds_for_frame = now - prev_frame_time;
+          prev_frame_time = now;
+          update(delta_seconds_for_frame, now);
+          requestAnimationFrame(next_animation_frame);
+        }
+
+        (function() {
+          const SCREENSCAPTURE_FRAMERATE = 60;
+          let screenshot_time = 0;
+          window.next_screenshot_frame = function () {
+            const dt = 1 / SCREENSCAPTURE_FRAMERATE;
+            update(dt, screenshot_time);
+            screenshot_time += dt;
+          };
+        })();
+
+        function update(delta_seconds_for_frame, now) {
+          slowdown_counter++;
+          if (slowdown_counter > slowdown_amount) {
+            const delta_seconds_for_update = now - prev_update_time;
+            slowdown_counter = 0;
+            prev_update_time = now;
+            const simulation_delta_seconds = delta_seconds_for_update / slowdown_amount;
+            simulation_now += simulation_delta_seconds;
+            demo.update(simulation_delta_seconds, simulation_now);
+          }
+
+          timestamp_left.innerText = demo.client_timestamp(PlayerSide.Left);
+          timestamp_right.innerText = demo.client_timestamp(PlayerSide.Right);
+          timestamp_server.innerText = demo.server_timestamp();
+
+          status_left.innerText = demo.client_reconciliation_status(PlayerSide.Left);
+          status_right.innerText = demo.client_reconciliation_status(PlayerSide.Right);
+
+          update_display_state_elements(display_left, demo.client_display_state(PlayerSide.Left));
+          update_display_state_elements(display_right, demo.client_display_state(PlayerSide.Right));
+          update_display_state_elements(display_server, demo.server_display_state());
+
+          commands_left.innerHTML = demo
+            .get_client_commands(PlayerSide.Left)
+            .map(command => `<li>${command}</li>`)
+            .join('');
+          commands_right.innerHTML = demo
+            .get_client_commands(PlayerSide.Right)
+            .map(command => `<li>${command}</li>`)
+            .join('');
+          commands_server.innerHTML = demo
+            .get_server_commands()
+            .map(command => `<li>${command}</li>`)
+            .join('');
+
+          const simulation_pulse_duration = Math.max(0.02, PULSE_DURATION / slowdown_amount);
+
+          for (const signal of signals) {
+            const { canvas, side, comms_channel } = signal;
+            const latency = latencies.get(side);
+            const context = canvas.getContext('2d');
+            for (let i = 0; i < demo.new_comms_activity_count(side, comms_channel); i++) {
+              signal.activity.push(0);
+            }
+            signal.activity = signal.activity
+              .filter(pulse_age => pulse_age < simulation_pulse_duration + latency)
+              .map(pulse_age => pulse_age + delta_seconds_for_frame / slowdown_amount);
+
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            for (let x = 0; x < canvas.width; x++) {
+              const strength = signal.activity.reduce((strength, pulse_age) => {
+                return strength + kernel((x / canvas.width * latency - pulse_age) / simulation_pulse_duration);
+              }, 0);
+              const opacity = 0.8 * strength + 0.2;
+              context.fillStyle = `rgba(31, 100, 89, ${opacity})`;
+              context.fillRect(signal.reverse ? canvas.width - x - 1 : x, 0, 1, canvas.height);
+            }
+            context.globalCompositeOperation = 'destination-in';
+            context.font = '12px "Roboto Condensed", sans-serif';
+            context.textAlign = 'center';
+            context.fillStyle = 'black';
+            context.fillText(signal.message.toUpperCase(), canvas.width / 2, 12);
+            context.globalCompositeOperation = 'source-over';
+          }
+        }
+
+        if (!IS_SCREEN_CAPTURE) {
+          next_animation_frame();
+        }
+      }
+      run();
+    </script>
+  </body>
+</html>
