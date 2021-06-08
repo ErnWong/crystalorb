@@ -10,14 +10,9 @@ license = "Apache-2.0"
 readme = "README.markdown"
 repository = "https://github.com/ErnWong/crystalorb"
 
-[features]
-default = [
-    "serde/derive"
-]
-
 [dependencies]
 tracing = "0.1.22"
-serde = "1.0.118"
+serde = {version = "1.0.118", features = ["derive"]}
 take_mut = "0.2.2"
 
 [dev-dependencies]
