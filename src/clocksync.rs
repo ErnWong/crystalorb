@@ -89,6 +89,10 @@ impl ClockSyncer {
 
     /// Perform the next update, where the [`ClockSyncer`] tries to gather more information about
     /// the client-server clock differences and makes adjustments when needed.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the [`ClockSyncer`] receives inconsistent `client_id` values from the server.
     pub fn update<NetworkResourceType: NetworkResource>(
         &mut self,
         delta_seconds: f64,
