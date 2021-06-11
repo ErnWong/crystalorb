@@ -185,7 +185,7 @@ impl Clone for ClockSyncChannelSettings {
 pub fn network_setup<WorldType: World>(
     mut net: ResMut<NetworkResource>,
     command_channel_settings_res: Res<CommandChannelSettings>,
-    snapshot_channel_settings_res: Res<CommandChannelSettings>,
+    snapshot_channel_settings_res: Res<SnapshotChannelSettings>,
     clocksync_channel_settings_res: Res<ClockSyncChannelSettings>,
 ) {
     // Ugly consequence of set_channels_builder not accepting a FnOnce.

@@ -1,3 +1,9 @@
+## v0.2.1
+
+### Fixed
+
+- `crystalorb-bevy-networking-turbulence` plugin used the wrong settings resource for registering the `Timestamped<Snapshot>` message channel (it used `CommandChannelSettings` instead of `SnapshotChannelSettings`), causing both incorrect configuration as well as panic, since the same channel number will be used twice.
+
 ## v0.2.0
 
 ### Fixed
