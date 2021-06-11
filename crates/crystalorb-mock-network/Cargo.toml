@@ -1,6 +1,6 @@
 [package]
 name = "crystalorb-mock-network"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Ernest Wong <sudo@ernestwong.nz>"]
 categories = ["games", "simulation"]
 description = "Mock, offline, in-memory transport layer for CrystalOrb"
@@ -11,7 +11,7 @@ readme = "README.markdown"
 repository = "https://github.com/ErnWong/crystalorb"
 
 [dependencies]
-crystalorb = {version = "0.2.0", path = "../../"}
+crystalorb = {version = "0.2.1", path = "../../"}
 serde = {version = "1.0.118", features = ["derive"]}
 
 [dev-dependencies]

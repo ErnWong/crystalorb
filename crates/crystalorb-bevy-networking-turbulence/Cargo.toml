@@ -1,6 +1,6 @@
 [package]
 name = "crystalorb-bevy-networking-turbulence"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Ernest Wong <sudo@ernestwong.nz>"]
 categories = ["games", "simulation"]
 description = "bevy_networking_turbulence integration for CrystalOrb"
@@ -20,7 +20,7 @@ bevy_app = "0.5"
 bevy_ecs = "0.5"
 bevy_core = "0.5"
 bevy_networking_turbulence = {version = "0.3.0", default-features = false}
-crystalorb = {version = "0.2.0", path="../../"}
+crystalorb = {version = "0.2.1", path="../../"}
 serde = {version = "1.0.118", features = ["derive"]}
 turbulence = "0.3"
 
