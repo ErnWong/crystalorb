@@ -11,7 +11,7 @@
 use crate::{
     clocksync::ClockSyncMessage,
     fixed_timestepper::{FixedTimestepper, TerminationCondition, TimeKeeper},
-    network_resource::{Connection, ConnectionHandleType, NetworkResource},
+    network_resource::{Connection, NetworkResource},
     timestamp::{Timestamp, Timestamped},
     world::{InitializationType, Simulation, World},
     Config,
@@ -81,7 +81,7 @@ impl<WorldType: World> Server<WorldType> {
     fn apply_validated_command<NetworkResourceType: NetworkResource>(
         &mut self,
         command: &Timestamped<WorldType::CommandType>,
-        command_source: Option<ConnectionHandleType>,
+        command_source: Option<NetworkResourceType::ConnectionHandleType>,
         net: &mut NetworkResourceType,
     ) {
         debug!("Received command from {:?} - {:?}", command_source, command);
@@ -108,16 +108,16 @@ impl<WorldType: World> Server<WorldType> {
     fn receive_command<NetworkResourceType: NetworkResource>(
         &mut self,
         command: &Timestamped<WorldType::CommandType>,
-        command_source: ConnectionHandleType,
+        command_source: NetworkResourceType::ConnectionHandleType,
         net: &mut NetworkResourceType,
     ) {
-        if WorldType::command_is_valid(command.inner(), command_source)
-        // TODO: Is it valid to validate the timestamps?
-        // && command.timestamp() >= self.timekeeping_simulation.last_completed_timestamp()
-        // && command.timestamp() <= self.estimated_client_simulating_timestamp()
-        {
-            self.apply_validated_command(&command, Some(command_source), net);
-        }
+        // FIXME: if WorldType::command_is_valid(command.inner(), command_source)
+        // // TODO: Is it valid to validate the timestamps?
+        // // && command.timestamp() >= self.timekeeping_simulation.last_completed_timestamp()
+        // // && command.timestamp() <= self.estimated_client_simulating_timestamp()
+        // {
+        self.apply_validated_command(&command, Some(command_source), net);
+        // }
     }
 
     /// Issue a command from the server to the world. The command will be scheduled to the
@@ -174,7 +174,6 @@ impl<WorldType: World> Server<WorldType> {
             while let Some(mut clock_sync_message) = connection.recv::<ClockSyncMessage>() {
                 trace!("Replying to clock sync message. client_id: {}", handle);
                 clock_sync_message.server_seconds_since_startup = seconds_since_startup;
-                clock_sync_message.client_id = handle;
                 clock_syncs.push((handle, clock_sync_message));
             }
         }

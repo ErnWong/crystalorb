@@ -1,28 +1,37 @@
-use crate::clocksync::ClockSyncer;
-use std::borrow::Borrow;
+use crate::{clocksync::ClockSyncer, network_resource::NetworkResource};
+use std::{borrow::Borrow, marker::PhantomData};
 
 /// The client interface while the client is in the initial [clock syncing
 /// stage](super#stage-1---syncing-clock-stage).
 #[derive(Debug)]
-pub struct SyncingClock<ClockSyncerRefType>(ClockSyncerRefType)
+pub struct SyncingClock<ClockSyncerRefType, NetworkResourceType>(
+    ClockSyncerRefType,
+    PhantomData<NetworkResourceType>,
+)
 where
-    ClockSyncerRefType: Borrow<ClockSyncer>;
+    ClockSyncerRefType: Borrow<ClockSyncer<NetworkResourceType>>,
+    NetworkResourceType: NetworkResource;
 
-impl<'a> From<&'a ClockSyncer> for SyncingClock<&'a ClockSyncer> {
-    fn from(clocksyncer: &'a ClockSyncer) -> Self {
-        Self(clocksyncer)
+impl<'a, NetworkResourceType: NetworkResource> From<&'a ClockSyncer<NetworkResourceType>>
+    for SyncingClock<&'a ClockSyncer<NetworkResourceType>, NetworkResourceType>
+{
+    fn from(clocksyncer: &'a ClockSyncer<NetworkResourceType>) -> Self {
+        Self(clocksyncer, PhantomData)
     }
 }
 
-impl<'a> From<&'a mut ClockSyncer> for SyncingClock<&'a mut ClockSyncer> {
-    fn from(clocksyncer: &'a mut ClockSyncer) -> Self {
-        Self(clocksyncer)
+impl<'a, NetworkResourceType: NetworkResource> From<&'a mut ClockSyncer<NetworkResourceType>>
+    for SyncingClock<&'a mut ClockSyncer<NetworkResourceType>, NetworkResourceType>
+{
+    fn from(clocksyncer: &'a mut ClockSyncer<NetworkResourceType>) -> Self {
+        Self(clocksyncer, PhantomData)
     }
 }
 
-impl<ClockSyncerRefType> SyncingClock<ClockSyncerRefType>
+impl<ClockSyncerRefType, NetworkResourceType> SyncingClock<ClockSyncerRefType, NetworkResourceType>
 where
-    ClockSyncerRefType: Borrow<ClockSyncer>,
+    ClockSyncerRefType: Borrow<ClockSyncer<NetworkResourceType>>,
+    NetworkResourceType: NetworkResource,
 {
     /// The number of clock offset samples collected so far.
     pub fn sample_count(&self) -> usize {

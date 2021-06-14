@@ -58,7 +58,7 @@ pub trait World: Stepper + Default + Send + Sync + 'static {
     /// `client_id` using the
     /// [`Ready::client_id`](crate::client::stage::Ready::client_id) method from the
     /// [`Ready`](crate::client::stage::Stage::Ready) stage.
-    fn command_is_valid(command: &Self::CommandType, client_id: usize) -> bool;
+    fn command_is_valid<ClientId>(command: &Self::CommandType, client_id: ClientId) -> bool;
 
     /// This describes how a [`Command`] affects the [`World`]. Use this method to update your
     /// state. For example, you may want to apply forces/impulses to your rigid bodies, or simply

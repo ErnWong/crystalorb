@@ -74,12 +74,14 @@ use stage::{Stage, StageMut, StageOwned};
 /// [`Server`](crate::server::Server) for game servers. You create, store, and update this client
 /// instance to run your game on the client side.
 #[derive(Debug)]
-pub struct Client<WorldType: World> {
+pub struct Client<WorldType: World, NetworkResourceType: NetworkResource> {
     config: Config,
-    stage: StageOwned<WorldType>,
+    stage: StageOwned<WorldType, NetworkResourceType>,
 }
 
-impl<WorldType: World> Client<WorldType> {
+impl<WorldType: World, NetworkResourceType: NetworkResource>
+    Client<WorldType, NetworkResourceType>
+{
     /// Constructs a new [`Client`].
     ///
     /// # Examples
@@ -143,11 +145,12 @@ impl<WorldType: World> Client<WorldType> {
     ///     # break;
     /// }
     /// ```
-    pub fn update<NetworkResourceType: NetworkResource>(
+    pub fn update(
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
+        client_id: NetworkResourceType::ConnectionHandleType,
     ) {
         let positive_delta_seconds = delta_seconds.max(0.0);
         #[allow(clippy::float_cmp)]
@@ -158,8 +161,13 @@ impl<WorldType: World> Client<WorldType> {
             );
         }
 
-        self.stage
-            .update(delta_seconds, seconds_since_startup, &self.config, net);
+        self.stage.update(
+            delta_seconds,
+            seconds_since_startup,
+            &self.config,
+            net,
+            client_id,
+        );
     }
 
     /// Get the current stage of the [`Client`], which provides access to extra functionality
@@ -188,7 +196,7 @@ impl<WorldType: World> Client<WorldType> {
     ///     );
     /// }
     /// ```
-    pub fn stage(&self) -> Stage<WorldType> {
+    pub fn stage(&self) -> Stage<WorldType, NetworkResourceType> {
         Stage::from(&self.stage)
     }
 
@@ -219,7 +227,7 @@ impl<WorldType: World> Client<WorldType> {
     ///     ready_client.issue_command(command, &mut network);
     /// }
     /// ```
-    pub fn stage_mut(&mut self) -> StageMut<WorldType> {
+    pub fn stage_mut(&mut self) -> StageMut<WorldType, NetworkResourceType> {
         StageMut::from(&mut self.stage)
     }
 }
@@ -227,15 +235,21 @@ impl<WorldType: World> Client<WorldType> {
 /// The internal CrystalOrb structure used to actively run the simulations, which is not
 /// constructed until the [`ClockSyncer`] is ready.
 #[derive(Debug)]
-pub struct ActiveClient<WorldType: World> {
-    clocksyncer: ClockSyncer,
+pub struct ActiveClient<WorldType: World, NetworkResourceType: NetworkResource> {
+    clocksyncer: ClockSyncer<NetworkResourceType>,
 
     timekeeping_simulations:
         TimeKeeper<ClientWorldSimulations<WorldType>, { TerminationCondition::FirstOvershoot }>,
 }
 
-impl<WorldType: World> ActiveClient<WorldType> {
-    fn new(seconds_since_startup: f64, config: Config, clocksyncer: ClockSyncer) -> Self {
+impl<WorldType: World, NetworkResourceType: NetworkResource>
+    ActiveClient<WorldType, NetworkResourceType>
+{
+    fn new(
+        seconds_since_startup: f64,
+        config: Config,
+        clocksyncer: ClockSyncer<NetworkResourceType>,
+    ) -> Self {
         let server_time = clocksyncer
             .server_seconds_since_startup(seconds_since_startup)
             .expect("Active client can only be constructed with a synchronized clock");
@@ -268,14 +282,15 @@ impl<WorldType: World> ActiveClient<WorldType> {
     }
 
     /// Perform the next update for the current rendering frame.
-    pub fn update<NetworkResourceType: NetworkResource>(
+    pub fn update(
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
+        client_id: NetworkResourceType::ConnectionHandleType,
     ) {
         self.clocksyncer
-            .update(delta_seconds, seconds_since_startup, net);
+            .update(delta_seconds, seconds_since_startup, net, client_id);
 
         for (_, mut connection) in net.connections() {
             while let Some(command) = connection.recv::<Timestamped<WorldType::CommandType>>() {

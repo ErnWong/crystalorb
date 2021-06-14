@@ -36,11 +36,6 @@ pub struct ClockSyncMessage {
     /// The time (in seconds) when the server side sends this `ClockSyncMessage` back to the client
     /// as a reply to the client's request.
     pub server_seconds_since_startup: f64,
-
-    /// The `client_id` that shouldn't really belong here, but is tagging along for the ride. This
-    /// is set by the server as part of the server's reply as well, and is set to the identifier
-    /// that the server has allocated for the client that has made the request.
-    pub client_id: usize,
 }
 
 /// Client-side clock syncing logic. This is responsible for sending out clock synchronization
@@ -51,7 +46,7 @@ pub struct ClockSyncMessage {
 /// effective clock offset that is used by the client once the effective clock offset deviates too
 /// far from the rolling average.
 #[derive(Debug)]
-pub struct ClockSyncer {
+pub struct ClockSyncer<NetworkResourceType: NetworkResource> {
     /// The difference in seconds between client's seconds_since_startup and server's
     /// seconds_since_startup, where a positive value refers that an earlier client time value
     /// corresponds to the same instant as a later server time value. Since servers start
@@ -67,12 +62,12 @@ pub struct ClockSyncer {
 
     /// An identifier issued by the server for us to identify ourselves from other clients. Used,
     /// for example, for issuing our player's commands to the server.
-    client_id: Option<usize>,
+    client_id: Option<NetworkResourceType::ConnectionHandleType>,
 
     config: Config,
 }
 
-impl ClockSyncer {
+impl<NetworkResourceType: NetworkResource> ClockSyncer<NetworkResourceType> {
     /// Create a new [`ClockSyncer`] with the given configuration parameters. The [`ClockSyncer`]
     /// will start off in a ["not ready" state](ClockSyncer::is_ready) until after multiple
     /// [`update`](ClockSyncer::update) calls. During the time when the [`ClockSyncer`] is not
@@ -93,11 +88,12 @@ impl ClockSyncer {
     /// # Panics
     ///
     /// Panics when the [`ClockSyncer`] receives inconsistent `client_id` values from the server.
-    pub fn update<NetworkResourceType: NetworkResource>(
+    pub fn update(
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
         net: &mut NetworkResourceType,
+        client_id: NetworkResourceType::ConnectionHandleType,
     ) {
         self.seconds_since_last_request_sent += delta_seconds;
         if self.seconds_since_last_request_sent > self.config.clock_sync_request_period {
@@ -107,7 +103,6 @@ impl ClockSyncer {
             net.broadcast_message(ClockSyncMessage {
                 client_send_seconds_since_startup: seconds_since_startup,
                 server_seconds_since_startup: 0.0,
-                client_id: 0,
             });
         }
 
@@ -121,15 +116,15 @@ impl ClockSyncer {
 
                 trace!(
                     "Received clocksync response. ClientId: {}. Estimated clock offset: {}",
-                    sync.client_id,
+                    client_id,
                     offset,
                 );
 
                 // Only one sample per update. Save the latest one.
                 latest_server_seconds_offset = Some(offset);
 
-                let existing_id = self.client_id.get_or_insert(sync.client_id);
-                assert_eq!(*existing_id, sync.client_id);
+                let existing_id = self.client_id.get_or_insert(client_id);
+                assert_eq!(*existing_id, client_id);
             }
         }
 
@@ -163,7 +158,7 @@ impl ClockSyncer {
     /// for example, for issuing our player's commands to the server.
     ///
     /// This is `None` if no server responses had been received yet.
-    pub fn client_id(&self) -> &Option<usize> {
+    pub fn client_id(&self) -> &Option<NetworkResourceType::ConnectionHandleType> {
         &self.client_id
     }
 

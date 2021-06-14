@@ -2,13 +2,7 @@
 //! networking library to send and receive messages.
 
 use serde::{de::DeserializeOwned, Serialize};
-use std::{error::Error, fmt::Debug};
-
-/// Used for identifying each connection. Note that this is how the
-/// [`Server`](crate::server::Server) determines the
-/// [`client_id`](crate::client::stage::Ready::client_id) for each client, so they should be unique
-/// among all clients that is or has once connected during the server's uptime.
-pub type ConnectionHandleType = usize;
+use std::{cmp::PartialEq, error::Error, fmt::Debug, fmt::Display};
 
 /// CrystalOrb needs an external networking library before it can be used. Such networking library
 /// will be responsible for sending three kinds of messages:
@@ -39,15 +33,24 @@ pub trait NetworkResource {
     /// case a generic lifetime parameter is provided here that you can use.
     type ConnectionType<'a>: Connection;
 
+    /// Used for identifying each connection. Note that this is how the
+    /// [`Server`](crate::server::Server) determines the
+    /// [`client_id`](crate::client::stage::Ready::client_id) for each client, so they should be unique
+    /// among all clients that is or has once connected during the server's uptime.
+    type ConnectionHandleType: Debug + Display + Copy + Clone + PartialEq;
+
     /// Iterate through the available connections. For servers, this would be the list of current
     /// client connections that are still alive. For the client, this would only contain the
     /// connection to the server once the connection has been established.
     fn connections<'a>(
         &'a mut self,
-    ) -> Box<dyn Iterator<Item = (ConnectionHandleType, Self::ConnectionType<'a>)> + 'a>;
+    ) -> Box<dyn Iterator<Item = (Self::ConnectionHandleType, Self::ConnectionType<'a>)> + 'a>;
 
     /// Get a specific connection given its connection handle.
-    fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>>;
+    fn get_connection(
+        &mut self,
+        handle: Self::ConnectionHandleType,
+    ) -> Option<Self::ConnectionType<'_>>;
 
     /// Optional: Send the given message to all active connections. A default implementation is
     /// already given that uses [`NetworkResource::connections`] and [`Connection::send`].
@@ -77,7 +80,7 @@ pub trait NetworkResource {
     /// the given `handle` could not be found.
     fn send_message<MessageType>(
         &mut self,
-        handle: ConnectionHandleType,
+        handle: Self::ConnectionHandleType,
         message: MessageType,
     ) -> Result<Option<MessageType>, Box<dyn Error + Send>>
     where
