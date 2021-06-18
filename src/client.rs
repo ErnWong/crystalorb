@@ -74,14 +74,11 @@ use stage::{Stage, StageMut, StageOwned};
 /// [`Server`](crate::server::Server) for game servers. You create, store, and update this client
 /// instance to run your game on the client side.
 #[derive(Debug)]
-pub struct Client<WorldType: World, NetworkResourceType: NetworkResource> {
-    config: Config,
-    stage: StageOwned<WorldType, NetworkResourceType>,
+pub struct Client<WorldType: World> {
+    stage: StageOwned<WorldType>,
 }
 
-impl<WorldType: World, NetworkResourceType: NetworkResource>
-    Client<WorldType, NetworkResourceType>
-{
+impl<WorldType: World> Client<WorldType> {
     /// Constructs a new [`Client`].
     ///
     /// # Examples
@@ -106,10 +103,9 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
     ///     ..Config::new()
     /// });
     /// ```
-    pub fn new(config: Config) -> Self {
+    pub fn new() -> Self {
         Self {
-            config: config.clone(),
-            stage: StageOwned::SyncingClock(ClockSyncer::new(config)),
+            stage: StageOwned::SyncingClock(ClockSyncer::new()),
         }
     }
 
@@ -149,8 +145,8 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
-        net: &mut NetworkResourceType,
-        client_id: NetworkResourceType::ConnectionHandleType,
+        net: &mut <WorldType::ConfigType as Config>::NetworkResourceType,
+        client_id: <<WorldType::ConfigType as Config>::NetworkResourceType as NetworkResource>::ConnectionHandleType,
     ) {
         let positive_delta_seconds = delta_seconds.max(0.0);
         #[allow(clippy::float_cmp)]
@@ -161,13 +157,8 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
             );
         }
 
-        self.stage.update(
-            delta_seconds,
-            seconds_since_startup,
-            &self.config,
-            net,
-            client_id,
-        );
+        self.stage
+            .update(delta_seconds, seconds_since_startup, net, client_id);
     }
 
     /// Get the current stage of the [`Client`], which provides access to extra functionality
@@ -196,7 +187,7 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
     ///     );
     /// }
     /// ```
-    pub fn stage(&self) -> Stage<WorldType, NetworkResourceType> {
+    pub fn stage(&self) -> Stage<WorldType> {
         Stage::from(&self.stage)
     }
 
@@ -227,7 +218,7 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
     ///     ready_client.issue_command(command, &mut network);
     /// }
     /// ```
-    pub fn stage_mut(&mut self) -> StageMut<WorldType, NetworkResourceType> {
+    pub fn stage_mut(&mut self) -> StageMut<WorldType> {
         StageMut::from(&mut self.stage)
     }
 }
@@ -235,26 +226,26 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
 /// The internal CrystalOrb structure used to actively run the simulations, which is not
 /// constructed until the [`ClockSyncer`] is ready.
 #[derive(Debug)]
-pub struct ActiveClient<WorldType: World, NetworkResourceType: NetworkResource> {
-    clocksyncer: ClockSyncer<NetworkResourceType>,
+pub struct ActiveClient<WorldType: World> {
+    clocksyncer: ClockSyncer<WorldType::ConfigType>,
 
-    timekeeping_simulations:
-        TimeKeeper<ClientWorldSimulations<WorldType>, { TerminationCondition::FirstOvershoot }>,
+    timekeeping_simulations: TimeKeeper<
+        WorldType::ConfigType,
+        ClientWorldSimulations<WorldType>,
+        { TerminationCondition::FirstOvershoot },
+    >,
 }
 
-impl<WorldType: World, NetworkResourceType: NetworkResource>
-    ActiveClient<WorldType, NetworkResourceType>
-{
-    fn new(
-        seconds_since_startup: f64,
-        config: Config,
-        clocksyncer: ClockSyncer<NetworkResourceType>,
-    ) -> Self {
+impl<WorldType: World> ActiveClient<WorldType> {
+    fn new(seconds_since_startup: f64, clocksyncer: ClockSyncer<WorldType::ConfigType>) -> Self {
         let server_time = clocksyncer
             .server_seconds_since_startup(seconds_since_startup)
             .expect("Active client can only be constructed with a synchronized clock");
 
-        let initial_timestamp = Timestamp::from_seconds(server_time, config.timestep_seconds);
+        let initial_timestamp = Timestamp::from_seconds(
+            server_time,
+            <WorldType::ConfigType as Config>::TIMESTEP_SECONDS,
+        );
 
         info!(
             "Initial timestamp: {:?}, client_id: {}",
@@ -266,10 +257,9 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
 
         Self {
             clocksyncer,
-            timekeeping_simulations: TimeKeeper::new(
-                ClientWorldSimulations::new(config.clone(), initial_timestamp),
-                config,
-            ),
+            timekeeping_simulations: TimeKeeper::new(ClientWorldSimulations::new(
+                initial_timestamp,
+            )),
         }
     }
 
@@ -286,17 +276,21 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
-        net: &mut NetworkResourceType,
-        client_id: NetworkResourceType::ConnectionHandleType,
+        net: &mut <WorldType::ConfigType as Config>::NetworkResourceType,
+        client_id: <<WorldType::ConfigType as Config>::NetworkResourceType as NetworkResource>::ConnectionHandleType,
     ) {
         self.clocksyncer
             .update(delta_seconds, seconds_since_startup, net, client_id);
 
         for (_, mut connection) in net.connections() {
-            while let Some(command) = connection.recv::<Timestamped<WorldType::CommandType>>() {
+            while let Some(command) =
+                connection.recv::<Timestamped<<WorldType::ConfigType as Config>::CommandType>>()
+            {
                 self.timekeeping_simulations.receive_command(&command);
             }
-            while let Some(snapshot) = connection.recv::<Timestamped<WorldType::SnapshotType>>() {
+            while let Some(snapshot) =
+                connection.recv::<Timestamped<<WorldType::ConfigType as Config>::SnapshotType>>()
+            {
                 self.timekeeping_simulations.receive_snapshot(snapshot);
             }
         }
@@ -312,7 +306,7 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
             self.clocksyncer
                 .server_seconds_since_startup(seconds_since_startup)
                 .expect("Clock should be synced")
-                + self.timekeeping_simulations.config.lag_compensation_latency,
+                + <WorldType::ConfigType as Config>::LAG_COMPENSATION_LATENCY,
         );
     }
 
@@ -396,7 +390,7 @@ impl Display for FastforwardingHealth {
 struct ClientWorldSimulations<WorldType: World> {
     /// The next server snapshot that needs applying after the current latest snapshot has been
     /// fully interpolated into.
-    queued_snapshot: Option<Timestamped<WorldType::SnapshotType>>,
+    queued_snapshot: Option<Timestamped<<WorldType::ConfigType as Config>::SnapshotType>>,
 
     /// The timestamp of the last queued snapshot from the server, so we can discard stale
     /// snapshots from the server when the arrive out of order. This persists even after the queued
@@ -413,7 +407,7 @@ struct ClientWorldSimulations<WorldType: World> {
     /// individual world simulation's internal command buffers would have already dropped, but
     /// would otherwise need to replay onto the server snapshot to get it back to the current
     /// timestamp.
-    base_command_buffer: CommandBuffer<WorldType::CommandType>,
+    base_command_buffer: CommandBuffer<<WorldType::ConfigType as Config>::CommandType>,
 
     /// The physics world simulation with and without the latest server snapshot applied.
     /// `world_simulation.get().new` has the latest server snapshot applied.
@@ -433,17 +427,15 @@ struct ClientWorldSimulations<WorldType: World> {
     /// Old and new gets swapped every step.
     /// They are None until the first world simulation state that is based on a server snapshot is
     /// ready to be "published".
-    states: OldNew<Option<Timestamped<WorldType::DisplayStateType>>>,
+    states: OldNew<Option<Timestamped<<WorldType::ConfigType as Config>::DisplayStateType>>>,
 
     /// The interpolation between `previous_state` and `current_state` for the requested render
     /// timestamp. This remains None until the client is initialised with the server's snapshots.
-    display_state: Option<Tweened<WorldType::DisplayStateType>>,
-
-    config: Config,
+    display_state: Option<Tweened<<WorldType::ConfigType as Config>::DisplayStateType>>,
 }
 
 impl<WorldType: World> ClientWorldSimulations<WorldType> {
-    pub fn new(config: Config, initial_timestamp: Timestamp) -> Self {
+    pub fn new(initial_timestamp: Timestamp) -> Self {
         let mut client_world_simulations = Self {
             queued_snapshot: None,
             last_queued_snapshot_timestamp: None,
@@ -453,7 +445,6 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
             blend_old_new_interpolation_t: 1.0,
             states: OldNew::new(),
             display_state: None,
-            config,
         };
         let OldNewResult { old, new } = client_world_simulations.world_simulations.get_mut();
         old.reset_last_completed_timestamp(initial_timestamp);
@@ -507,7 +498,10 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
         }
     }
 
-    fn receive_command(&mut self, command: &Timestamped<WorldType::CommandType>) {
+    fn receive_command(
+        &mut self,
+        command: &Timestamped<<WorldType::ConfigType as Config>::CommandType>,
+    ) {
         debug!("Received command {:?}", command);
         let OldNewResult { old, new } = self.world_simulations.get_mut();
         self.base_command_buffer.insert(command);
@@ -515,7 +509,10 @@ impl<WorldType: World> ClientWorldSimulations<WorldType> {
         new.schedule_command(command);
     }
 
-    fn receive_snapshot(&mut self, snapshot: Timestamped<WorldType::SnapshotType>) {
+    fn receive_snapshot(
+        &mut self,
+        snapshot: Timestamped<<WorldType::ConfigType as Config>::SnapshotType>,
+    ) {
         trace!(
             "Received snapshot: {:?} frames behind",
             self.last_completed_timestamp() - snapshot.timestamp()
@@ -549,7 +546,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
     fn step(&mut self) {
         fn load_snapshot<WorldType: World>(
             this: &mut ClientWorldSimulations<WorldType>,
-            snapshot: &Timestamped<WorldType::SnapshotType>,
+            snapshot: &Timestamped<<WorldType::ConfigType as Config>::SnapshotType>,
         ) {
             trace!("Loading new snapshot from server");
 
@@ -605,7 +602,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
             );
             new_world_simulation.try_completing_simulations_up_to(
                 old_world_simulation.last_completed_timestamp(),
-                this.config.fastforward_max_per_step,
+                <WorldType::ConfigType as Config>::FASTFORWARD_MAX_PER_STEP,
             );
         }
 
@@ -631,13 +628,11 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                 old_world_simulation.display_state(),
                 new_world_simulation.display_state(),
             ) {
-                (Some(old), Some(new)) => Some(
-                    Timestamped::<WorldType::DisplayStateType>::from_interpolation(
-                        &old,
-                        &new,
-                        this.blend_old_new_interpolation_t,
-                    ),
-                ),
+                (Some(old), Some(new)) => Some(Timestamped::<
+                    <WorldType::ConfigType as Config>::DisplayStateType,
+                >::from_interpolation(
+                    &old, &new, this.blend_old_new_interpolation_t
+                )),
                 (None, Some(new)) => Some(new),
                 (Some(_), None) => {
                     unreachable!("New world is always initialized before old world does")
@@ -653,7 +648,8 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
 
         match self.infer_current_reconciliation_status() {
             ReconciliationStatus::Blending(_) => {
-                self.blend_old_new_interpolation_t += self.config.blend_progress_per_frame();
+                self.blend_old_new_interpolation_t +=
+                    <WorldType::ConfigType as Config>::blend_progress_per_frame();
                 self.blend_old_new_interpolation_t =
                     self.blend_old_new_interpolation_t.clamp(0.0, 1.0);
                 simulate_next_frame(self);
@@ -806,10 +802,9 @@ impl<WorldType: World> FixedTimestepper for ClientWorldSimulations<WorldType> {
             old: optional_undershot_state,
             new: optional_overshot_state,
         } = self.states.get();
-        let tween_t = self
-            .config
-            .tweening_method
-            .shape_interpolation_t(1.0 - timestep_overshoot_seconds / self.config.timestep_seconds);
+        let tween_t = <WorldType::ConfigType as Config>::TWEENING_METHOD.shape_interpolation_t(
+            1.0 - timestep_overshoot_seconds / <WorldType::ConfigType as Config>::TIMESTEP_SECONDS,
+        );
         trace!("tween_t {}", tween_t);
         if let Some(undershot_state) = optional_undershot_state {
             if let Some(overshot_state) = optional_overshot_state {
@@ -840,7 +835,7 @@ impl<WorldType: World> FixedTimestepper for ClientWorldSimulations<WorldType> {
                 // in the next iteration.
                 self.last_queued_snapshot_timestamp = Some(
                     self.last_completed_timestamp()
-                        - (self.config.lag_compensation_frame_count() * 2),
+                        - (<WorldType::ConfigType as Config>::lag_compensation_frame_count() * 2),
                 );
             }
         }

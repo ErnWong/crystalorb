@@ -24,26 +24,26 @@ use tracing::{debug, error, trace, warn};
 #[derive(Debug)]
 pub struct Server<WorldType: World> {
     timekeeping_simulation: TimeKeeper<
+        WorldType::ConfigType,
         Simulation<WorldType, { InitializationType::PreInitialized }>,
         { TerminationCondition::LastUndershoot },
     >,
     seconds_since_last_snapshot: f64,
-    config: Config,
 }
 
 impl<WorldType: World> Server<WorldType> {
     /// Constructs a new [`Server`]. This function requires a `seconds_since_startup` parameter to
     /// initialize the server's simulation timestamp.
-    pub fn new(config: Config, seconds_since_startup: f64) -> Self {
+    pub fn new(seconds_since_startup: f64) -> Self {
         let mut server = Self {
-            timekeeping_simulation: TimeKeeper::new(Simulation::new(), config.clone()),
+            timekeeping_simulation: TimeKeeper::new(Simulation::new()),
             seconds_since_last_snapshot: 0.0,
-            config,
         };
 
-        let initial_timestamp =
-            Timestamp::from_seconds(seconds_since_startup, server.config.timestep_seconds)
-                - server.config.lag_compensation_frame_count();
+        let initial_timestamp = Timestamp::from_seconds(
+            seconds_since_startup,
+            WorldType::ConfigType::TIMESTEP_SECONDS,
+        ) - WorldType::ConfigType::lag_compensation_frame_count();
         server
             .timekeeping_simulation
             .reset_last_completed_timestamp(initial_timestamp);
@@ -69,18 +69,18 @@ impl<WorldType: World> Server<WorldType> {
     /// This is also the timestamp that gets attached to the command when you call
     /// [`Server::issue_command`].
     pub fn estimated_client_simulating_timestamp(&self) -> Timestamp {
-        self.simulating_timestamp() + self.config.lag_compensation_frame_count()
+        self.simulating_timestamp() + WorldType::ConfigType::lag_compensation_frame_count()
     }
 
     /// The timestamp that clients have supposed to have completed simulating (which should always
     /// be ahead of the server to compensate for the latency between the server and the clients).
     pub fn estimated_client_last_completed_timestamp(&self) -> Timestamp {
-        self.last_completed_timestamp() + self.config.lag_compensation_frame_count()
+        self.last_completed_timestamp() + WorldType::ConfigType::lag_compensation_frame_count()
     }
 
     fn apply_validated_command<NetworkResourceType: NetworkResource>(
         &mut self,
-        command: &Timestamped<WorldType::CommandType>,
+        command: &Timestamped<<WorldType::ConfigType as Config>::CommandType>,
         command_source: Option<NetworkResourceType::ConnectionHandleType>,
         net: &mut NetworkResourceType,
     ) {
@@ -98,7 +98,7 @@ impl<WorldType: World> Server<WorldType> {
                 }
             }
             let result = connection.send(command.clone());
-            connection.flush::<Timestamped<WorldType::CommandType>>();
+            connection.flush::<Timestamped<<WorldType::ConfigType as Config>::CommandType>>();
             if let Some(message) = result {
                 error!("Failed to relay command to [{}]: {:?}", handle, message);
             }
@@ -107,24 +107,24 @@ impl<WorldType: World> Server<WorldType> {
 
     fn receive_command<NetworkResourceType: NetworkResource>(
         &mut self,
-        command: &Timestamped<WorldType::CommandType>,
+        command: &Timestamped<<WorldType::ConfigType as Config>::CommandType>,
         command_source: NetworkResourceType::ConnectionHandleType,
         net: &mut NetworkResourceType,
     ) {
-        // FIXME: if WorldType::command_is_valid(command.inner(), command_source)
-        // // TODO: Is it valid to validate the timestamps?
-        // // && command.timestamp() >= self.timekeeping_simulation.last_completed_timestamp()
-        // // && command.timestamp() <= self.estimated_client_simulating_timestamp()
-        // {
-        self.apply_validated_command(&command, Some(command_source), net);
-        // }
+        if WorldType::command_is_valid(command.inner(), command_source)
+        // TODO: Is it valid to validate the timestamps?
+        // && command.timestamp() >= self.timekeeping_simulation.last_completed_timestamp()
+        // && command.timestamp() <= self.estimated_client_simulating_timestamp()
+        {
+            self.apply_validated_command(&command, Some(command_source), net);
+        }
     }
 
     /// Issue a command from the server to the world. The command will be scheduled to the
     /// estimated client's current timestamp.
     pub fn issue_command<NetworkResourceType: NetworkResource>(
         &mut self,
-        command: WorldType::CommandType,
+        command: <WorldType::ConfigType as Config>::CommandType,
         net: &mut NetworkResourceType,
     ) {
         self.apply_validated_command(
@@ -138,12 +138,19 @@ impl<WorldType: World> Server<WorldType> {
     /// diagnostic purposes.
     pub fn buffered_commands(
         &self,
-    ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {
+    ) -> impl Iterator<
+        Item = (
+            Timestamp,
+            &Vec<<WorldType::ConfigType as Config>::CommandType>,
+        ),
+    > {
         self.timekeeping_simulation.buffered_commands()
     }
 
     /// Get the current display state of the server's world.
-    pub fn display_state(&self) -> Timestamped<WorldType::DisplayStateType> {
+    pub fn display_state(
+        &self,
+    ) -> Timestamped<<WorldType::ConfigType as Config>::DisplayStateType> {
         self.timekeeping_simulation
             .display_state()
             .expect("Server simulation does not need initialization")
@@ -168,7 +175,9 @@ impl<WorldType: World> Server<WorldType> {
         let mut new_commands = Vec::new();
         let mut clock_syncs = Vec::new();
         for (handle, mut connection) in net.connections() {
-            while let Some(command) = connection.recv::<Timestamped<WorldType::CommandType>>() {
+            while let Some(command) =
+                connection.recv::<Timestamped<<WorldType::ConfigType as Config>::CommandType>>()
+            {
                 new_commands.push((command, handle));
             }
             while let Some(mut clock_sync_message) = connection.recv::<ClockSyncMessage>() {
@@ -189,7 +198,7 @@ impl<WorldType: World> Server<WorldType> {
             .update(positive_delta_seconds, seconds_since_startup);
 
         self.seconds_since_last_snapshot += positive_delta_seconds;
-        if self.seconds_since_last_snapshot > self.config.snapshot_send_period {
+        if self.seconds_since_last_snapshot > WorldType::ConfigType::SNAPSHOT_SEND_PERIOD {
             trace!(
                 "Broadcasting snapshot at timestamp: {:?} (note: drift error: {})",
                 self.timekeeping_simulation.last_completed_timestamp(),

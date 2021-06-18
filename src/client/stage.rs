@@ -51,14 +51,14 @@ use super::ActiveClient;
 ///
 /// See the [module-level documentation](self) for more information.
 #[derive(Debug)]
-pub(crate) enum StageOwned<WorldType: World, NetworkResourceType: NetworkResource> {
+pub(crate) enum StageOwned<WorldType: World> {
     /// The [first stage][module-stage].
     ///
     /// See the relevant section in the [module-level documentation][module-stage] for more
     /// info.
     ///
     /// [module-stage]: self#stage-1---syncing-clock-stage
-    SyncingClock(ClockSyncer<NetworkResourceType>),
+    SyncingClock(ClockSyncer<WorldType::ConfigType>),
 
     /// The [second stage][module-stage].
     ///
@@ -66,7 +66,7 @@ pub(crate) enum StageOwned<WorldType: World, NetworkResourceType: NetworkResourc
     /// info.
     ///
     /// [module-stage]: self#stage-2---syncing-initial-state-stage
-    SyncingInitialState(ActiveClient<WorldType, NetworkResourceType>),
+    SyncingInitialState(ActiveClient<WorldType>),
 
     /// The [third stage][module-stage].
     ///
@@ -74,19 +74,16 @@ pub(crate) enum StageOwned<WorldType: World, NetworkResourceType: NetworkResourc
     /// info.
     ///
     /// [module-stage]: self#stage-3---ready-stage
-    Ready(ActiveClient<WorldType, NetworkResourceType>),
+    Ready(ActiveClient<WorldType>),
 }
 
-impl<WorldType: World, NetworkResourceType: NetworkResource>
-    StageOwned<WorldType, NetworkResourceType>
-{
+impl<WorldType: World> StageOwned<WorldType> {
     pub fn update(
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
-        config: &Config,
-        net: &mut NetworkResourceType,
-        client_id: NetworkResourceType::ConnectionHandleType,
+        net: &mut <WorldType::ConfigType as Config>::NetworkResourceType,
+        client_id: <<WorldType::ConfigType as Config>::NetworkResourceType as NetworkResource>::ConnectionHandleType,
     ) {
         let should_transition = match self {
             StageOwned::SyncingClock(clocksyncer) => {
@@ -104,10 +101,9 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
         };
 
         if should_transition {
-            let config = config.clone();
             take_mut::take(self, |stage| match stage {
                 StageOwned::SyncingClock(clocksyncer) => StageOwned::SyncingInitialState(
-                    ActiveClient::new(seconds_since_startup, config, clocksyncer),
+                    ActiveClient::new(seconds_since_startup, clocksyncer),
                 ),
                 StageOwned::SyncingInitialState(client) => StageOwned::Ready(client),
                 StageOwned::Ready(_) => unreachable!(),
@@ -116,13 +112,8 @@ impl<WorldType: World, NetworkResourceType: NetworkResource>
     }
 }
 
-impl<'a, WorldType: World, NetworkResourceType: NetworkResource>
-    From<&'a StageOwned<WorldType, NetworkResourceType>>
-    for Stage<'a, WorldType, NetworkResourceType>
-{
-    fn from(
-        stage: &'a StageOwned<WorldType, NetworkResourceType>,
-    ) -> Stage<'a, WorldType, NetworkResourceType> {
+impl<'a, WorldType: World> From<&'a StageOwned<WorldType>> for Stage<'a, WorldType> {
+    fn from(stage: &'a StageOwned<WorldType>) -> Stage<'a, WorldType> {
         match stage {
             StageOwned::SyncingClock(clocksyncer) => Stage::SyncingClock(clocksyncer.into()),
             StageOwned::SyncingInitialState(active_client) => {
@@ -133,13 +124,8 @@ impl<'a, WorldType: World, NetworkResourceType: NetworkResource>
     }
 }
 
-impl<'a, WorldType: World, NetworkResourceType: NetworkResource>
-    From<&'a mut StageOwned<WorldType, NetworkResourceType>>
-    for StageMut<'a, WorldType, NetworkResourceType>
-{
-    fn from(
-        stage: &'a mut StageOwned<WorldType, NetworkResourceType>,
-    ) -> StageMut<'a, WorldType, NetworkResourceType> {
+impl<'a, WorldType: World> From<&'a mut StageOwned<WorldType>> for StageMut<'a, WorldType> {
+    fn from(stage: &'a mut StageOwned<WorldType>) -> StageMut<'a, WorldType> {
         match stage {
             StageOwned::SyncingClock(clocksyncer) => StageMut::SyncingClock(clocksyncer.into()),
             StageOwned::SyncingInitialState(active_client) => {
@@ -160,14 +146,14 @@ impl<'a, WorldType: World, NetworkResourceType: NetworkResource>
 /// [get-stage]: crate::client::Client::stage
 /// [get-stagemut]: crate::client::Client::stage_mut
 #[derive(Debug)]
-pub enum Stage<'a, WorldType: World, NetworkResourceType: NetworkResource> {
+pub enum Stage<'a, WorldType: World> {
     /// The [first stage][module-stage].
     ///
     /// See the relevant section in the [module-level documentation][module-stage] for more
     /// info.
     ///
     /// [module-stage]: self#stage-1---syncing-clock-stage
-    SyncingClock(SyncingClock<&'a ClockSyncer<NetworkResourceType>, NetworkResourceType>),
+    SyncingClock(SyncingClock<&'a ClockSyncer<WorldType::ConfigType>, WorldType::ConfigType>),
 
     /// The [second stage][module-stage].
     ///
@@ -175,13 +161,7 @@ pub enum Stage<'a, WorldType: World, NetworkResourceType: NetworkResource> {
     /// info.
     ///
     /// [module-stage]: self#stage-2---syncing-initial-state-stage
-    SyncingInitialState(
-        SyncingInitialState<
-            WorldType,
-            NetworkResourceType,
-            &'a ActiveClient<WorldType, NetworkResourceType>,
-        >,
-    ),
+    SyncingInitialState(SyncingInitialState<WorldType, &'a ActiveClient<WorldType>>),
 
     /// The [third stage][module-stage].
     ///
@@ -189,7 +169,7 @@ pub enum Stage<'a, WorldType: World, NetworkResourceType: NetworkResource> {
     /// info.
     ///
     /// [module-stage]: self#stage-3---ready-stage
-    Ready(Ready<WorldType, NetworkResourceType, &'a ActiveClient<WorldType, NetworkResourceType>>),
+    Ready(Ready<WorldType, &'a ActiveClient<WorldType>>),
 }
 
 /// This is the mutable view of the client's [stage](self) that is returned by
@@ -202,14 +182,14 @@ pub enum Stage<'a, WorldType: World, NetworkResourceType: NetworkResource> {
 /// [get-stage]: crate::client::Client::stage
 /// [get-stagemut]: crate::client::Client::stage_mut
 #[derive(Debug)]
-pub enum StageMut<'a, WorldType: World, NetworkResourceType: NetworkResource> {
+pub enum StageMut<'a, WorldType: World> {
     /// The [first stage][module-stage].
     ///
     /// See the relevant section in the [module-level documentation][module-stage] for more
     /// info.
     ///
     /// [module-stage]: self#stage-1---syncing-clock-stage
-    SyncingClock(SyncingClock<&'a mut ClockSyncer<NetworkResourceType>, NetworkResourceType>),
+    SyncingClock(SyncingClock<&'a mut ClockSyncer<WorldType::ConfigType>, WorldType::ConfigType>),
 
     /// The [second stage][module-stage].
     ///
@@ -217,13 +197,7 @@ pub enum StageMut<'a, WorldType: World, NetworkResourceType: NetworkResource> {
     /// info.
     ///
     /// [module-stage]: self#stage-2---syncing-initial-state-stage
-    SyncingInitialState(
-        SyncingInitialState<
-            WorldType,
-            NetworkResourceType,
-            &'a mut ActiveClient<WorldType, NetworkResourceType>,
-        >,
-    ),
+    SyncingInitialState(SyncingInitialState<WorldType, &'a mut ActiveClient<WorldType>>),
 
     /// The [third stage][module-stage].
     ///
@@ -231,7 +205,5 @@ pub enum StageMut<'a, WorldType: World, NetworkResourceType: NetworkResource> {
     /// info.
     ///
     /// [module-stage]: self#stage-3---ready-stage
-    Ready(
-        Ready<WorldType, NetworkResourceType, &'a mut ActiveClient<WorldType, NetworkResourceType>>,
-    ),
+    Ready(Ready<WorldType, &'a mut ActiveClient<WorldType>>),
 }

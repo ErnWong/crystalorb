@@ -1,4 +1,4 @@
-use crate::{network_resource::NetworkResource, timestamp::Timestamp, world::World};
+use crate::{timestamp::Timestamp, world::World};
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::ActiveClient;
@@ -6,48 +6,34 @@ use super::ActiveClient;
 /// The client interface while the client is in the initial [state syncing
 /// stage](super#stage-2---syncing-initial-state-stage).
 #[derive(Debug)]
-pub struct SyncingInitialState<WorldType, NetworkResourceType, ActiveClientRefType>(
+pub struct SyncingInitialState<WorldType, ActiveClientRefType>(
     ActiveClientRefType,
     PhantomData<WorldType>,
-    PhantomData<NetworkResourceType>,
 )
 where
-    ActiveClientRefType: Borrow<ActiveClient<WorldType, NetworkResourceType>>,
-    WorldType: World,
-    NetworkResourceType: NetworkResource;
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
+    WorldType: World;
 
-impl<'a, WorldType: World, NetworkResourceType: NetworkResource>
-    From<&'a ActiveClient<WorldType, NetworkResourceType>>
-    for SyncingInitialState<
-        WorldType,
-        NetworkResourceType,
-        &'a ActiveClient<WorldType, NetworkResourceType>,
-    >
+impl<'a, WorldType: World> From<&'a ActiveClient<WorldType>>
+    for SyncingInitialState<WorldType, &'a ActiveClient<WorldType>>
 {
-    fn from(active_client: &'a ActiveClient<WorldType, NetworkResourceType>) -> Self {
-        Self(active_client, PhantomData, PhantomData)
+    fn from(active_client: &'a ActiveClient<WorldType>) -> Self {
+        Self(active_client, PhantomData)
     }
 }
 
-impl<'a, WorldType: World, NetworkResourceType: NetworkResource>
-    From<&'a mut ActiveClient<WorldType, NetworkResourceType>>
-    for SyncingInitialState<
-        WorldType,
-        NetworkResourceType,
-        &'a mut ActiveClient<WorldType, NetworkResourceType>,
-    >
+impl<'a, WorldType: World> From<&'a mut ActiveClient<WorldType>>
+    for SyncingInitialState<WorldType, &'a mut ActiveClient<WorldType>>
 {
-    fn from(active_client: &'a mut ActiveClient<WorldType, NetworkResourceType>) -> Self {
-        Self(active_client, PhantomData, PhantomData)
+    fn from(active_client: &'a mut ActiveClient<WorldType>) -> Self {
+        Self(active_client, PhantomData)
     }
 }
 
-impl<WorldType, NetworkResourceType, ActiveClientRefType>
-    SyncingInitialState<WorldType, NetworkResourceType, ActiveClientRefType>
+impl<WorldType, ActiveClientRefType> SyncingInitialState<WorldType, ActiveClientRefType>
 where
-    ActiveClientRefType: Borrow<ActiveClient<WorldType, NetworkResourceType>>,
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
     WorldType: World,
-    NetworkResourceType: NetworkResource,
 {
     /// The timestamp of the most recent frame that has completed its simulation.
     /// This is typically one less than [`SyncingInitialState::simulating_timestamp`].

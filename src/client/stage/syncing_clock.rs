@@ -1,37 +1,37 @@
-use crate::{clocksync::ClockSyncer, network_resource::NetworkResource};
+use crate::{clocksync::ClockSyncer, Config};
 use std::{borrow::Borrow, marker::PhantomData};
 
 /// The client interface while the client is in the initial [clock syncing
 /// stage](super#stage-1---syncing-clock-stage).
 #[derive(Debug)]
-pub struct SyncingClock<ClockSyncerRefType, NetworkResourceType>(
+pub struct SyncingClock<ClockSyncerRefType, ConfigType>(
     ClockSyncerRefType,
-    PhantomData<NetworkResourceType>,
+    PhantomData<ConfigType>,
 )
 where
-    ClockSyncerRefType: Borrow<ClockSyncer<NetworkResourceType>>,
-    NetworkResourceType: NetworkResource;
+    ClockSyncerRefType: Borrow<ClockSyncer<ConfigType>>,
+    ConfigType: Config;
 
-impl<'a, NetworkResourceType: NetworkResource> From<&'a ClockSyncer<NetworkResourceType>>
-    for SyncingClock<&'a ClockSyncer<NetworkResourceType>, NetworkResourceType>
+impl<'a, ConfigType: Config> From<&'a ClockSyncer<ConfigType>>
+    for SyncingClock<&'a ClockSyncer<ConfigType>, ConfigType>
 {
-    fn from(clocksyncer: &'a ClockSyncer<NetworkResourceType>) -> Self {
+    fn from(clocksyncer: &'a ClockSyncer<ConfigType>) -> Self {
         Self(clocksyncer, PhantomData)
     }
 }
 
-impl<'a, NetworkResourceType: NetworkResource> From<&'a mut ClockSyncer<NetworkResourceType>>
-    for SyncingClock<&'a mut ClockSyncer<NetworkResourceType>, NetworkResourceType>
+impl<'a, ConfigType: Config> From<&'a mut ClockSyncer<ConfigType>>
+    for SyncingClock<&'a mut ClockSyncer<ConfigType>, ConfigType>
 {
-    fn from(clocksyncer: &'a mut ClockSyncer<NetworkResourceType>) -> Self {
+    fn from(clocksyncer: &'a mut ClockSyncer<ConfigType>) -> Self {
         Self(clocksyncer, PhantomData)
     }
 }
 
-impl<ClockSyncerRefType, NetworkResourceType> SyncingClock<ClockSyncerRefType, NetworkResourceType>
+impl<ClockSyncerRefType, ConfigType> SyncingClock<ClockSyncerRefType, ConfigType>
 where
-    ClockSyncerRefType: Borrow<ClockSyncer<NetworkResourceType>>,
-    NetworkResourceType: NetworkResource,
+    ClockSyncerRefType: Borrow<ClockSyncer<ConfigType>>,
+    ConfigType: Config,
 {
     /// The number of clock offset samples collected so far.
     pub fn sample_count(&self) -> usize {

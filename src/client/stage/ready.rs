@@ -2,6 +2,7 @@ use crate::{
     network_resource::NetworkResource,
     timestamp::{Timestamp, Timestamped},
     world::{Tweened, World},
+    Config,
 };
 use std::{
     borrow::{Borrow, BorrowMut},
@@ -13,40 +14,31 @@ use super::{super::ReconciliationStatus, ActiveClient};
 /// The client interface once the client is in the [ready
 /// stage](super#stage-3---ready-stage).
 #[derive(Debug)]
-pub struct Ready<WorldType, NetworkResourceType, ActiveClientRefType>(
-    ActiveClientRefType,
-    PhantomData<WorldType>,
-    PhantomData<NetworkResourceType>,
-)
+pub struct Ready<WorldType, ActiveClientRefType>(ActiveClientRefType, PhantomData<WorldType>)
 where
-    ActiveClientRefType: Borrow<ActiveClient<WorldType, NetworkResourceType>>,
-    WorldType: World,
-    NetworkResourceType: NetworkResource;
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
+    WorldType: World;
 
-impl<'a, WorldType: World, NetworkResourceType: NetworkResource>
-    From<&'a ActiveClient<WorldType, NetworkResourceType>>
-    for Ready<WorldType, NetworkResourceType, &'a ActiveClient<WorldType, NetworkResourceType>>
+impl<'a, WorldType: World> From<&'a ActiveClient<WorldType>>
+    for Ready<WorldType, &'a ActiveClient<WorldType>>
 {
-    fn from(active_client: &'a ActiveClient<WorldType, NetworkResourceType>) -> Self {
-        Self(active_client, PhantomData, PhantomData)
+    fn from(active_client: &'a ActiveClient<WorldType>) -> Self {
+        Self(active_client, PhantomData)
     }
 }
 
-impl<'a, WorldType: World, NetworkResourceType: NetworkResource>
-    From<&'a mut ActiveClient<WorldType, NetworkResourceType>>
-    for Ready<WorldType, NetworkResourceType, &'a mut ActiveClient<WorldType, NetworkResourceType>>
+impl<'a, WorldType: World> From<&'a mut ActiveClient<WorldType>>
+    for Ready<WorldType, &'a mut ActiveClient<WorldType>>
 {
-    fn from(active_client: &'a mut ActiveClient<WorldType, NetworkResourceType>) -> Self {
-        Self(active_client, PhantomData, PhantomData)
+    fn from(active_client: &'a mut ActiveClient<WorldType>) -> Self {
+        Self(active_client, PhantomData)
     }
 }
 
-impl<WorldType, NetworkResourceType, ActiveClientRefType>
-    Ready<WorldType, NetworkResourceType, ActiveClientRefType>
+impl<WorldType, ActiveClientRefType> Ready<WorldType, ActiveClientRefType>
 where
-    ActiveClientRefType: Borrow<ActiveClient<WorldType, NetworkResourceType>>,
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>>,
     WorldType: World,
-    NetworkResourceType: NetworkResource,
 {
     /// The timestamp of the most recent frame that has completed its simulation.
     /// This is typically one less than [`Ready::simulating_timestamp`].
@@ -66,7 +58,9 @@ where
     /// A number that is used to identify the client among all the clients connected to the server.
     /// This number may be useful, for example, to identify which piece of world state belongs to
     /// which player.
-    pub fn client_id(&self) -> NetworkResourceType::ConnectionHandleType {
+    pub fn client_id(
+        &self,
+    ) -> <<WorldType::ConfigType as Config>::NetworkResourceType as NetworkResource>::ConnectionHandleType{
         self.0
             .borrow()
             .clocksyncer
@@ -78,7 +72,12 @@ where
     /// diagnostic purposes.
     pub fn buffered_commands(
         &self,
-    ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {
+    ) -> impl Iterator<
+        Item = (
+            Timestamp,
+            &Vec<<WorldType::ConfigType as Config>::CommandType>,
+        ),
+    > {
         self.0
             .borrow()
             .timekeeping_simulations
@@ -87,7 +86,7 @@ where
     }
 
     /// Get the current display state that can be used to render the client's screen.
-    pub fn display_state(&self) -> &Tweened<WorldType::DisplayStateType> {
+    pub fn display_state(&self) -> &Tweened<<WorldType::ConfigType as Config>::DisplayStateType> {
         &self
             .0
             .borrow()
@@ -140,20 +139,17 @@ where
     }
 }
 
-impl<WorldType, NetworkResourceType, ActiveClientRefType>
-    Ready<WorldType, NetworkResourceType, ActiveClientRefType>
+impl<WorldType, ActiveClientRefType> Ready<WorldType, ActiveClientRefType>
 where
-    ActiveClientRefType: Borrow<ActiveClient<WorldType, NetworkResourceType>>
-        + BorrowMut<ActiveClient<WorldType, NetworkResourceType>>,
+    ActiveClientRefType: Borrow<ActiveClient<WorldType>> + BorrowMut<ActiveClient<WorldType>>,
     WorldType: World,
-    NetworkResourceType: NetworkResource,
 {
     /// Issue a command from this client's player to the world. The command will be scheduled
     /// to the current simulating timestamp (the previously completed timestamp + 1).
     pub fn issue_command(
         &mut self,
-        command: WorldType::CommandType,
-        net: &mut NetworkResourceType,
+        command: <WorldType::ConfigType as Config>::CommandType,
+        net: &mut <WorldType::ConfigType as Config>::NetworkResourceType,
     ) {
         let timestamped_command = Timestamped::new(command, self.simulating_timestamp());
         self.0

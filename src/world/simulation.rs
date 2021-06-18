@@ -3,6 +3,7 @@ use crate::{
     fixed_timestepper::{FixedTimestepper, Stepper},
     timestamp::{Timestamp, Timestamped},
     world::World,
+    Config,
 };
 use std::fmt::Debug;
 use tracing::trace;
@@ -26,7 +27,7 @@ pub(crate) enum InitializationType {
 #[derive(Debug)]
 pub(crate) struct Simulation<WorldType: World, const INITIALIZATION_TYPE: InitializationType> {
     world: WorldType,
-    command_buffer: CommandBuffer<WorldType::CommandType>,
+    command_buffer: CommandBuffer<<WorldType::ConfigType as Config>::CommandType>,
     has_initialized: bool,
 }
 
@@ -62,7 +63,10 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
 
     /// Schedule a command to be applied to the world at the beginning of the frame with the
     /// given timestamp.
-    pub fn schedule_command(&mut self, command: &Timestamped<WorldType::CommandType>) {
+    pub fn schedule_command(
+        &mut self,
+        command: &Timestamped<<WorldType::ConfigType as Config>::CommandType>,
+    ) {
         self.command_buffer.insert(command);
     }
 
@@ -91,8 +95,8 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
     /// out of order, and we do not want to skip past any stale commands.
     pub fn apply_completed_snapshot(
         &mut self,
-        completed_snapshot: &Timestamped<WorldType::SnapshotType>,
-        rewound_command_buffer: CommandBuffer<WorldType::CommandType>,
+        completed_snapshot: &Timestamped<<WorldType::ConfigType as Config>::SnapshotType>,
+        rewound_command_buffer: CommandBuffer<<WorldType::ConfigType as Config>::CommandType>,
     ) {
         self.world
             .apply_snapshot(completed_snapshot.inner().clone());
@@ -104,14 +108,18 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
 
     /// Generates a timestamped snapshot of the world for the latest frame that has completed
     /// its simulation.
-    pub fn last_completed_snapshot(&self) -> Timestamped<WorldType::SnapshotType> {
+    pub fn last_completed_snapshot(
+        &self,
+    ) -> Timestamped<<WorldType::ConfigType as Config>::SnapshotType> {
         Timestamped::new(self.world.snapshot(), self.last_completed_timestamp())
     }
 
     /// Get the current display state of the world. Returns `None` if the world has not been
     /// initialized with a snapshot yet, and [`INITIALIZATION_TYPE`](Simulation) is
     /// [`InitializationType::NeedsInitialization`].
-    pub fn display_state(&self) -> Option<Timestamped<WorldType::DisplayStateType>> {
+    pub fn display_state(
+        &self,
+    ) -> Option<Timestamped<<WorldType::ConfigType as Config>::DisplayStateType>> {
         if self.has_initialized {
             Some(Timestamped::new(
                 self.world.display_state(),
@@ -125,7 +133,12 @@ impl<WorldType: World, const INITIALIZATION_TYPE: InitializationType>
     /// Get a list of commands currently buffered. This is primarily for diagnostic purposes.
     pub fn buffered_commands(
         &self,
-    ) -> impl Iterator<Item = (Timestamp, &Vec<WorldType::CommandType>)> {
+    ) -> impl Iterator<
+        Item = (
+            Timestamp,
+            &Vec<<WorldType::ConfigType as Config>::CommandType>,
+        ),
+    > {
         self.command_buffer.iter()
     }
 }

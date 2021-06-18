@@ -26,7 +26,7 @@ use std::{cmp::PartialEq, error::Error, fmt::Debug, fmt::Display};
 /// [`bevy_networking_turbulence`](https://github.com/smokku/bevy_networking_turbulence) plugin. See
 /// [`crystalorb-bevy-networking-turbulence`](https://github.com/ErnWong/crystalorb/tree/crates/crystalorb-bevy-networking-turbulence)
 /// for an example for integrating with `bevy_networking_turbulence`.
-pub trait NetworkResource {
+pub trait NetworkResource: Debug {
     /// The [`Connection`] structure that CrystalOrb will use to send/receive messages from a
     /// specific remote machine. This may probably be a wrapper to a mutable reference to some
     /// connection type that is used by your external networking library of choice, in which

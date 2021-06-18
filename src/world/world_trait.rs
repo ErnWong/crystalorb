@@ -1,6 +1,4 @@
-use crate::{command::Command, fixed_timestepper::Stepper, world::DisplayState};
-use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
+use crate::{fixed_timestepper::Stepper, Config};
 
 /// Structures that implement the [`World`] trait are structures that are responsible for storing
 /// *and* simulating the game physics. The [`World`] is a simulation that is updated using its
@@ -32,24 +30,8 @@ use std::fmt::Debug;
 /// game-specific state you need. The `Stepper::step` implementation for such a world would
 /// typically invoke `DefaultMechanicalWorld::step`, and any other game-specific update logic.
 pub trait World: Stepper + Default + Send + Sync + 'static {
-    /// The command that can be used by the game and the player to interact with the physics
-    /// simulation. Typically, this is an enum of some kind, but it is up to you.
-    type CommandType: Command;
-
-    /// The subset of state information about the world that can be used to fully recreate the
-    /// world. Needs to be serializable so that it can be sent from the server to the client. There
-    /// is nothing stopping you from making the [`SnapshotType`](World::SnapshotType) the same type
-    /// as your [`World`] if you are ok with serializing the entire physics engine state. If you
-    /// think sending your entire [`World`] is a bit too heavy-weighted, you can hand-craft and
-    /// optimise your own `SnapshotType` structure to be as light-weight as possible.
-    type SnapshotType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static;
-
-    /// The subset of state information about the world that is to be displayed/rendered. This is
-    /// used by the client to create the perfect blend of state information for the current
-    /// rendering frame. You could make this [`DisplayState`](World::DisplayStateType) the same
-    /// structure as your [`World`] if you don't mind CrystalOrb making lots of copies of your
-    /// entire [`World`] structure and performing interpolation on all your state variables.
-    type DisplayStateType: DisplayState;
+    /// Configuration parameters that tweak how CrystalOrb works.
+    type ConfigType: Config;
 
     /// Each [`Command`] that the server receives from the client needs to be validated before
     /// being applied as well as relayed to other clients. You can use this method to check that
@@ -58,28 +40,31 @@ pub trait World: Stepper + Default + Send + Sync + 'static {
     /// `client_id` using the
     /// [`Ready::client_id`](crate::client::stage::Ready::client_id) method from the
     /// [`Ready`](crate::client::stage::Stage::Ready) stage.
-    fn command_is_valid<ClientId>(command: &Self::CommandType, client_id: ClientId) -> bool;
+    fn command_is_valid<ClientId>(
+        command: &<Self::ConfigType as Config>::CommandType,
+        client_id: ClientId,
+    ) -> bool;
 
     /// This describes how a [`Command`] affects the [`World`]. Use this method to update your
     /// state. For example, you may want to apply forces/impulses to your rigid bodies, or simply
     /// toggle some of your state variables that will affect how your [`Stepper::step`] will run.
-    fn apply_command(&mut self, command: &Self::CommandType);
+    fn apply_command(&mut self, command: &<Self::ConfigType as Config>::CommandType);
 
     /// Apply a [snapshot](World::SnapshotType) generated from another [`World`]'s
     /// [`World::snapshot`] method, so that this [`World`] will behave identically to that other
     /// [`World`]. See [`World::SnapshotType`] for more information.
     ///
     /// Typically, the server generates snapshots that clients need to regularly apply.
-    fn apply_snapshot(&mut self, snapshot: Self::SnapshotType);
+    fn apply_snapshot(&mut self, snapshot: <Self::ConfigType as Config>::SnapshotType);
 
     /// Generate the subset of the world state information that is needed to recreate this
     /// [`World`] and have it behave identically to this current [`World`]. See
     /// [`World::SnapshotType`] for more information.
     ///
     /// Typically, the server generates snapshots that clients need to regularly apply.
-    fn snapshot(&self) -> Self::SnapshotType;
+    fn snapshot(&self) -> <Self::ConfigType as Config>::SnapshotType;
 
     /// Generate the subset of the world state information that is needed to render the world.
     /// See [`World::DisplayStateType`] and [`DisplayState`].
-    fn display_state(&self) -> Self::DisplayStateType;
+    fn display_state(&self) -> <Self::ConfigType as Config>::DisplayStateType;
 }

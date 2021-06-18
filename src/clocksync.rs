@@ -46,7 +46,7 @@ pub struct ClockSyncMessage {
 /// effective clock offset that is used by the client once the effective clock offset deviates too
 /// far from the rolling average.
 #[derive(Debug)]
-pub struct ClockSyncer<NetworkResourceType: NetworkResource> {
+pub struct ClockSyncer<ConfigType: Config> {
     /// The difference in seconds between client's seconds_since_startup and server's
     /// seconds_since_startup, where a positive value refers that an earlier client time value
     /// corresponds to the same instant as a later server time value. Since servers start
@@ -62,23 +62,20 @@ pub struct ClockSyncer<NetworkResourceType: NetworkResource> {
 
     /// An identifier issued by the server for us to identify ourselves from other clients. Used,
     /// for example, for issuing our player's commands to the server.
-    client_id: Option<NetworkResourceType::ConnectionHandleType>,
-
-    config: Config,
+    client_id: Option<<ConfigType::NetworkResourceType as NetworkResource>::ConnectionHandleType>,
 }
 
-impl<NetworkResourceType: NetworkResource> ClockSyncer<NetworkResourceType> {
+impl<ConfigType: Config> ClockSyncer<ConfigType> {
     /// Create a new [`ClockSyncer`] with the given configuration parameters. The [`ClockSyncer`]
     /// will start off in a ["not ready" state](ClockSyncer::is_ready) until after multiple
     /// [`update`](ClockSyncer::update) calls. During the time when the [`ClockSyncer`] is not
     /// ready, some of the methods may return `None` as documented.
-    pub fn new(config: Config) -> Self {
+    pub fn new() -> Self {
         Self {
             server_seconds_offset: None,
             server_seconds_offset_samples: VecDeque::new(),
             seconds_since_last_request_sent: 0.0,
             client_id: None,
-            config,
         }
     }
 
@@ -92,11 +89,11 @@ impl<NetworkResourceType: NetworkResource> ClockSyncer<NetworkResourceType> {
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
-        net: &mut NetworkResourceType,
-        client_id: NetworkResourceType::ConnectionHandleType,
+        net: &mut ConfigType::NetworkResourceType,
+        client_id: <ConfigType::NetworkResourceType as NetworkResource>::ConnectionHandleType,
     ) {
         self.seconds_since_last_request_sent += delta_seconds;
-        if self.seconds_since_last_request_sent > self.config.clock_sync_request_period {
+        if self.seconds_since_last_request_sent > ConfigType::CLOCK_SYNC_REQUEST_PERIOD {
             self.seconds_since_last_request_sent = 0.0;
 
             trace!("Sending clocksync request");
@@ -151,14 +148,16 @@ impl<NetworkResourceType: NetworkResource> ClockSyncer<NetworkResourceType> {
 
     /// How many samples are needed to start making useful estimates.
     pub fn samples_needed(&self) -> usize {
-        self.config.clock_sync_samples_needed_to_store()
+        ConfigType::clock_sync_samples_needed_to_store()
     }
 
     /// An identifier issued by the server for us to identify ourselves from other clients. Used,
     /// for example, for issuing our player's commands to the server.
     ///
     /// This is `None` if no server responses had been received yet.
-    pub fn client_id(&self) -> &Option<NetworkResourceType::ConnectionHandleType> {
+    pub fn client_id(
+        &self,
+    ) -> &Option<<ConfigType::NetworkResourceType as NetworkResource>::ConnectionHandleType> {
         &self.client_id
     }
 
@@ -187,18 +186,18 @@ impl<NetworkResourceType: NetworkResource> ClockSyncer<NetworkResourceType> {
 
         assert!(
             self.server_seconds_offset_samples.len()
-                <= self.config.clock_sync_samples_needed_to_store()
+                <= ConfigType::clock_sync_samples_needed_to_store()
         );
 
         if self.server_seconds_offset_samples.len()
-            >= self.config.clock_sync_samples_needed_to_store()
+            >= ConfigType::clock_sync_samples_needed_to_store()
         {
             let rolling_mean_offset_seconds = self.rolling_mean_offset_seconds();
 
             let is_initial_sync = self.server_seconds_offset.is_none();
             let has_desynced = self.server_seconds_offset.map_or(false, |offset| {
                 (rolling_mean_offset_seconds - offset).abs()
-                    > self.config.max_tolerable_clock_deviation
+                    > ConfigType::MAX_TOLERABLE_CLOCK_DEVIATION
             });
 
             if is_initial_sync || has_desynced {
@@ -224,9 +223,9 @@ impl<NetworkResourceType: NetworkResource> ClockSyncer<NetworkResourceType> {
         let mut samples: Vec<f64> = self.server_seconds_offset_samples.iter().copied().collect();
         samples.sort_unstable_by(|a, b| a.partial_cmp(b).expect("Samples should not be NaN"));
 
-        let samples_without_outliers =
-            &samples[self.config.clock_sync_samples_to_discard_per_extreme()
-                ..samples.len() - self.config.clock_sync_samples_to_discard_per_extreme()];
+        let samples_without_outliers = &samples
+            [ConfigType::clock_sync_samples_to_discard_per_extreme()
+                ..samples.len() - ConfigType::clock_sync_samples_to_discard_per_extreme()];
 
         samples_without_outliers.iter().sum::<f64>() / samples_without_outliers.len() as f64
     }
