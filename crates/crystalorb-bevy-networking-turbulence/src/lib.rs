@@ -188,7 +188,6 @@ pub fn network_setup<WorldType: World>(
     snapshot_channel_settings_res: Res<SnapshotChannelSettings>,
     clocksync_channel_settings_res: Res<ClockSyncChannelSettings>,
 ) {
-    // Ugly consequence of set_channels_builder not accepting a FnOnce.
     let command_channel_settings = command_channel_settings_res.clone();
     let snapshot_channel_settings = snapshot_channel_settings_res.clone();
     let clocksync_channel_settings = clocksync_channel_settings_res.clone();
