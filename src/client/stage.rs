@@ -78,7 +78,7 @@ pub(crate) enum StageOwned<WorldType: World> {
 }
 
 impl<WorldType: World> StageOwned<WorldType> {
-    pub fn update<NetworkResourceType: NetworkResource>(
+    pub fn update<NetworkResourceType: NetworkResource<WorldType>>(
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,

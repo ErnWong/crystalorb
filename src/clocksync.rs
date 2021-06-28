@@ -10,6 +10,7 @@
 
 use crate::{
     network_resource::{Connection, NetworkResource},
+    world::World,
     Config,
 };
 use serde::{Deserialize, Serialize};
@@ -93,7 +94,7 @@ impl ClockSyncer {
     /// # Panics
     ///
     /// Panics when the [`ClockSyncer`] receives inconsistent `client_id` values from the server.
-    pub fn update<NetworkResourceType: NetworkResource>(
+    pub fn update<WorldType: World, NetworkResourceType: NetworkResource<WorldType>>(
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
@@ -113,7 +114,7 @@ impl ClockSyncer {
 
         let mut latest_server_seconds_offset: Option<f64> = None;
         for (_, mut connection) in net.connections() {
-            while let Some(sync) = connection.recv::<ClockSyncMessage>() {
+            while let Some(sync) = connection.recv_clock_sync() {
                 let received_time = seconds_since_startup;
                 let corresponding_client_time =
                     (sync.client_send_seconds_since_startup + received_time) / 2.0;

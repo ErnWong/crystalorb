@@ -9,7 +9,6 @@
 //! client stage.
 
 use crate::{
-    clocksync::ClockSyncMessage,
     fixed_timestepper::{FixedTimestepper, TerminationCondition, TimeKeeper},
     network_resource::{Connection, ConnectionHandleType, NetworkResource},
     timestamp::{Timestamp, Timestamped},
@@ -78,7 +77,7 @@ impl<WorldType: World> Server<WorldType> {
         self.last_completed_timestamp() + self.config.lag_compensation_frame_count()
     }
 
-    fn apply_validated_command<NetworkResourceType: NetworkResource>(
+    fn apply_validated_command<NetworkResourceType: NetworkResource<WorldType>>(
         &mut self,
         command: &Timestamped<WorldType::CommandType>,
         command_source: Option<ConnectionHandleType>,
@@ -105,7 +104,7 @@ impl<WorldType: World> Server<WorldType> {
         }
     }
 
-    fn receive_command<NetworkResourceType: NetworkResource>(
+    fn receive_command<NetworkResourceType: NetworkResource<WorldType>>(
         &mut self,
         command: &Timestamped<WorldType::CommandType>,
         command_source: ConnectionHandleType,
@@ -122,7 +121,7 @@ impl<WorldType: World> Server<WorldType> {
 
     /// Issue a command from the server to the world. The command will be scheduled to the
     /// estimated client's current timestamp.
-    pub fn issue_command<NetworkResourceType: NetworkResource>(
+    pub fn issue_command<NetworkResourceType: NetworkResource<WorldType>>(
         &mut self,
         command: WorldType::CommandType,
         net: &mut NetworkResourceType,
@@ -151,7 +150,7 @@ impl<WorldType: World> Server<WorldType> {
 
     /// Perform the next update. You would typically call this in your game engine's update loop of
     /// some kind.
-    pub fn update<NetworkResourceType: NetworkResource>(
+    pub fn update<NetworkResourceType: NetworkResource<WorldType>>(
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
@@ -168,10 +167,10 @@ impl<WorldType: World> Server<WorldType> {
         let mut new_commands = Vec::new();
         let mut clock_syncs = Vec::new();
         for (handle, mut connection) in net.connections() {
-            while let Some(command) = connection.recv::<Timestamped<WorldType::CommandType>>() {
+            while let Some(command) = connection.recv_command() {
                 new_commands.push((command, handle));
             }
-            while let Some(mut clock_sync_message) = connection.recv::<ClockSyncMessage>() {
+            while let Some(mut clock_sync_message) = connection.recv_clock_sync() {
                 trace!("Replying to clock sync message. client_id: {}", handle);
                 clock_sync_message.server_seconds_since_startup = seconds_since_startup;
                 clock_sync_message.client_id = handle;

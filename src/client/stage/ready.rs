@@ -138,7 +138,7 @@ where
 {
     /// Issue a command from this client's player to the world. The command will be scheduled
     /// to the current simulating timestamp (the previously completed timestamp + 1).
-    pub fn issue_command<NetworkResourceType: NetworkResource>(
+    pub fn issue_command<NetworkResourceType: NetworkResource<WorldType>>(
         &mut self,
         command: WorldType::CommandType,
         net: &mut NetworkResourceType,
