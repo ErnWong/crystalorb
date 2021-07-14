@@ -103,11 +103,11 @@ pub trait NetworkResource<WorldType: World> {
 /// Representation of a connection to a specific remote machine that allows CrystalOrb to send and
 /// receive messages.
 pub trait Connection<WorldType: World> {
-    /// Interface for CrystalOrb to receive the next Command message.
+    /// Interface for CrystalOrb to receive the next command message.
     fn recv_command(&mut self) -> Option<Timestamped<WorldType::CommandType>>;
-    /// Interface for CrystalOrb to receive the next Snapshot message.
+    /// Interface for CrystalOrb to receive the next snapshot message.
     fn recv_snapshot(&mut self) -> Option<Timestamped<WorldType::SnapshotType>>;
-    /// Interface for CrystalOrb to receive the next ClockSync message.
+    /// Interface for CrystalOrb to receive the next clock sync message.
     fn recv_clock_sync(&mut self) -> Option<ClockSyncMessage>;
 
     /// Interface for CrystalOrb to try sending a message to the connection's destination. If
