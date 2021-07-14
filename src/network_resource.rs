@@ -4,6 +4,8 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::{error::Error, fmt::Debug};
 
+use crate::{clocksync::ClockSyncMessage, timestamp::Timestamped, world::World};
+
 /// Used for identifying each connection. Note that this is how the
 /// [`Server`](crate::server::Server) determines the
 /// [`client_id`](crate::client::stage::Ready::client_id) for each client, so they should be unique
@@ -32,12 +34,12 @@ pub type ConnectionHandleType = usize;
 /// [`bevy_networking_turbulence`](https://github.com/smokku/bevy_networking_turbulence) plugin. See
 /// [`crystalorb-bevy-networking-turbulence`](https://github.com/ErnWong/crystalorb/tree/crates/crystalorb-bevy-networking-turbulence)
 /// for an example for integrating with `bevy_networking_turbulence`.
-pub trait NetworkResource {
+pub trait NetworkResource<WorldType: World> {
     /// The [`Connection`] structure that CrystalOrb will use to send/receive messages from a
     /// specific remote machine. This may probably be a wrapper to a mutable reference to some
     /// connection type that is used by your external networking library of choice, in which
     /// case a generic lifetime parameter is provided here that you can use.
-    type ConnectionType<'a>: Connection;
+    type ConnectionType<'a>: Connection<WorldType>;
 
     /// Iterate through the available connections. For servers, this would be the list of current
     /// client connections that are still alive. For the client, this would only contain the
@@ -100,14 +102,13 @@ pub trait NetworkResource {
 
 /// Representation of a connection to a specific remote machine that allows CrystalOrb to send and
 /// receive messages.
-pub trait Connection {
-    /// Interface for CrystalOrb to request the next message received, if there is one.
-    ///
-    /// CrystalOrb will invoke this method with the three message types as specified in
-    /// [`NetworkResource`].
-    fn recv<MessageType>(&mut self) -> Option<MessageType>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static;
+pub trait Connection<WorldType: World> {
+    /// Interface for CrystalOrb to receive the next command message.
+    fn recv_command(&mut self) -> Option<Timestamped<WorldType::CommandType>>;
+    /// Interface for CrystalOrb to receive the next snapshot message.
+    fn recv_snapshot(&mut self) -> Option<Timestamped<WorldType::SnapshotType>>;
+    /// Interface for CrystalOrb to receive the next clock sync message.
+    fn recv_clock_sync(&mut self) -> Option<ClockSyncMessage>;
 
     /// Interface for CrystalOrb to try sending a message to the connection's destination. If
     /// unsuccessful, the message should be returned. Otherwise, `None` should be returned.

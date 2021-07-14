@@ -261,7 +261,7 @@ impl<T> DelayedQueue<T> {
 
 pub struct MockConnectionRef<'a>(&'a mut MockConnection);
 
-impl NetworkResource for MockNetwork {
+impl<WorldType: World> NetworkResource<WorldType> for MockNetwork {
     type ConnectionType<'a> = MockConnectionRef<'a>;
 
     fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
@@ -283,14 +283,26 @@ impl NetworkResource for MockNetwork {
     }
 }
 
-impl<'a> Connection for MockConnectionRef<'a> {
-    fn recv<MessageType>(&mut self) -> Option<MessageType>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
+impl<'a, WorldType: World> Connection<WorldType> for MockConnectionRef<'a> {
+    fn recv_command(&mut self) -> Option<Timestamped<WorldType::CommandType>> {
         assert!(self.0.is_connected.get());
-        self.0.get_mut::<MessageType>().recv()
+        self.0
+            .get_mut::<Timestamped<WorldType::CommandType>>()
+            .recv()
     }
+
+    fn recv_snapshot(&mut self) -> Option<Timestamped<WorldType::SnapshotType>> {
+        assert!(self.0.is_connected.get());
+        self.0
+            .get_mut::<Timestamped<WorldType::SnapshotType>>()
+            .recv()
+    }
+
+    fn recv_clock_sync(&mut self) -> Option<ClockSyncMessage> {
+        assert!(self.0.is_connected.get());
+        self.0.get_mut::<ClockSyncMessage>().recv()
+    }
+
     fn send<MessageType>(&mut self, message: MessageType) -> Option<MessageType>
     where
         MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,

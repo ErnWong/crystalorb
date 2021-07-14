@@ -143,7 +143,7 @@ impl<WorldType: World> Client<WorldType> {
     ///     # break;
     /// }
     /// ```
-    pub fn update<NetworkResourceType: NetworkResource>(
+    pub fn update<NetworkResourceType: NetworkResource<WorldType>>(
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
@@ -268,7 +268,7 @@ impl<WorldType: World> ActiveClient<WorldType> {
     }
 
     /// Perform the next update for the current rendering frame.
-    pub fn update<NetworkResourceType: NetworkResource>(
+    pub fn update<NetworkResourceType: NetworkResource<WorldType>>(
         &mut self,
         delta_seconds: f64,
         seconds_since_startup: f64,
@@ -278,10 +278,10 @@ impl<WorldType: World> ActiveClient<WorldType> {
             .update(delta_seconds, seconds_since_startup, net);
 
         for (_, mut connection) in net.connections() {
-            while let Some(command) = connection.recv::<Timestamped<WorldType::CommandType>>() {
+            while let Some(command) = connection.recv_command() {
                 self.timekeeping_simulations.receive_command(&command);
             }
-            while let Some(snapshot) = connection.recv::<Timestamped<WorldType::SnapshotType>>() {
+            while let Some(snapshot) = connection.recv_snapshot() {
                 self.timekeeping_simulations.receive_snapshot(snapshot);
             }
         }
