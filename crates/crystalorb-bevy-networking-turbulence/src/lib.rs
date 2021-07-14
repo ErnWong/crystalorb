@@ -31,7 +31,7 @@ pub use crystalorb;
 pub struct WrappedNetworkResource<'a>(pub &'a mut NetworkResource);
 pub struct WrappedConnection<'a>(pub &'a mut MessageChannels);
 
-impl<'a> NetworkResourceTrait for WrappedNetworkResource<'a> {
+impl<'a, WorldType: World> NetworkResourceTrait<WorldType> for WrappedNetworkResource<'a> {
     type ConnectionType<'b> = WrappedConnection<'b>;
 
     fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
@@ -53,11 +53,16 @@ impl<'a> NetworkResourceTrait for WrappedNetworkResource<'a> {
     }
 }
 
-impl<'a> ConnectionTrait for WrappedConnection<'a> {
-    fn recv<MessageType>(&mut self) -> Option<MessageType>
-    where
-        MessageType: Debug + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    {
+impl<'a, WorldType: World> ConnectionTrait<WorldType> for WrappedConnection<'a> {
+    fn recv_command(&mut self) -> Option<Timestamped<WorldType::CommandType>> {
+        self.0.recv()
+    }
+
+    fn recv_snapshot(&mut self) -> Option<Timestamped<WorldType::SnapshotType>> {
+        self.0.recv()
+    }
+
+    fn recv_clock_sync(&mut self) -> Option<ClockSyncMessage> {
         self.0.recv()
     }
 
