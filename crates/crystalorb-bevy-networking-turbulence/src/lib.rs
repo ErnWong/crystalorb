@@ -1,5 +1,4 @@
 #![feature(generic_associated_types)]
-#![feature(extended_key_value_attributes)]
 #![doc = include_str!("../README.markdown")]
 
 use bevy_app::{AppBuilder, EventReader, EventWriter, Plugin};

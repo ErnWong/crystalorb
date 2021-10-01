@@ -553,7 +553,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
             this.base_command_buffer.drain_up_to(snapshot.timestamp());
 
             new_world_simulation
-                .apply_completed_snapshot(&snapshot, this.base_command_buffer.clone());
+                .apply_completed_snapshot(snapshot, this.base_command_buffer.clone());
 
             if new_world_simulation.last_completed_timestamp()
                 > old_world_simulation.last_completed_timestamp()

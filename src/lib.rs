@@ -1,13 +1,14 @@
-#![feature(extended_key_value_attributes)]
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(map_first_last)]
-#![feature(const_generics)]
+#![feature(adt_const_params)]
 #![feature(generic_associated_types)]
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
 #![warn(clippy::pedantic, clippy::cargo, clippy::unwrap_used)]
 #![allow(
+    incomplete_features,
     clippy::must_use_candidate,
+    clippy::redundant_feature_names, // Required because of feature names in Bevy turbulence plugin
     clippy::too_many_lines,
     clippy::module_name_repetitions,
     clippy::cast_lossless, // TODO: Fix these. See issue #1

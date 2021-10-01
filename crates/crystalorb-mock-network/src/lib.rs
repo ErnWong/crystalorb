@@ -1,5 +1,4 @@
 #![feature(generic_associated_types)]
-#![feature(extended_key_value_attributes)]
 #![doc = include_str!("../README.markdown")]
 
 use crystalorb::{
@@ -268,7 +267,7 @@ impl<WorldType: World> NetworkResource<WorldType> for MockNetwork {
         self.connections
             .get_mut(&handle)
             .filter(|connection| connection.is_connected.get())
-            .map(|connection| MockConnectionRef(connection))
+            .map(MockConnectionRef)
     }
 
     fn connections<'a>(

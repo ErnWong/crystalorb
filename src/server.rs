@@ -115,7 +115,7 @@ impl<WorldType: World> Server<WorldType> {
         // && command.timestamp() >= self.timekeeping_simulation.last_completed_timestamp()
         // && command.timestamp() <= self.estimated_client_simulating_timestamp()
         {
-            self.apply_validated_command(&command, Some(command_source), net);
+            self.apply_validated_command(command, Some(command_source), net);
         }
     }
 
