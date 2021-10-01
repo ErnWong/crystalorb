@@ -79,8 +79,7 @@ where
 
     /// Get the current display state that can be used to render the client's screen.
     pub fn display_state(&self) -> &Tweened<WorldType::DisplayStateType> {
-        &self
-            .0
+        self.0
             .borrow()
             .timekeeping_simulations
             .display_state
