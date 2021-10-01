@@ -267,7 +267,7 @@ impl<WorldType: World> NetworkResource<WorldType> for MockNetwork {
         self.connections
             .get_mut(&handle)
             .filter(|connection| connection.is_connected.get())
-            .map(|connection| MockConnectionRef(connection))
+            .map(MockConnectionRef)
     }
 
     fn connections<'a>(
