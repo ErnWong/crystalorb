@@ -8,6 +8,7 @@
 #![allow(
     incomplete_features,
     clippy::must_use_candidate,
+    clippy::redundant_feature_names, // Required because of feature names in Bevy turbulence plugin
     clippy::too_many_lines,
     clippy::module_name_repetitions,
     clippy::cast_lossless, // TODO: Fix these. See issue #1
