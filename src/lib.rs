@@ -1,4 +1,3 @@
-#![feature(extended_key_value_attributes)]
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(map_first_last)]
 #![feature(adt_const_params)]
