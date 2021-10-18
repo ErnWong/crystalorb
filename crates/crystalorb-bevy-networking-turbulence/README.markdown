@@ -10,10 +10,10 @@ At the moment, you still need to put all your physics and real-time game logic i
 
 ## Usage
 
-- Add the `CrystalOrbClientPlugin` bevy [plugin](https://bevyengine.org/learn/getting-started/plugins/) into your client bevy app.
-- Add the `CrystalOrbServerPlugin` bevy [plugin](https://bevyengine.org/learn/getting-started/plugins/) into your server bevy app.
-- Access the `CrystalOrb::Client` on your client app as a bevy [resource](https://bevyengine.org/learn/getting-started/resources/).
-- Access the `CrystalOrb::Server` on your server app as a bevy [resource](https://bevyengine.org/learn/getting-started/resources/).
+- Add the `CrystalOrbClientPlugin` bevy [plugin](https://bevyengine.org/learn/book/getting-started/plugins/) into your client bevy app.
+- Add the `CrystalOrbServerPlugin` bevy [plugin](https://bevyengine.org/learn/book/getting-started/plugins/) into your server bevy app.
+- Access the `CrystalOrb::Client` on your client app as a bevy [resource](https://bevyengine.org/learn/book/getting-started/resources/).
+- Access the `CrystalOrb::Server` on your server app as a bevy [resource](https://bevyengine.org/learn/book/getting-started/resources/).
 
 Heres an example client:
 
