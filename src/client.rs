@@ -649,7 +649,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                         self.infer_current_reconciliation_status(),
                         ReconciliationStatus::Blending(_) | ReconciliationStatus::AwaitingSnapshot,
                     ),
-                    "Unexpected status change into: {:?}",
+                    "Unexpected status change from Blending to: {:?}",
                     self.infer_current_reconciliation_status()
                 );
             }
@@ -671,7 +671,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                             self.infer_current_reconciliation_status(),
                             ReconciliationStatus::Blending(t) if t == 0.0
                         ),
-                        "Unexpected status change into: {:?}",
+                        "Unexpected status change from AwaitingSnapshot to: {:?}",
                         self.infer_current_reconciliation_status()
                     );
                 } else {
@@ -683,7 +683,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                             self.infer_current_reconciliation_status(),
                             ReconciliationStatus::AwaitingSnapshot
                         ),
-                        "Unexpected status change into: {:?}",
+                        "Unexpected status change from AwaitingSnapshot to: {:?}",
                         self.infer_current_reconciliation_status()
                     );
                 }
@@ -706,7 +706,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                         self.infer_current_reconciliation_status(),
                         ReconciliationStatus::Fastforwarding(FastforwardingHealth::Healthy)
                     ),
-                    "Unexpected status change into: {:?}",
+                    "Unexpected status change from Fastforwarding(Obsolete) to: {:?}",
                     self.infer_current_reconciliation_status()
                 );
             }
@@ -723,7 +723,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                         self.infer_current_reconciliation_status(),
                         ReconciliationStatus::Blending(t) if t == 0.0
                     ),
-                    "Unexpected status change into: {:?}",
+                    "Unexpected status change from Fastforwarding(Healthy) to: {:?}",
                     self.infer_current_reconciliation_status()
                 );
             }
@@ -747,7 +747,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                         self.infer_current_reconciliation_status(),
                         ReconciliationStatus::Blending(t) if t == 0.0
                     ),
-                    "Unexpected status change into: {:?}",
+                    "Unexpected status change from Fastforwarding(Overshot) to: {:?}",
                     self.infer_current_reconciliation_status()
                 );
             }
