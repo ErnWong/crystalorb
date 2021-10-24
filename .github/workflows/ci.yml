@@ -39,8 +39,6 @@ jobs:
         with:
           args: "--ignore-tests --exclude-files examples --exclude-files crates --run-types Doctests Tests"
       - uses: codecov/codecov-action@v2
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
       - uses: actions/upload-artifact@v1
         with:
           name: code-coverage-report
