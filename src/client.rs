@@ -649,7 +649,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                         self.infer_current_reconciliation_status(),
                         ReconciliationStatus::Blending(_) | ReconciliationStatus::AwaitingSnapshot,
                     ),
-                    "Unexpected status change into: {:?}",
+                    "Unexpected status change from Blending to: {:?}",
                     self.infer_current_reconciliation_status()
                 );
             }
@@ -671,7 +671,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                             self.infer_current_reconciliation_status(),
                             ReconciliationStatus::Blending(t) if t == 0.0
                         ),
-                        "Unexpected status change into: {:?}",
+                        "Unexpected status change from AwaitingSnapshot to: {:?}",
                         self.infer_current_reconciliation_status()
                     );
                 } else {
@@ -683,7 +683,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                             self.infer_current_reconciliation_status(),
                             ReconciliationStatus::AwaitingSnapshot
                         ),
-                        "Unexpected status change into: {:?}",
+                        "Unexpected status change from AwaitingSnapshot to: {:?}",
                         self.infer_current_reconciliation_status()
                     );
                 }
@@ -705,8 +705,11 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                     matches!(
                         self.infer_current_reconciliation_status(),
                         ReconciliationStatus::Fastforwarding(FastforwardingHealth::Healthy)
+                    ) || matches!(
+                        self.infer_current_reconciliation_status(),
+                        ReconciliationStatus::Blending(t) if t == 0.0
                     ),
-                    "Unexpected status change into: {:?}",
+                    "Unexpected status change from Fastforwarding(Obsolete) to: {:?}",
                     self.infer_current_reconciliation_status()
                 );
             }
@@ -723,7 +726,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                         self.infer_current_reconciliation_status(),
                         ReconciliationStatus::Blending(t) if t == 0.0
                     ),
-                    "Unexpected status change into: {:?}",
+                    "Unexpected status change from Fastforwarding(Healthy) to: {:?}",
                     self.infer_current_reconciliation_status()
                 );
             }
@@ -747,7 +750,7 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                         self.infer_current_reconciliation_status(),
                         ReconciliationStatus::Blending(t) if t == 0.0
                     ),
-                    "Unexpected status change into: {:?}",
+                    "Unexpected status change from Fastforwarding(Overshot) to: {:?}",
                     self.infer_current_reconciliation_status()
                 );
             }
@@ -829,5 +832,110 @@ impl<WorldType: World> FixedTimestepper for ClientWorldSimulations<WorldType> {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{command::Command, world::DisplayState};
+    use quickcheck::{Arbitrary, Gen};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Serialize, Deserialize, Debug)]
+    enum SimulatedEvent {
+        ReceiveSnapshot { timestamp_offset: i16 },
+        Update { delta_seconds: f64 },
+    }
+
+    impl Arbitrary for SimulatedEvent {
+        fn arbitrary(g: &mut Gen) -> Self {
+            if bool::arbitrary(g) {
+                SimulatedEvent::ReceiveSnapshot {
+                    timestamp_offset: i16::arbitrary(g),
+                }
+            } else {
+                SimulatedEvent::Update {
+                    delta_seconds: f64::arbitrary(g),
+                }
+            }
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    struct EmptyCommand;
+
+    impl Command for EmptyCommand {}
+
+    #[derive(Default, Serialize, Deserialize, Debug, Clone)]
+    struct EmptyWorld;
+
+    impl Stepper for EmptyWorld {
+        fn step(&mut self) {}
+    }
+
+    impl World for EmptyWorld {
+        type CommandType = EmptyCommand;
+        type SnapshotType = EmptyWorld;
+        type DisplayStateType = EmptyWorld;
+
+        fn command_is_valid(_command: &Self::CommandType, _client_id: usize) -> bool {
+            true
+        }
+
+        fn apply_command(&mut self, _command: &Self::CommandType) {}
+
+        fn apply_snapshot(&mut self, _snapshot: Self::SnapshotType) {}
+
+        fn snapshot(&self) -> Self::SnapshotType {
+            EmptyWorld
+        }
+
+        fn display_state(&self) -> Self::DisplayStateType {
+            EmptyWorld
+        }
+    }
+
+    impl DisplayState for EmptyWorld {
+        fn from_interpolation(_state1: &Self, _state2: &Self, _t: f64) -> Self {
+            Self
+        }
+    }
+
+    #[quickcheck_macros::quickcheck]
+    fn test_all_possible_reconciliation_status_transitions_are_expected(
+        events: Vec<SimulatedEvent>,
+    ) {
+        // GIVEN a ClientWorldSimulations wrapped in a TimeKeeper.
+        let config = Config::default();
+        let mut timekeeping_simulations = TimeKeeper::<
+            ClientWorldSimulations<EmptyWorld>,
+            { TerminationCondition::FirstOvershoot },
+        >::new(
+            ClientWorldSimulations::<EmptyWorld>::new(config.clone(), Timestamp::default()),
+            config,
+        );
+        let mut seconds_since_startup = 0.0f64;
+
+        // WHEN the ClientWorldSimulations is subject to any timing sequence of snapshots and
+        // update.
+        for event in events {
+            match event {
+                SimulatedEvent::ReceiveSnapshot { timestamp_offset } => {
+                    let timestamp = Timestamp::default() + timestamp_offset;
+                    timekeeping_simulations
+                        .receive_snapshot(Timestamped::new(EmptyWorld, timestamp));
+                }
+                SimulatedEvent::Update { delta_seconds } => {
+                    seconds_since_startup += delta_seconds;
+                    timekeeping_simulations.update(delta_seconds, seconds_since_startup);
+                }
+            }
+        }
+
+        // THEN the ClientWorldSimulations should be able to process them gracefully without
+        // causing a panic:
+        //  - All invariants that are asserted during runtime are satisfied. In particular:
+        //     - All ClientWorldSimulations reconciliation status transitions are expected.
     }
 }
