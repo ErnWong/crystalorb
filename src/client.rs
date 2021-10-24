@@ -906,6 +906,7 @@ mod tests {
     fn test_all_possible_reconciliation_status_transitions_are_expected(
         events: Vec<SimulatedEvent>,
     ) {
+        // GIVEN a ClientWorldSimulations wrapped in a TimeKeeper.
         let config = Config::default();
         let mut timekeeping_simulations = TimeKeeper::<
             ClientWorldSimulations<EmptyWorld>,
@@ -915,6 +916,9 @@ mod tests {
             config,
         );
         let mut seconds_since_startup = 0.0f64;
+
+        // WHEN the ClientWorldSimulations is subject to any timing sequence of snapshots and
+        // update.
         for event in events {
             match event {
                 SimulatedEvent::ReceiveSnapshot { timestamp_offset } => {
@@ -928,5 +932,10 @@ mod tests {
                 }
             }
         }
+
+        // THEN the ClientWorldSimulations should be able to process them gracefully without
+        // causing a panic:
+        //  - All invariants that are asserted during runtime are satisfied. In particular:
+        //     - All ClientWorldSimulations reconciliation status transitions are expected.
     }
 }
