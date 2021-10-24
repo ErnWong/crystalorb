@@ -705,6 +705,9 @@ impl<WorldType: World> Stepper for ClientWorldSimulations<WorldType> {
                     matches!(
                         self.infer_current_reconciliation_status(),
                         ReconciliationStatus::Fastforwarding(FastforwardingHealth::Healthy)
+                    ) || matches!(
+                        self.infer_current_reconciliation_status(),
+                        ReconciliationStatus::Blending(t) if t == 0.0
                     ),
                     "Unexpected status change from Fastforwarding(Obsolete) to: {:?}",
                     self.infer_current_reconciliation_status()
