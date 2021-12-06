@@ -261,7 +261,11 @@ impl<T> DelayedQueue<T> {
 pub struct MockConnectionRef<'a>(&'a mut MockConnection);
 
 impl<WorldType: World> NetworkResource<WorldType> for MockNetwork {
-    type ConnectionType<'a> = MockConnectionRef<'a>;
+    type ConnectionType<'a>
+    where
+        Self: 'a,
+        WorldType: 'a,
+    = MockConnectionRef<'a>;
 
     fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
         self.connections

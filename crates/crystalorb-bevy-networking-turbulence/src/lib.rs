@@ -31,7 +31,11 @@ pub struct WrappedNetworkResource<'a>(pub &'a mut NetworkResource);
 pub struct WrappedConnection<'a>(pub &'a mut MessageChannels);
 
 impl<'a, WorldType: World> NetworkResourceTrait<WorldType> for WrappedNetworkResource<'a> {
-    type ConnectionType<'b> = WrappedConnection<'b>;
+    type ConnectionType<'b>
+    where
+        Self: 'b,
+        WorldType: 'b,
+    = WrappedConnection<'b>;
 
     fn get_connection(&mut self, handle: ConnectionHandleType) -> Option<Self::ConnectionType<'_>> {
         self.0
