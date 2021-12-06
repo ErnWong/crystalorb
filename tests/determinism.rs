@@ -7,7 +7,7 @@ use crystalorb::{
     Config, TweeningMethod,
 };
 use pretty_assertions::assert_eq;
-use test_env_log::test;
+use test_log::test;
 
 mod common;
 

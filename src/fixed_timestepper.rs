@@ -267,7 +267,7 @@ mod tests {
     use crate::timestamp;
     use float_cmp::approx_eq;
     use itertools::iproduct;
-    use test_env_log::test;
+    use test_log::test;
     use tracing::info;
 
     const CONFIG: Config = Config::new();

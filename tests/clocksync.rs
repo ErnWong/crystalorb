@@ -1,7 +1,7 @@
 #![feature(generic_associated_types)]
 
 use crystalorb::{client::stage::Stage, Config, TweeningMethod};
-use test_env_log::test;
+use test_log::test;
 
 mod common;
 
