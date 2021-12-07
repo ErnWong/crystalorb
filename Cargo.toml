@@ -1,6 +1,6 @@
 [package]
 name = "crystalorb"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Ernest Wong <sudo@ernestwong.nz>"]
 categories = ["games", "simulation"]
 description = "Network-agnostic, high-level game networking library"
