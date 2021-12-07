@@ -39,7 +39,10 @@ pub trait NetworkResource<WorldType: World> {
     /// specific remote machine. This may probably be a wrapper to a mutable reference to some
     /// connection type that is used by your external networking library of choice, in which
     /// case a generic lifetime parameter is provided here that you can use.
-    type ConnectionType<'a>: Connection<WorldType>;
+    type ConnectionType<'a>: Connection<WorldType>
+    where
+        Self: 'a,
+        WorldType: 'a;
 
     /// Iterate through the available connections. For servers, this would be the list of current
     /// client connections that are still alive. For the client, this would only contain the
