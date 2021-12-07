@@ -52,8 +52,31 @@ Doubt it. This is my first time doing game networking, so expect it to be all gl
 - Gabriel Gambetta's [Fast-Paced Multiplayer](https://www.gabrielgambetta.com/client-server-game-architecture.html) series.
 - The GDC Talk [It IS Rocket Science! The Physics of Rocket League Detailed](https://www.youtube.com/watch?v=ueEmiDM94IE) by Jared Cone.
 - The GDC Talk [Overwatch Gameplay Architecture and Netcode](https://www.youtube.com/watch?v=W3aieHjyNvw) by Timothy Ford.
+- An informational page in the [Networked Replication RFC](https://github.com/maniwani/rfcs/blob/main/replication_concepts.md) by @maniwani.
 
-(Yes, those were where I absorbed most of my small game-networking knowledge from. Yes, their designs are probably much better than crystalorb)
+(Yes, those were where I absorbed most of my small game-networking knowledge from. Yes, their designs are probably much better than CrystalOrb)
+
+## Similar and related projects
+
+CrystalOrb is a client-server rollback library, and there are other kinds of rollback/networking libraries out there you should check out! Here are some other rollback libraries by other authors in the rust community you might be interested in:
+
+- [GGRS](https://github.com/gschup/ggrs) by @gschup is a P2P rollback library based on the GGPO network SDK and has a [Bevy plugin](https://github.com/gschup/bevy_ggrs).
+- [backroll-rs](https://github.com/HouraiTeahouse/backroll-rs) from @HouraiTeahouse is also a P2P rollback library based on the GGPO network SDK and also has a [Bevy plugin](https://github.com/HouraiTeahouse/backroll-rs/tree/main/bevy_backroll).
+- [bevy_rollback](https://github.com/jamescarterbell/bevy_rollback) by @jamescarterbell is a rollback library made for the [Bevy game engine](https://bevyengine.org/).
+- [evoke](https://github.com/arcana-engine/evoke) from @arcana-engine is a client-server state replication library with delta compression.
+- [orb](https://github.com/smokku/soldank/tree/581b4f446b2cf5264f4c25f4cc2eaa1c0bfc192a/shared/src/orb) by @smokku looks into [extracting the fundamental part](https://github.com/ErnWong/crystalorb/pull/5#issuecomment-882757283) of CrystalOrb out into its own module.
+- [snowglobe](https://github.com/hastearcade/snowglobe) from @hastearcade is a JavaScript port of CrystalOrb.
+- The Bevy game engine has a [Networked Replication RFC](https://github.com/bevyengine/rfcs/pull/19) currently being drafted by @maniwani. It contains very [insightful information](https://github.com/maniwani/rfcs/blob/main/replication_concepts.md) about fast-paced game networking techniques (i.e. state replication).
+
+<i><sub>Your project's not listed? Feel free to make a PR or [submit](https://github.com/ErnWong/crystalorb/issues/new/choose) an issue, and I'd be happy to promote it.</sub></i>
+
+## More examples
+
+- [Demo](https://github.com/ErnWong/crystalorb/blob/master/examples/demo) by @ErnWong is hard-coded for only two clients ([source](https://github.com/ErnWong/crystalorb/tree/master/examples/demo)).
+- [orbgame](https://github.com/vilcans/orbgame) by @vilcans is a [Bevy](https://bevyengine.org/) demo that accepts more than two clients.
+- [Dango Tribute](https://github.com/ErnWong/dango-tribute) by @ErnWong is a [Bevy](https://bevyengine.org/) interactive experience with multiplayer blob physics. CrystalOrb was the networking code that was eventually extracted out from that project.
+
+<i><sub>Your project's not listed? Feel free to make a PR or [submit](https://github.com/ErnWong/crystalorb/issues/new/choose) an issue, and I'd be happy to promote it.</sub></i>
 
 ## Unstable Rust Features
 
