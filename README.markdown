@@ -5,7 +5,7 @@
   <h1>crystalorb</h1>
   <p><strong>Network-agnostic, high-level game networking library<br>for client-side prediction and server reconciliation.</strong></p>
   <p>
-    <a href="https://crates.io/crates/crystalorb"><img alt="crates.io" src="https://meritbadge.herokuapp.com/crystalorb"></a>
+    <a href="https://crates.io/crates/crystalorb"><img alt="crates.io" src="https://img.shields.io/crates/v/crystalorb.svg"></a>
     <a href="https://docs.rs/crystalorb"><img alt="docs.rs" src="https://docs.rs/crystalorb/badge.svg"></a>
     <a href="https://github.com/ErnWong/crystalorb/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/ErnWong/crystalorb/actions/workflows/ci.yml/badge.svg"></a>
     <a href="https://github.com/ErnWong/crystalorb/actions/workflows/cd.yml"><img alt="cd" src="https://github.com/ErnWong/crystalorb/actions/workflows/cd.yml/badge.svg"></a>
