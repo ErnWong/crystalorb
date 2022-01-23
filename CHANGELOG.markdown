@@ -1,6 +1,7 @@
 ## Next
 
-1. Updated to rust 2021 edition.
+1. Updated all crates to rust 2021 edition. [#27](https://github.com/ErnWong/crystalorb/pull/27)
+2. Updated `crystalorb-bevy-networking-turbulence` plugin crate to bevy 0.6. [#26](https://github.com/ErnWong/crystalorb/issues/26) [#27](https://github.com/ErnWong/crystalorb/pull/27)
 
 ## v0.3.0
 
