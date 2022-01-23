@@ -1,3 +1,7 @@
+## Next
+
+1. Updated to rust 2021 edition.
+
 ## v0.3.0
 
 ### Breaking Changes
