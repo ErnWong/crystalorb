@@ -16,14 +16,14 @@ use-udp = ["bevy_networking_turbulence/use-udp"]
 use-webrtc = ["bevy_networking_turbulence/use-webrtc"]
 
 [dependencies]
-bevy_app = "0.5"
-bevy_ecs = "0.5"
-bevy_core = "0.5"
-bevy_networking_turbulence = {version = "0.3.0", default-features = false}
+bevy_app = "0.6"
+bevy_ecs = "0.6"
+bevy_core = "0.6"
+bevy_networking_turbulence = {version = "0.4.1", default-features = false}
 crystalorb = {version = "0.3.0", path="../../"}
 serde = {version = "1.0.118", features = ["derive"]}
 turbulence = "0.3"
 
 [dev-dependencies]
-bevy = {version = "0.5", default-features = false}
+bevy = {version = "0.6", default-features = false}
 crystalorb-demo = {path = "../../examples/demo"}

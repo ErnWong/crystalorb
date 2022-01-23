@@ -45,7 +45,7 @@ struct PlayerInputState {
   jump: bool,
 }
 
-fn player_input(
+fn player_input_system(
   mut state: Local<PlayerInputState>,
   input: Res<Input<KeyCode>>,
   mut client: ResMut<Client<DemoWorld>>,
@@ -71,7 +71,7 @@ fn player_input(
 }
 
 fn main() {
-  App::build()
+  App::new()
     // You can optionally override some message channel settings
     // There is `CommandChannelSettings`, `SnapshotChannelSettings`, and `ClockSyncChannelSettings`
     // Make sure you apply the same settings for both client and server.
@@ -99,7 +99,7 @@ fn main() {
     ))
     .add_plugins(DefaultPlugins)
     .add_plugin(CrystalOrbClientPlugin::<DemoWorld>::new(Config::default()))
-    .add_system(player_input.system())
+    .add_system(player_input_system)
     .run();
 }
 ```
@@ -122,7 +122,7 @@ use crystalorb_bevy_networking_turbulence::{
 use std::time::Duration;
 
 fn main() {
-  App::build()
+  App::new()
     // You can optionally override some message channel settings
     // There is `CommandChannelSettings`, `SnapshotChannelSettings`, and `ClockSyncChannelSettings`
     // Make sure you apply the same settings for both client and server.

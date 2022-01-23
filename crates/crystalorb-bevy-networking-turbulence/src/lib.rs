@@ -1,7 +1,7 @@
 #![feature(generic_associated_types)]
 #![doc = include_str!("../README.markdown")]
 
-use bevy_app::{AppBuilder, EventReader, EventWriter, Plugin};
+use bevy_app::{App, EventReader, EventWriter, Plugin};
 use bevy_core::Time;
 use bevy_ecs::prelude::*;
 use bevy_networking_turbulence::{
@@ -242,7 +242,7 @@ impl<WorldType: World> CrystalOrbServerPlugin<WorldType> {
 }
 
 impl<WorldType: World> Plugin for CrystalOrbServerPlugin<WorldType> {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_plugin(NetworkingPlugin::default())
             .insert_resource(Server::<WorldType>::new(self.config.clone(), 0.0))
             .init_resource::<CommandChannelSettings>()
@@ -313,7 +313,7 @@ impl<WorldType: World> CrystalOrbClientPlugin<WorldType> {
 }
 
 impl<WorldType: World> Plugin for CrystalOrbClientPlugin<WorldType> {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_plugin(NetworkingPlugin::default())
             .insert_resource(Client::<WorldType>::new(self.config.clone()))
             .init_resource::<CommandChannelSettings>()
