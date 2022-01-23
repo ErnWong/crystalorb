@@ -14,6 +14,9 @@
       devShell = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
           rustup
+          wasm-pack
+          pkgconfig
+          openssl
         ];
       };
     });
