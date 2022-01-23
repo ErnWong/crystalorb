@@ -17,6 +17,7 @@
           wasm-pack
           pkgconfig
           openssl
+          simple-http-server
         ];
       };
     });
