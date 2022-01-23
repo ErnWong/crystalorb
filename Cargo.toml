@@ -4,7 +4,7 @@ version = "0.3.0"
 authors = ["Ernest Wong <sudo@ernestwong.nz>"]
 categories = ["games", "simulation"]
 description = "Network-agnostic, high-level game networking library"
-edition = "2018"
+edition = "2021"
 keywords = ["netcode"]
 license = "Apache-2.0"
 readme = "README.markdown"
@@ -27,6 +27,7 @@ crystalorb-mock-network = {path = "./crates/crystalorb-mock-network"}
 crystalorb-demo = {path = "./examples/demo"}
 
 [workspace]
+resolver = "2"
 members = [
   "examples/demo",
   "crates/crystalorb-mock-network",
